@@ -14,9 +14,9 @@ def home():
     return """
     <h2>Web Application Portal</h2>
     <ul>
-        <li><a href="/app1/">Payment System</a></li>
-        <li><a href="/app2/">HR System</a></li>
-        <li><a href="/app3/">Inventory System</a></li>
+        <li><a href="/app1/">liqudity Schedule</a></li>
+        <li><a href="/app2/">Asset Register</a></li>
+        <li><a href="/app3/">Prepayment</a></li>
     </ul>
     """
 
