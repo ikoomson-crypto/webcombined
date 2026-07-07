@@ -1,0 +1,901 @@
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // ---------- GLOBALS ----------
+    let dataTable, assignmentsTable, returnFormsTable, usersTable, unassignedTable, historyTable;
+    let allAssets = [], allAssignments = [];
+    let selectedAssets = new Set();
+    let currentCompany = null;
+
+    // ---------- HELPERS ----------
+    function formatNumber(n) { return n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+    function escapeHtml(str) { if(!str) return ''; return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+    // ---------- SIDEBAR / NAV ----------
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('collapsed');
+        document.getElementById('mainContent').classList.toggle('expanded');
+        document.querySelector('.toggle-sidebar').classList.toggle('collapsed');
+    }
+    function toggleMenuGroup(id) {
+        const el = document.getElementById(id); const arrow = event.currentTarget.querySelector('.menu-arrow i');
+        el.classList.toggle('collapsed');
+        arrow.classList.toggle('fa-chevron-down'); arrow.classList.toggle('fa-chevron-up');
+    }
+    function navigateTo(view) {
+        document.querySelectorAll('.menu-item').forEach(i=>i.classList.remove('active'));
+        if(event?.target) { const mi=event.target.closest('.menu-item'); if(mi) mi.classList.add('active'); }
+        ['dashboard','assets','categories','users','assignments','returnForms','downloads','unassignedAssets','assetHistory'].forEach(v=> document.getElementById(v+'View').style.display='none');
+        if(view==='dashboard') { document.getElementById('dashboardView').style.display='block'; loadDashboardData(); }
+        else if(view==='assets') { document.getElementById('assetsView').style.display='block'; loadAssets(); }
+        else if(view==='categories') { document.getElementById('categoriesView').style.display='block'; loadCategories(); }
+        else if(view==='users') { document.getElementById('usersView').style.display='block'; loadUsers(); }
+        else if(view==='assignments') { document.getElementById('assignmentsView').style.display='block'; loadAssignments(); }
+        else if(view==='returnForms') { document.getElementById('returnFormsView').style.display='block'; loadReturnForms(); }
+        else if(view==='downloads') { document.getElementById('downloadsView').style.display='block'; }
+        else if(view==='unassignedAssets') { document.getElementById('unassignedAssetsView').style.display='block'; loadUnassignedAssets(); }
+        else if(view==='assetHistory') { document.getElementById('assetHistoryView').style.display='block'; loadAssetHistory(); }
+        else if(view==='depreciation') { window.location.href='/depreciation/schedule'; }
+        else if(view==='assetSchedule') { window.location.href='/reports/asset-movement'; }
+        else if(view==='userAssetReport') { window.location.href='/reports/user-assets'; }
+        else if(view==='help') { Swal.fire({title:'Help', html:`<div style='text-align:left'><h6>Companies</h6><ul><li>Switch via sidebar</li><li>Create/edit companies</li></ul><h6>Users</h6><ul><li>Add/edit/activate/deactivate</li><li>Roles: admin, manager, user</li></ul><h6>Assignments</h6><ul><li>Assign assets to users</li><li>Return with condition & signature</li><li>Attach files to returns</li></ul><h6>Unassigned Assets</h6><ul><li>View all unassigned assets</li><li>Click Assign to assign to a user</li></ul><h6>Asset History</h6><ul><li>View complete history of each asset</li><li>Shows past and current users</li></ul></div>`, icon:'info'}); }
+    }
+
+    function navigateTo(view) {
+    document.querySelectorAll('.menu-item').forEach(i=>i.classList.remove('active'));
+    if(event?.target) { const mi=event.target.closest('.menu-item'); if(mi) mi.classList.add('active'); }
+    ['dashboard','assets','categories','users','assignments','returnForms','downloads','unassignedAssets','assetHistory','editAssignments'].forEach(v=> document.getElementById(v+'View').style.display='none');
+    if(view==='dashboard') { document.getElementById('dashboardView').style.display='block'; loadDashboardData(); }
+    else if(view==='assets') { document.getElementById('assetsView').style.display='block'; loadAssets(); }
+    else if(view==='categories') { document.getElementById('categoriesView').style.display='block'; loadCategories(); }
+    else if(view==='users') { document.getElementById('usersView').style.display='block'; loadUsers(); }
+    else if(view==='assignments') { document.getElementById('assignmentsView').style.display='block'; loadAssignments(); }
+    else if(view==='returnForms') { document.getElementById('returnFormsView').style.display='block'; loadReturnForms(); }
+    else if(view==='downloads') { document.getElementById('downloadsView').style.display='block'; }
+    else if(view==='unassignedAssets') { document.getElementById('unassignedAssetsView').style.display='block'; loadUnassignedAssets(); }
+    else if(view==='assetHistory') { document.getElementById('assetHistoryView').style.display='block'; loadAssetHistory(); }
+    else if(view==='editAssignments') { document.getElementById('editAssignmentsView').style.display='block'; loadEditAssignments(); }
+    else if(view==='depreciation') { window.location.href='/depreciation/schedule'; }
+    else if(view==='assetSchedule') { window.location.href='/reports/asset-movement'; }
+    else if(view==='userAssetReport') { window.location.href='/reports/user-assets'; }
+    else if(view==='help') { Swal.fire({title:'Help', html:`<div style='text-align:left'><h6>Companies</h6><ul><li>Switch via sidebar</li><li>Create/edit companies</li></ul><h6>Users</h6><ul><li>Add/edit/activate/deactivate</li><li>Roles: admin, manager, user</li></ul><h6>Assignments</h6><ul><li>Assign assets to users</li><li>Return with condition & signature</li><li>Attach files to returns</li></ul><h6>Assign Assets</h6><ul><li>View all unassigned assets</li><li>Click Assign to assign to a user</li></ul><h6>Edit Assignments</h6><ul><li>View and edit existing assignments</li><li>Change assigned user, dates, or delete</li></ul><h6>Asset History</h6><ul><li>View complete history of each asset</li><li>Shows past and current users</li></ul></div>`, icon:'info'}); }
+}
+
+
+    // ---------- COMPANY ----------
+    function loadCurrentCompany() {
+    $.get('api/current-company', function(r){
+        if(r.success) { currentCompany = r.company;
+            $('#currentCompanyName').html('<i class="fas fa-building"></i> '+escapeHtml(currentCompany.name));
+            $('#currentCompanyCurrency').html('<i class="fas fa-coins"></i> Base: '+currentCompany.base_currency);
+            ['dashboard','assets','categories','users','assignments','returnForms','downloads','unassigned','history','editAssignments'].forEach(v=> $(`#${v}CompanyBadge`).text(currentCompany.name+' ('+currentCompany.base_currency+')'));
+        }
+    });
+}
+    function showCompanyModal() { $('#companyModal').modal('show'); loadCompanies(); }
+    function loadCompanies() {
+        $('#companiesList').html('<div class="text-muted">Loading...</div>');
+        $.get('api/companies', function(r){
+            const list = $('#companiesList'); list.empty();
+            (r.companies||[]).forEach(c => {
+                const isCurrent = currentCompany && currentCompany.id === c.id;
+                list.append(`<div class="category-item" style="${isCurrent?'border-left:4px solid #4f46e5;':''}">
+                    <div><span class="category-name"><i class="fas fa-building"></i> ${escapeHtml(c.name)} ${isCurrent?' <span class="badge bg-primary">Active</span>':''} ${c.code==='DEFAULT'?'<span class="badge bg-secondary">Default</span>':''}</span>
+                    <div class="category-count">Code: ${escapeHtml(c.code)} | ${c.base_currency}</div></div>
+                    <div><button class="btn btn-sm btn-warning" onclick="editCompany(${c.id})"><i class="fas fa-edit"></i></button>
+                    ${!isCurrent?`<button class="btn btn-sm btn-primary" onclick="switchCompany(${c.id})"><i class="fas fa-exchange-alt"></i></button>`:''}
+                    ${c.code!=='DEFAULT'?`<button class="btn btn-sm btn-danger" onclick="deleteCompany(${c.id})"><i class="fas fa-trash"></i></button>`:''}</div></div>`);
+            });
+        });
+    }
+    function createCompany() {
+        const name=$('#newCompanyName').val().trim(), code=$('#newCompanyCode').val().trim().toUpperCase(), baseCurrency=$('#newCompanyCurrency').val();
+        if(!name || !code) return Swal.fire('Error','Name and code required','error');
+        if(code.length>10) return Swal.fire('Error','Code max 10 chars','error');
+        Swal.fire({title:'Creating...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        $.ajax({url:'api/companies',method:'POST',contentType:'application/json',data:JSON.stringify({name,code,base_currency:baseCurrency, address:$('#newCompanyAddress').val(), phone:$('#newCompanyPhone').val(), email:$('#newCompanyEmail').val(), tax_id:$('#newCompanyTaxId').val()}),
+            success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success',r.message,'success'); $('#newCompanyName,#newCompanyCode,#newCompanyAddress,#newCompanyPhone,#newCompanyEmail,#newCompanyTaxId').val(''); loadCompanies(); loadCurrentCompany(); loadDashboardData(); loadAssets(); loadUsers(); loadCategoriesDropdown(); } else Swal.fire('Error',r.error,'error'); },
+            error:()=>{ Swal.close(); Swal.fire('Error','Failed','error'); }
+        });
+    }
+    function editCompany(id) {
+        $.get('api/companies', function(r){
+            const c = r.companies.find(x=>x.id===id); if(!c) return Swal.fire('Error','Not found','error');
+            const isDefault = c.code==='DEFAULT';
+            Swal.fire({title:'Edit Company', html:`
+                <form id="editCompanyForm"><div class="row g-2"><div class="col-md-6"><label>Name</label><input type="text" id="editCompanyName" class="form-control" value="${escapeHtml(c.name)}" ${isDefault?'readonly':''}></div>
+                <div class="col-md-6"><label>Code</label><input type="text" id="editCompanyCode" class="form-control" value="${escapeHtml(c.code)}" maxlength="10" ${isDefault?'readonly':''}></div>
+                <div class="col-md-6"><label>Currency</label><select id="editCompanyCurrency" class="form-control" ${isDefault?'disabled':''}><option value="USD" ${c.base_currency==='USD'?'selected':''}>USD</option><option value="EUR" ${c.base_currency==='EUR'?'selected':''}>EUR</option><option value="GBP" ${c.base_currency==='GBP'?'selected':''}>GBP</option><option value="GHS" ${c.base_currency==='GHS'?'selected':''}>GHS</option></select></div>
+                <div class="col-md-6"><label>Address</label><input type="text" id="editCompanyAddress" class="form-control" value="${escapeHtml(c.address||'')}"></div>
+                <div class="col-md-4"><label>Phone</label><input type="text" id="editCompanyPhone" class="form-control" value="${escapeHtml(c.phone||'')}"></div>
+                <div class="col-md-4"><label>Email</label><input type="email" id="editCompanyEmail" class="form-control" value="${escapeHtml(c.email||'')}"></div>
+                <div class="col-md-4"><label>Tax ID</label><input type="text" id="editCompanyTaxId" class="form-control" value="${escapeHtml(c.tax_id||'')}"></div>
+                <div class="col-12"><div class="form-check"><input type="checkbox" class="form-check-input" id="editCompanyActive" ${c.is_active?'checked':''} ${isDefault?'disabled':''}><label>Active</label></div></div></div><input type="hidden" id="editCompanyId" value="${c.id}"></form>
+            `, showCancelButton:true, confirmButtonText:'Save', width:'700px', preConfirm:()=>{ return saveCompanyEdit(); }});
+        });
+    }
+    function saveCompanyEdit() {
+        const id=$('#editCompanyId').val(); const isDefault=$('#editCompanyName').prop('readonly');
+        let data={address:$('#editCompanyAddress').val().trim(), phone:$('#editCompanyPhone').val().trim(), email:$('#editCompanyEmail').val().trim(), tax_id:$('#editCompanyTaxId').val().trim()};
+        if(!isDefault) {
+            const name=$('#editCompanyName').val().trim(), code=$('#editCompanyCode').val().trim().toUpperCase();
+            if(!name||!code) { Swal.fire('Error','Name & code required','error'); return false; }
+            if(code.length>10) { Swal.fire('Error','Code max 10','error'); return false; }
+            data={...data, name, code, base_currency:$('#editCompanyCurrency').val(), is_active:$('#editCompanyActive').is(':checked')};
+        }
+        Swal.fire({title:'Saving...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        $.ajax({url:`api/companies/${id}`,method:'PUT',contentType:'application/json',data:JSON.stringify(data),
+            success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success','Updated','success'); loadCompanies(); loadCurrentCompany(); loadDashboardData(); loadAssets(); loadUsers(); loadCategoriesDropdown(); } else Swal.fire('Error',r.error,'error'); },
+            error:()=>{ Swal.close(); Swal.fire('Error','Failed','error'); }
+        }); return true;
+    }
+    function switchCompany(id) {
+        Swal.fire({title:'Switching...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        $.ajax({url:`api/companies/${id}/switch`,method:'POST',success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success',r.message,'success'); if(dataTable){dataTable.clear().destroy(); dataTable=null;} if(assignmentsTable){assignmentsTable.clear().destroy(); assignmentsTable=null;} if(returnFormsTable){returnFormsTable.clear().destroy(); returnFormsTable=null;} if(usersTable){usersTable.clear().destroy(); usersTable=null;} if(unassignedTable){unassignedTable.clear().destroy(); unassignedTable=null;} if(historyTable){historyTable.clear().destroy(); historyTable=null;} allAssets=[]; allAssignments=[]; selectedAssets.clear(); loadCurrentCompany(); loadCompanies(); loadDashboardData(); loadAssets(); loadUsers(); loadAssignments(); loadReturnForms(); loadCategoriesDropdown(); $('#companyModal').modal('hide');} else Swal.fire('Error',r.error,'error'); },
+            error:()=>{ Swal.close(); Swal.fire('Error','Failed','error'); }
+        });
+    }
+    function deleteCompany(id) {
+        if(currentCompany && currentCompany.id===id) return Swal.fire('Error','Cannot delete active company. Switch first.','error');
+        Swal.fire({title:'Delete Company?',text:'All categories, users, assets will be deleted.',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',confirmButtonText:'Delete'}).then(res=>{
+            if(res.isConfirmed){ $.ajax({url:`api/companies/${id}`,method:'DELETE',success:function(r){ if(r.success){ Swal.fire('Deleted',r.message,'success'); loadCompanies(); loadCurrentCompany(); loadDashboardData(); loadAssets(); loadUsers(); loadCategoriesDropdown(); } else Swal.fire('Error',r.error,'error'); }}); }
+        });
+    }
+
+    // ---------- CATEGORIES ----------
+    function loadCategoriesDropdown() {
+        $.get('api/categories', function(r){
+            const sel = $('#asset_category'); sel.empty().append('<option value="">Select Category</option>');
+            (r.categories||[]).forEach(c=>{ if(c!=='Uncategorized') sel.append(`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`); });
+        });
+    }
+    function loadCategories() {
+        $('#categoriesList').html('<div class="text-muted">Loading...</div>');
+        $.get('api/categories/all', function(r){
+            const cats = r.categories||[];
+            $.get('api/assets', function(assets){
+                const counts={}; assets.forEach(a=>{ const cat=a.asset_category||'Uncategorized'; counts[cat]=(counts[cat]||0)+1; });
+                const list=$('#categoriesList'); list.empty();
+                if(!cats.length) list.html('<div class="text-muted">No categories. Create one above.</div>');
+                else cats.forEach(c=>{
+                    list.append(`<div class="category-item"><div><span class="category-name"><i class="fas fa-tag"></i> ${escapeHtml(c.name)}</span><div class="category-count">${counts[c.name]||0} assets</div></div>
+                    <div><button class="btn btn-sm btn-info" onclick="filterByCategory('${escapeHtml(c.name).replace(/'/g,"\\'")}')"><i class="fas fa-eye"></i></button>
+                    ${c.name!=='Uncategorized'?`<button class="btn btn-sm btn-danger" onclick="deleteCategory('${escapeHtml(c.name).replace(/'/g,"\\'")}')"><i class="fas fa-trash"></i></button>`:''}</div></div>`);
+                });
+                const stats=$('#categoryStats'); stats.empty();
+                cats.slice(0,4).forEach(c=>{ const cnt=counts[c.name]||0; const pct=assets.length? (cnt/assets.length*100).toFixed(1):0; stats.append(`<div class="col-md-3"><div class="stats-card" style="background:#eef2ff;color:#1e293b;"><h6>${escapeHtml(c.name)}</h6><h4>${cnt}</h4><small>${pct}%</small></div></div>`); });
+            });
+        });
+    }
+    function createCategory() {
+        const name=$('#newCategoryName').val().trim(); if(!name) return Swal.fire('Error','Enter name','error');
+        $.ajax({url:'api/categories',method:'POST',contentType:'application/json',data:JSON.stringify({category:name}), success:function(r){ if(r.success){ Swal.fire('Success','Category created','success'); $('#newCategoryName').val(''); loadCategories(); loadCategoriesDropdown(); } else Swal.fire('Error',r.error,'error'); }});
+    }
+    function deleteCategory(cat) {
+        Swal.fire({title:'Delete Category?',text:`"${cat}" assets will become "Uncategorized"`,icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',confirmButtonText:'Delete'}).then(res=>{
+            if(res.isConfirmed){ $.ajax({url:`api/categories/${encodeURIComponent(cat)}`,method:'DELETE', success:function(r){ if(r.success){ Swal.fire('Deleted',r.message,'success'); loadCategories(); loadCategoriesDropdown(); loadAssets(); } }}); }
+        });
+    }
+    function filterByCategory(cat) { navigateTo('assets'); setTimeout(()=>{ $('#searchInput').val(cat).trigger('keyup'); },400); }
+
+    // ---------- USERS ----------
+    function loadUsers() {
+        if(usersTable){ usersTable.clear().destroy(); usersTable=null; }
+        $.get('api/users', function(r){
+            const tbody=$('#usersTable tbody'); tbody.empty();
+            (r.users||[]).forEach(u=>{
+                const roleMap={'admin':'admin','manager':'manager','user':'user'};
+                tbody.append(`<tr><td><strong>${escapeHtml(u.full_name)}</strong></td><td><span class="user-role-badge ${roleMap[u.role]||'user'}">${u.role||'User'}</span></td><td>${escapeHtml(u.department||'-')}</td><td>${escapeHtml(u.phone||'-')}</td><td>${u.is_active?'<span class="badge bg-success">Active</span>':'<span class="badge bg-danger">Inactive</span>'}</td><td>${u.created_date||''}</td>
+                <td><button class="btn btn-sm btn-warning" onclick="editUser(${u.id})"><i class="fas fa-edit"></i></button><button class="btn btn-sm btn-${u.is_active?'secondary':'success'}" onclick="toggleUserStatus(${u.id})"><i class="fas fa-${u.is_active?'pause':'play'}"></i></button><button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})"><i class="fas fa-trash"></i></button></td></tr>`);
+            });
+            usersTable = $('#usersTable').DataTable({pageLength:25, responsive:true, order:[[0,'asc']]});
+        });
+    }
+    function saveUser() {
+        const id=$('#editUserId').val(); const data={full_name:$('#userFullName').val().trim(), role:$('#userRole').val(), department:$('#userDepartment').val().trim(), phone:$('#userPhone').val().trim()};
+        if(!data.full_name) return Swal.fire('Error','Name required','error');
+        const url=id?`api/users/${id}`:'api/users'; const method=id?'PUT':'POST';
+        Swal.fire({title:id?'Updating...':'Creating...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        $.ajax({url,method,contentType:'application/json',data:JSON.stringify(data), success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success',r.message,'success'); resetUserForm(); loadUsers(); loadUserDropdown(); } else Swal.fire('Error',r.error,'error'); }});
+    }
+    function editUser(id) {
+        $.get('api/users', function(r){ const u=r.users.find(x=>x.id===id); if(!u) return Swal.fire('Error','Not found','error');
+            $('#editUserId').val(u.id); $('#userFullName').val(u.full_name); $('#userRole').val(u.role); $('#userDepartment').val(u.department); $('#userPhone').val(u.phone);
+            $('.btn-success:contains("Add User")').html('<i class="fas fa-save"></i> Update User');
+        });
+    }
+    function resetUserForm(){ $('#editUserId').val(''); $('#userFullName').val(''); $('#userRole').val('user'); $('#userDepartment').val(''); $('#userPhone').val(''); $('.btn-success:contains("Update User")').html('<i class="fas fa-save"></i> Add User'); }
+    function toggleUserStatus(id){ $.ajax({url:`api/users/${id}/toggle-status`,method:'POST', success:function(r){ if(r.success){ Swal.fire('Success',r.message,'success'); loadUsers(); loadUserDropdown(); } }}); }
+    function deleteUser(id){ Swal.fire({title:'Delete User?',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',confirmButtonText:'Delete'}).then(res=>{ if(res.isConfirmed){ $.ajax({url:`api/users/${id}`,method:'DELETE', success:function(r){ if(r.success){ Swal.fire('Deleted',r.message,'success'); loadUsers(); loadUserDropdown(); } }}); } }); }
+    function loadUserDropdown(){ $.get('api/users/simple', function(r){ const sel=$('#assignToUser'); sel.empty().append('<option value="">Select User</option>'); (r.users||[]).forEach(u=>sel.append(`<option value="${u.id}">${escapeHtml(u.full_name)}</option>`)); }); }
+
+    // ---------- ASSETS ----------
+    function loadAssets() {
+        if(dataTable){ dataTable.clear().destroy(); dataTable=null; }
+        $.get('api/assets', function(assets){
+            allAssets=assets; selectedAssets.clear(); updateBulkActionsBar();
+            const tbody=$('#assetsTable tbody'); tbody.empty();
+            let totalInit=0,totalOther=0,totalOverall=0;
+            $.get('api/assignments', function(assignResp){
+                const assigns=assignResp.assignments||[];
+                assets.forEach(a=>{
+                    const total=a.initial_cost+a.other_cost; totalInit+=a.initial_cost; totalOther+=a.other_cost; totalOverall+=total;
+                    const status=a.disposal_date?'Disposed':'Active'; const statusClass=a.disposal_date?'status-disposed':'status-active';
+                    const activeAss=assigns.find(x=>x.asset_id===a.id && x.status==='Active');
+                    let assignmentHtml='<span class="unassigned-badge"><i class="fas fa-user-slash"></i> Unassigned</span>';
+                    if(activeAss) assignmentHtml=`<span class="${activeAss.is_overdue?'overdue-badge':'assigned-badge'}"><i class="fas fa-user"></i> ${escapeHtml(activeAss.assigned_to)}${activeAss.is_overdue?' <i class="fas fa-exclamation-circle"></i>':''}</span>`;
+                    const isAssigned = a.user && a.user!=='Unassigned' && a.user!=='';
+                    tbody.append(`<tr>
+                        <td><input type="checkbox" class="asset-checkbox" data-id="${a.id}" onchange="toggleAssetSelection(${a.id})"></td>
+                        <td><strong>${escapeHtml(a.asset_no)}</strong></td>
+                        <td><span class="category-badge">${escapeHtml(a.asset_category||'Uncategorized')}</span></td>
+                        <td>${escapeHtml(a.description)}</td>
+                        <td>${escapeHtml(a.user||'Unassigned')}</td>
+                        <td>${escapeHtml(a.serial_no||'-')}</td>
+                        <td>${escapeHtml(a.condition)}</td>
+                        <td>${a.purchase_date}</td>
+                        <td>${a.depreciation_start_date}</td>
+                        <td>${a.useful_life_yrs}</td>
+                        <td>${a.disposal_date||'-'}</td>
+                        <td><span class="status-badge ${statusClass}">${status}</span></td>
+                        <td>${assignmentHtml}</td>
+                        <td>${a.currency} ${formatNumber(a.initial_cost)}</td>
+                        <td>${a.currency} ${formatNumber(a.other_cost)}</td>
+                        <td><strong>${a.currency} ${formatNumber(total)}</strong></td>
+                        <td>${escapeHtml(a.entity)}</td>
+                        <td>${a.currency}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info" onclick="viewAsset(${a.id})"><i class="fas fa-eye"></i></button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="editAsset(${a.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset(${a.id})"><i class="fas fa-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="viewDepreciation(${a.id})"><i class="fas fa-chart-line"></i></button>
+                            ${isAssigned?`<button class="btn btn-sm btn-outline-success" onclick="showReturnModal(${a.id})"><i class="fas fa-undo-alt"></i></button>`:`<button class="btn btn-sm btn-outline-primary" onclick="showAssignModal(${a.id})"><i class="fas fa-user-plus"></i></button>`}
+                            <button class="btn btn-sm btn-outline-info" onclick="showAssetHistoryDetail(${a.id})"><i class="fas fa-history"></i></button>
+                        </td>
+                    </tr>`);
+                });
+                $('#totalInitialCost').html(formatNumber(totalInit)); $('#totalOtherCost').html(formatNumber(totalOther)); $('#totalOverallCost').html('<strong>'+formatNumber(totalOverall)+'</strong>');
+                dataTable = $('#assetsTable').DataTable({pageLength:25, responsive:true, order:[[1,'asc']], drawCallback:function(){ $('.asset-checkbox').each(function(){ const id=parseInt($(this).data('id')); if(selectedAssets.has(id)) $(this).prop('checked',true); }); updateSelectAllCheckbox(); } });
+                $('#searchInput').off('keyup').on('keyup', function(){ if(dataTable) dataTable.search(this.value).draw(); });
+            });
+        });
+    }
+    function viewAsset(id){ const a=allAssets.find(x=>x.id===id); if(a) Swal.fire({title:`${a.asset_no}`, html:`<div style="text-align:left"><p><strong>Category:</strong> ${escapeHtml(a.asset_category)}</p><p><strong>Description:</strong> ${escapeHtml(a.description)}</p><p><strong>User:</strong> ${escapeHtml(a.user)}</p><p><strong>Serial:</strong> ${escapeHtml(a.serial_no||'N/A')}</p><p><strong>Condition:</strong> ${a.condition}</p><p><strong>Purchase:</strong> ${a.purchase_date}</p><p><strong>Depr Start:</strong> ${a.depreciation_start_date}</p><p><strong>Useful Life:</strong> ${a.useful_life_yrs} yrs</p><p><strong>Disposal:</strong> ${a.disposal_date||'Active'}</p><p><strong>Initial:</strong> ${a.currency} ${formatNumber(a.initial_cost)}</p><p><strong>Other:</strong> ${a.currency} ${formatNumber(a.other_cost)}</p><p><strong>Total:</strong> ${a.currency} ${formatNumber(a.initial_cost+a.other_cost)}</p><p><strong>Entity:</strong> ${escapeHtml(a.entity)}</p></div>`, icon:'info'}); }
+    function editAsset(id){ const a=allAssets.find(x=>x.id===id); if(a){ $('#modalTitle').html('<i class="fas fa-edit"></i> Edit Asset'); $('#asset_id').val(a.id); $('#asset_no').val(a.asset_no); $('#description').val(a.description); $('#user').val(a.user); $('#serial_no').val(a.serial_no); $('#condition').val(a.condition); $('#purchase_date').val(a.purchase_date); $('#depreciation_start_date').val(a.depreciation_start_date); $('#useful_life_yrs').val(a.useful_life_yrs); $('#disposal_date').val(a.disposal_date); $('#initial_cost').val(a.initial_cost); $('#other_cost').val(a.other_cost); $('#entity').val(a.entity); $('#currency').val(a.currency); loadCategoriesDropdown(); setTimeout(()=>$('#asset_category').val(a.asset_category),100); $('#assetModal').modal('show'); } }
+    function viewDepreciation(id){ window.location.href=`/depreciation/schedule/${id}`; }
+    function saveAsset(){
+        const data={asset_no:$('#asset_no').val(), asset_category:$('#asset_category').val(), description:$('#description').val(), user:$('#user').val(), serial_no:$('#serial_no').val(), condition:$('#condition').val(), purchase_date:$('#purchase_date').val(), depreciation_start_date:$('#depreciation_start_date').val(), useful_life_yrs:$('#useful_life_yrs').val(), disposal_date:$('#disposal_date').val(), initial_cost:$('#initial_cost').val(), other_cost:$('#other_cost').val(), entity:$('#entity').val(), currency:$('#currency').val()};
+        const id=$('#asset_id').val(); const method=id?'PUT':'POST'; const url=id?`api/assets/${id}`:'api/assets';
+        $.ajax({url,method,contentType:'application/json',data:JSON.stringify(data), success:function(r){ if(r.success){ Swal.fire('Success','Asset saved','success'); $('#assetModal').modal('hide'); loadAssets(); loadCategories(); loadUnassignedAssets(); loadAssetHistory(); } }, error:()=>Swal.fire('Error','Failed','error') });
+    }
+    function deleteAsset(id){ Swal.fire({title:'Delete?',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',confirmButtonText:'Delete'}).then(res=>{ if(res.isConfirmed){ $.ajax({url:`api/assets/${id}`,method:'DELETE', success:function(r){ if(r.success){ Swal.fire('Deleted','','success'); selectedAssets.delete(id); loadAssets(); loadAssignments(); loadReturnForms(); loadCategories(); loadUnassignedAssets(); loadAssetHistory(); } }}); } }); }
+    function showAddModal(){ $('#modalTitle').html('<i class="fas fa-plus-circle"></i> Add Asset'); $('#assetForm')[0].reset(); $('#asset_id').val(''); $('#disposal_date').val(''); loadCategoriesDropdown(); $('#assetModal').modal('show'); }
+
+    // ---------- ASSIGNMENTS ----------
+    function showAssignModal(assetId){ const a=allAssets.find(x=>x.id===assetId); if(!a) return Swal.fire('Error','Asset not found','error'); loadUserDropdown(); $('#assignAssetId').val(a.id); $('#assignAssetInfo').val(a.asset_no+' - '+a.description); $('#assignDate').val(new Date().toISOString().split('T')[0]); $('#assignmentModal').modal('show'); }
+    function saveAssignment(){
+        const assetId=$('#assignAssetId').val(), userId=$('#assignToUser').val(), assignedDate=$('#assignDate').val(), expectedReturn=$('#assignExpectedReturn').val(), notes=$('#assignNotes').val().trim();
+        if(!userId) return Swal.fire('Error','Select a user','error'); if(!assignedDate) return Swal.fire('Error','Select date','error');
+        Swal.fire({title:'Assigning...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        $.ajax({url:'api/assignments',method:'POST',contentType:'application/json',data:JSON.stringify({asset_id:parseInt(assetId),user_id:parseInt(userId),assigned_date:assignedDate,expected_return_date:expectedReturn,notes}),
+            success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success','Assigned!','success'); $('#assignmentModal').modal('hide'); loadAssets(); loadAssignments(); loadDashboardData(); loadUnassignedAssets(); loadAssetHistory(); } else Swal.fire('Error',r.error,'error'); }
+        });
+    }
+
+    function loadAssignments() {
+    if(assignmentsTable){ assignmentsTable.clear().destroy(); assignmentsTable=null; }
+    $.get('api/assignments', function(r){
+        const tbody = $('#assignmentsTable tbody');
+        tbody.empty();
+
+        (r.assignments||[]).forEach(a => {
+            let actionsHtml = '';
+
+            if (a.status === 'Active') {
+                // Active assignment - show Return button only
+                actionsHtml = `
+                    <button class="btn btn-sm btn-success" onclick="showReturnModal(${a.asset_id})" title="Process Return">
+                        <i class="fas fa-undo-alt"></i> Return
+                    </button>
+                    <button class="btn btn-sm btn-info" onclick="showAssetHistoryDetail(${a.asset_id})" title="View History">
+                        <i class="fas fa-history"></i>
+                    </button>
+                `;
+            } else {
+                // Returned/Completed - show only History button
+                actionsHtml = `
+                    <button class="btn btn-sm btn-info" onclick="showAssetHistoryDetail(${a.asset_id})" title="View History">
+                        <i class="fas fa-history"></i>
+                    </button>
+                `;
+            }
+
+            const statusClass = a.status === 'Active' ? 'bg-warning' : 'bg-success';
+            const overdueHtml = a.is_overdue ? ' <span class="badge bg-danger">Overdue</span>' : '';
+            const returnedDate = a.actual_return_date || '-';
+
+            tbody.append(`<tr>
+                <td><strong>${escapeHtml(a.asset_no)}</strong></td>
+                <td>${escapeHtml(a.asset_description)}</td>
+                <td>${escapeHtml(a.assigned_to)}</td>
+                <td>${escapeHtml(a.assigned_by)}</td>
+                <td>${a.assigned_date}</td>
+                <td>${a.expected_return_date || '-'}</td>
+                <td>${returnedDate}</td>
+                <td><span class="badge ${statusClass}">${a.status}${overdueHtml}</span></td>
+                <td>${actionsHtml}</td>
+            </tr>`);
+        });
+
+        assignmentsTable = $('#assignmentsTable').DataTable({
+            pageLength: 25,
+            responsive: true,
+            order: [[4, 'desc']],
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ assignments"
+            }
+        });
+    });
+}
+        // ---------- RETURN FORMS ----------
+    function showReturnModal(assetId){ const a=allAssets.find(x=>x.id===assetId); if(!a) return Swal.fire('Error','Asset not found','error');
+        $.get('api/assignments', function(r){ const active=r.assignments.find(x=>x.asset_id===assetId && x.status==='Active'); if(!active) return Swal.fire('Info','Not assigned','info');
+            $('#returnAssetId').val(assetId); $('#returnAssignmentId').val(active.id); $('#returnAssetInfo').val(a.asset_no+' - '+a.description+' (Assigned to: '+active.assigned_to+')'); $('#returnedBy').val(active.assigned_to); $('#returnDate').val(new Date().toISOString().split('T')[0]); $('#returnModal').modal('show');
+        });
+    }
+    function saveReturn(){
+        const assignmentId=$('#returnAssignmentId').val(), returnedBy=$('#returnedBy').val().trim(), returnDate=$('#returnDate').val(), condition=$('#returnCondition').val();
+        if(!returnedBy) return Swal.fire('Error','Returned by required','error'); if(!returnDate) return Swal.fire('Error','Return date required','error');
+        Swal.fire({title:'Processing...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        $.ajax({url:`api/assignments/${assignmentId}/return`,method:'POST',contentType:'application/json',data:JSON.stringify({returned_by:returnedBy,return_date:returnDate,condition,damage_description:$('#returnDamageDesc').val().trim(),maintenance_required:$('#returnMaintenance').is(':checked'),received_by:$('#returnReceivedBy').val().trim(),notes:$('#returnNotes').val().trim(),signature:$('#returnSignature').val().trim()}),
+            success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success','Return confirmed','success'); $('#returnModal').modal('hide'); loadAssets(); loadAssignments(); loadReturnForms(); loadDashboardData(); loadUnassignedAssets(); loadAssetHistory(); } else Swal.fire('Error',r.error,'error'); }
+        });
+    }
+    function loadReturnForms() {
+    if(returnFormsTable){ returnFormsTable.clear().destroy(); returnFormsTable=null; }
+    $.get('api/return-forms', function(r){
+        const tbody = $('#returnFormsTable tbody');
+        tbody.empty();
+        (r.return_forms||[]).forEach(f=>{
+            const hasAttach = f.attachment_path ? 'has-attachment' : 'no-attachment';
+            tbody.append(`<tr>
+                <td><strong>${escapeHtml(f.asset_no)}</strong></td>
+                <td>${escapeHtml(f.asset_description)}</td>
+                <td>${escapeHtml(f.returned_by)}</td>
+                <td>${f.returned_date}</td>
+                <td><span class="badge ${f.condition==='Damaged'?'bg-danger':f.condition==='Poor'?'bg-warning':'bg-success'}">${f.condition}</span></td>
+                <td>${f.maintenance_required?'<i class="fas fa-check-circle text-warning"></i>':'<i class="fas fa-times-circle text-success"></i>'}</td>
+                <td>${escapeHtml(f.received_by||'-')}</td>
+                <td><span class="attachment-badge ${hasAttach}">${f.attachment_path?'<i class="fas fa-paperclip"></i> Attached':'No file'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-info" onclick="viewReturnForm(${f.id})" title="View Details"><i class="fas fa-eye"></i></button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="editReturnForm(${f.id})" title="Edit Return"><i class="fas fa-edit"></i> Edit</button>
+                    ${f.attachment_path?`<button class="btn btn-sm btn-outline-secondary" onclick="downloadAttachment(${f.id})" title="Download Attachment"><i class="fas fa-paperclip"></i></button>`:''}
+                    <button class="btn btn-sm btn-outline-primary" onclick="showAttachmentUpload(${f.id})" title="Upload Attachment"><i class="fas fa-upload"></i></button>
+                </td>
+            </tr>`);
+        });
+        returnFormsTable = $('#returnFormsTable').DataTable({
+            pageLength: 25,
+            responsive: true,
+            order: [[3, 'desc']],
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ return forms"
+            }
+        });
+    });
+}
+    function viewReturnForm(id){
+        $.get('api/return-forms', function(r){ const f=r.return_forms.find(x=>x.id===id); if(!f) return Swal.fire('Error','Not found','error');
+            Swal.fire({title:`Return Form ${f.asset_no}`, html:`<div style="text-align:left"><p><strong>Asset:</strong> ${escapeHtml(f.asset_no)} - ${escapeHtml(f.asset_description)}</p><p><strong>Returned By:</strong> ${escapeHtml(f.returned_by)}</p><p><strong>Date:</strong> ${f.returned_date}</p><p><strong>Condition:</strong> ${f.condition}</p><p><strong>Damage:</strong> ${f.damage_description||'None'}</p><p><strong>Maintenance:</strong> ${f.maintenance_required?'Yes':'No'}</p><p><strong>Received By:</strong> ${escapeHtml(f.received_by||'-')}</p><p><strong>Signature:</strong> ${escapeHtml(f.signature||'-')}</p><p><strong>Notes:</strong> ${f.notes||'None'}</p></div>`, width:'600px'});
+        });
+    }
+    function showAttachmentUpload(formId){
+        Swal.fire({title:'Upload Attachment', html:'<div class="mb-3"><input type="file" class="form-control" id="attachmentFile" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"><small class="text-muted">Max 10MB</small></div>', showCancelButton:true, confirmButtonText:'Upload', preConfirm:()=>{ const file=document.getElementById('attachmentFile').files[0]; if(!file){ Swal.showValidationMessage('Select a file'); return false; } if(file.size>10*1024*1024){ Swal.showValidationMessage('Max 10MB'); return false; } return file; } }).then(res=>{ if(res.isConfirmed && res.value) uploadAttachment(formId, res.value); });
+    }
+    function uploadAttachment(formId, file){ const fd=new FormData(); fd.append('file',file); Swal.fire({title:'Uploading...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()}); $.ajax({url:`api/return-forms/${formId}/attachment`,method:'POST',data:fd,processData:false,contentType:false, success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success','Uploaded','success'); loadReturnForms(); } else Swal.fire('Error',r.error,'error'); }, error:()=>{ Swal.close(); Swal.fire('Error','Upload failed','error'); } }); }
+    function downloadAttachment(id){ window.location.href=`api/return-forms/${id}/attachment`; }
+
+    // ---------- EDIT RETURN FUNCTIONS ----------
+    function editReturnForm(formId) {
+        $.get('api/return-forms', function(r) {
+            const form = r.return_forms.find(f => f.id === formId);
+            if (!form) {
+                Swal.fire('Error', 'Return form not found', 'error');
+                return;
+            }
+            $('#editReturnFormId').val(form.id);
+            $('#editReturnAssignmentId').val(form.assignment_id);
+            $('#editReturnAssetId').val(form.asset_id);
+            $('#editReturnAssetInfo').val(form.asset_no + ' - ' + form.asset_description);
+            $('#editReturnedBy').val(form.returned_by);
+            $('#editReturnDate').val(form.returned_date);
+            $('#editReturnCondition').val(form.condition);
+            $('#editReturnDamageDesc').val(form.damage_description || '');
+            $('#editReturnMaintenance').prop('checked', form.maintenance_required);
+            $('#editReturnReceivedBy').val(form.received_by || '');
+            $('#editReturnNotes').val(form.notes || '');
+            $('#editReturnSignature').val(form.signature || '');
+            $('#editReturnModal').modal('show');
+        });
+    }
+
+    function saveEditReturn() {
+        const formId = $('#editReturnFormId').val();
+        const data = {
+            returned_by: $('#editReturnedBy').val().trim(),
+            returned_date: $('#editReturnDate').val(),
+            condition: $('#editReturnCondition').val(),
+            damage_description: $('#editReturnDamageDesc').val().trim(),
+            maintenance_required: $('#editReturnMaintenance').is(':checked'),
+            received_by: $('#editReturnReceivedBy').val().trim(),
+            notes: $('#editReturnNotes').val().trim(),
+            signature: $('#editReturnSignature').val().trim()
+        };
+        if (!data.returned_by) { Swal.fire('Error', 'Returned by is required', 'error'); return; }
+        if (!data.returned_date) { Swal.fire('Error', 'Return date is required', 'error'); return; }
+        Swal.fire({ title: 'Updating Return...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+        $.ajax({
+            url: `api/return-forms/${formId}`,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(r) {
+                Swal.close();
+                if (r.success) {
+                    Swal.fire('Success', 'Return form updated successfully!', 'success');
+                    $('#editReturnModal').modal('hide');
+                    loadReturnForms();
+                    loadAssets();
+                    loadAssignments();
+                    loadDashboardData();
+                    loadUnassignedAssets();
+                    loadAssetHistory();
+                } else {
+                    Swal.fire('Error', r.error || 'Failed to update return', 'error');
+                }
+            },
+            error: function(xhr) {
+                Swal.close();
+                Swal.fire('Error', xhr.responseJSON?.error || 'Failed to update return', 'error');
+            }
+        });
+    }
+
+    function deleteReturn() {
+        const formId = $('#editReturnFormId').val();
+        Swal.fire({
+            title: 'Delete Return Form?',
+            text: 'This action cannot be undone. The asset will become assigned again.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+                $.ajax({
+                    url: `api/return-forms/${formId}`,
+                    method: 'DELETE',
+                    success: function(r) {
+                        Swal.close();
+                        if (r.success) {
+                            Swal.fire('Deleted!', 'Return form deleted successfully.', 'success');
+                            $('#editReturnModal').modal('hide');
+                            loadReturnForms();
+                            loadAssets();
+                            loadAssignments();
+                            loadDashboardData();
+                            loadUnassignedAssets();
+                            loadAssetHistory();
+                        } else {
+                            Swal.fire('Error', r.error || 'Failed to delete return', 'error');
+                        }
+                    },
+                    error: function(xhr) {
+                        Swal.close();
+                        Swal.fire('Error', xhr.responseJSON?.error || 'Failed to delete return', 'error');
+                    }
+                });
+            }
+        });
+    }
+
+// ---------- EDIT ASSIGNMENTS ----------
+let editAssignmentsTable;
+
+function loadEditAssignments() {
+    if(editAssignmentsTable){ editAssignmentsTable.clear().destroy(); editAssignmentsTable=null; }
+    $.get('api/assignments', function(r){
+        const tbody = $('#editAssignmentsTable tbody');
+        tbody.empty();
+
+        (r.assignments||[]).forEach(a => {
+            const statusClass = a.status === 'Active' ? 'bg-warning' : 'bg-success';
+            const overdueHtml = a.is_overdue ? ' <span class="badge bg-danger">Overdue</span>' : '';
+
+            tbody.append(`<tr>
+                <td><strong>${escapeHtml(a.asset_no)}</strong></td>
+                <td>${escapeHtml(a.asset_description)}</td>
+                <td>${escapeHtml(a.assigned_to)}</td>
+                <td>${escapeHtml(a.assigned_by)}</td>
+                <td>${a.assigned_date}</td>
+                <td>${a.expected_return_date || '-'}</td>
+                <td><span class="badge ${statusClass}">${a.status}${overdueHtml}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-warning" onclick="editAssignment(${a.id})" title="Edit Assignment">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    ${a.status === 'Active' ?
+                        `<button class="btn btn-sm btn-outline-danger" onclick="deleteAssignment(${a.id})" title="Delete Assignment">
+                            <i class="fas fa-trash"></i>
+                        </button>` : ''
+                    }
+                    <button class="btn btn-sm btn-outline-info" onclick="showAssetHistoryDetail(${a.asset_id})" title="View History">
+                        <i class="fas fa-history"></i>
+                    </button>
+                </td>
+            </tr>`);
+        });
+
+        editAssignmentsTable = $('#editAssignmentsTable').DataTable({
+            pageLength: 25,
+            responsive: true,
+            order: [[4, 'desc']],
+            language: {
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ assignments"
+            }
+        });
+    });
+}
+
+function editAssignment(assignmentId) {
+    $.get('api/assignments', function(r) {
+        const assignment = r.assignments.find(a => a.id === assignmentId);
+        if (!assignment) {
+            Swal.fire('Error', 'Assignment not found', 'error');
+            return;
+        }
+
+        // Get users for dropdown
+        $.get('api/users/simple', function(userResp) {
+            const users = userResp.users || [];
+
+            // Build edit form HTML
+            let userOptions = '<option value="">Select User</option>';
+            users.forEach(u => {
+                const selected = u.full_name === assignment.assigned_to ? 'selected' : '';
+                userOptions += `<option value="${u.id}" ${selected}>${escapeHtml(u.full_name)}</option>`;
+            });
+
+            const html = `
+                <form id="editAssignmentForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Asset</label>
+                            <input type="text" class="form-control" value="${escapeHtml(assignment.asset_no)} - ${escapeHtml(assignment.asset_description)}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label required">Assign To</label>
+                            <select class="form-control" id="editAssignToUser" required>
+                                ${userOptions}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label required">Assigned Date</label>
+                            <input type="date" class="form-control" id="editAssignDate" value="${assignment.assigned_date}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Expected Return Date</label>
+                            <input type="date" class="form-control" id="editAssignExpectedReturn" value="${assignment.expected_return_date || ''}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="editAssignNotes" rows="3">${escapeHtml(assignment.notes || '')}</textarea>
+                        </div>
+                    </div>
+                    <input type="hidden" id="editAssignmentId" value="${assignment.id}">
+                    <input type="hidden" id="editAssignmentAssetId" value="${assignment.asset_id}">
+                </form>
+            `;
+
+            Swal.fire({
+                title: 'Edit Assignment',
+                html: html,
+                showCancelButton: true,
+                confirmButtonText: 'Save Changes',
+                cancelButtonText: 'Cancel',
+                width: '700px',
+                preConfirm: () => {
+                    const userId = document.getElementById('editAssignToUser').value;
+                    const assignedDate = document.getElementById('editAssignDate').value;
+                    const expectedReturn = document.getElementById('editAssignExpectedReturn').value;
+                    const notes = document.getElementById('editAssignNotes').value;
+
+                    if (!userId) {
+                        Swal.showValidationMessage('Please select a user');
+                        return false;
+                    }
+                    if (!assignedDate) {
+                        Swal.showValidationMessage('Please select an assigned date');
+                        return false;
+                    }
+
+                    return {
+                        user_id: parseInt(userId),
+                        assigned_date: assignedDate,
+                        expected_return_date: expectedReturn || null,
+                        notes: notes
+                    };
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    saveEditAssignment(assignment.id, result.value);
+                }
+            });
+        });
+    });
+}
+
+function saveEditAssignment(assignmentId, data) {
+    Swal.fire({
+        title: 'Updating Assignment...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    $.ajax({
+        url: `api/assignments/${assignmentId}`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(r) {
+            Swal.close();
+            if (r.success) {
+                Swal.fire('Success', 'Assignment updated successfully!', 'success');
+                loadEditAssignments();
+                loadAssignments();
+                loadAssets();
+                loadUnassignedAssets();
+                loadAssetHistory();
+                loadDashboardData();
+            } else {
+                Swal.fire('Error', r.error || 'Failed to update assignment', 'error');
+            }
+        },
+        error: function(xhr) {
+            Swal.close();
+            Swal.fire('Error', xhr.responseJSON?.error || 'Failed to update assignment', 'error');
+        }
+    });
+}
+
+function deleteAssignment(assignmentId) {
+    Swal.fire({
+        title: 'Delete Assignment?',
+        text: 'This action cannot be undone. The asset will become unassigned.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Deleting...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            $.ajax({
+                url: `api/assignments/${assignmentId}`,
+                method: 'DELETE',
+                success: function(r) {
+                    Swal.close();
+                    if (r.success) {
+                        Swal.fire('Deleted!', 'Assignment deleted successfully.', 'success');
+                        loadEditAssignments();
+                        loadAssignments();
+                        loadAssets();
+                        loadUnassignedAssets();
+                        loadAssetHistory();
+                        loadDashboardData();
+                    } else {
+                        Swal.fire('Error', r.error || 'Failed to delete assignment', 'error');
+                    }
+                },
+                error: function(xhr) {
+                    Swal.close();
+                    Swal.fire('Error', xhr.responseJSON?.error || 'Failed to delete assignment', 'error');
+                }
+            });
+        }
+    });
+}
+
+    // ---------- UNASSIGNED ASSETS ----------
+    function loadUnassignedAssets() {
+        if(unassignedTable){ unassignedTable.clear().destroy(); unassignedTable=null; }
+        $.get('api/assets', function(assets){
+            const unassigned = assets.filter(a => !a.user || a.user === 'Unassigned' || a.user === '');
+            const tbody = $('#unassignedTable tbody'); tbody.empty();
+            if(unassigned.length === 0) {
+                tbody.append(`<tr><td colspan="9" class="text-center text-muted">No unassigned assets found.</td></tr>`);
+            } else {
+                unassigned.forEach(a => {
+                    tbody.append(`<tr>
+                        <td><strong>${escapeHtml(a.asset_no)}</strong></td>
+                        <td><span class="category-badge">${escapeHtml(a.asset_category||'Uncategorized')}</span></td>
+                        <td>${escapeHtml(a.description)}</td>
+                        <td>${escapeHtml(a.serial_no||'-')}</td>
+                        <td>${escapeHtml(a.condition)}</td>
+                        <td>${a.currency} ${formatNumber(a.initial_cost)}</td>
+                        <td>${a.currency}</td>
+                        <td>${escapeHtml(a.entity)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="showAssignModal(${a.id})"><i class="fas fa-user-plus"></i> Assign</button>
+                            <button class="btn btn-sm btn-info" onclick="showAssetHistoryDetail(${a.id})"><i class="fas fa-history"></i></button>
+                        </td>
+                    </tr>`);
+                });
+            }
+            unassignedTable = $('#unassignedTable').DataTable({pageLength:25, responsive:true, order:[[0,'asc']]});
+        });
+    }
+
+    // ---------- ASSET HISTORY ----------
+    function loadAssetHistory() {
+        if(historyTable){ historyTable.clear().destroy(); historyTable=null; }
+        $.get('api/assets', function(assets){
+            const tbody = $('#historyTable tbody'); tbody.empty();
+            $.get('api/assignments', function(assignResp){
+                const allAssigns = assignResp.assignments || [];
+                assets.forEach(a => {
+                    const assetAssigns = allAssigns.filter(x => x.asset_id === a.id);
+                    const current = assetAssigns.find(x => x.status === 'Active');
+                    const past = assetAssigns.filter(x => x.status === 'Returned' || x.status === 'Completed');
+                    const hasHistory = assetAssigns.length > 0;
+                    const status = a.disposal_date ? 'Disposed' : (current ? 'Assigned' : 'Unassigned');
+                    const statusClass = status === 'Assigned' ? 'bg-warning' : status === 'Disposed' ? 'bg-danger' : 'bg-secondary';
+
+                    let historySummary = '';
+                    if(hasHistory) {
+                        historySummary = `${assetAssigns.length} assignment(s)`;
+                        if(current) historySummary += ` (Current: ${escapeHtml(current.assigned_to)})`;
+                        if(past.length > 0) historySummary += ` | Past: ${past.slice(0,3).map(p => escapeHtml(p.assigned_to)).join(', ')}${past.length > 3 ? '...' : ''}`;
+                    } else {
+                        historySummary = 'No history';
+                    }
+
+                    tbody.append(`<tr>
+                        <td><strong>${escapeHtml(a.asset_no)}</strong></td>
+                        <td>${escapeHtml(a.description)}</td>
+                        <td><span class="category-badge">${escapeHtml(a.asset_category||'Uncategorized')}</span></td>
+                        <td>${escapeHtml(a.serial_no||'-')}</td>
+                        <td>${current ? `<span class="assigned-badge"><i class="fas fa-user"></i> ${escapeHtml(current.assigned_to)}</span>` : '<span class="unassigned-badge">Unassigned</span>'}</td>
+                        <td><small>${historySummary}</small></td>
+                        <td><span class="badge ${statusClass}">${status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info" onclick="showAssetHistoryDetail(${a.id})"><i class="fas fa-history"></i> View</button>
+                        </td>
+                    </tr>`);
+                });
+                historyTable = $('#historyTable').DataTable({pageLength:25, responsive:true, order:[[0,'asc']]});
+                $('#historySearchInput').off('keyup').on('keyup', function(){ if(historyTable) historyTable.search(this.value).draw(); });
+            });
+        });
+    }
+
+    // ---------- ASSET HISTORY DETAIL MODAL ----------
+    function showAssetHistoryDetail(assetId) {
+        const asset = allAssets.find(a => a.id === assetId);
+        if(!asset) return Swal.fire('Error','Asset not found','error');
+        $.get(`api/assignments/asset/${assetId}/history`, function(r){
+            const assignments = r.assignments || [];
+            let html = `
+                <div class="mb-3">
+                    <h6><strong>${escapeHtml(asset.asset_no)}</strong> - ${escapeHtml(asset.description)}</h6>
+                    <p class="text-muted small">Category: ${escapeHtml(asset.asset_category)} | Serial: ${escapeHtml(asset.serial_no||'N/A')} | Entity: ${escapeHtml(asset.entity)}</p>
+                </div>
+                <div class="history-timeline">
+            `;
+            if(assignments.length === 0) {
+                html += `<p class="text-muted">No assignment history for this asset.</p>`;
+            } else {
+                assignments.forEach((a) => {
+                    const isCurrent = a.status === 'Active';
+                    const itemClass = isCurrent ? 'current' : 'past';
+                    const icon = isCurrent ? 'fa-user-check' : 'fa-undo-alt';
+                    const statusText = isCurrent ? 'Currently Assigned' : 'Returned';
+                    html += `
+                        <div class="history-item ${itemClass}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong><i class="fas ${icon}"></i> ${escapeHtml(a.assigned_to)}</strong>
+                                    <span class="badge ${isCurrent ? 'bg-success' : 'bg-secondary'} ms-2">${statusText}</span>
+                                    ${a.is_overdue ? '<span class="badge bg-danger ms-2">Overdue</span>' : ''}
+                                </div>
+                                <small class="text-muted">${a.assigned_date}</small>
+                            </div>
+                            <div class="small mt-1">
+                                ${a.expected_return_date ? `<span class="text-muted">Expected Return: ${a.expected_return_date}</span>` : ''}
+                                ${a.actual_return_date ? `<span class="text-muted ms-3">Actual Return: ${a.actual_return_date}</span>` : ''}
+                                ${a.returned_condition ? `<span class="text-muted ms-3">Condition: ${a.returned_condition}</span>` : ''}
+                            </div>
+                            ${a.notes ? `<div class="small text-muted mt-1"><i class="fas fa-comment"></i> ${escapeHtml(a.notes)}</div>` : ''}
+                            ${a.return_notes ? `<div class="small text-muted mt-1"><i class="fas fa-comment"></i> Return Notes: ${escapeHtml(a.return_notes)}</div>` : ''}
+                        </div>
+                    `;
+                });
+            }
+            html += `</div>`;
+            $('#historyDetailBody').html(html);
+            $('#historyDetailModal').modal('show');
+        });
+    }
+
+    // ---------- EXPORT HISTORY PDF ----------
+    function exportHistoryPDF() {
+        const searchValue = $('#historySearchInput').val() || '';
+        let url = '/reports/asset-history/export/pdf';
+        if (searchValue) {
+            url += '?search=' + encodeURIComponent(searchValue);
+        }
+        window.open(url, '_blank');
+    }
+
+    // ---------- BULK ----------
+    function toggleAssetSelection(id){ if(selectedAssets.has(id)) selectedAssets.delete(id); else selectedAssets.add(id); updateBulkActionsBar(); updateSelectAllCheckbox(); }
+    function toggleSelectAll(){ if($('#selectAllCheckbox').prop('checked')) selectAll(); else deselectAll(); }
+    function selectAll(){ $('.asset-checkbox:visible').each(function(){ const id=parseInt($(this).data('id')); selectedAssets.add(id); $(this).prop('checked',true); }); updateBulkActionsBar(); updateSelectAllCheckbox(); }
+    function deselectAll(){ selectedAssets.clear(); $('.asset-checkbox').prop('checked',false); updateBulkActionsBar(); updateSelectAllCheckbox(); }
+    function updateSelectAllCheckbox(){ const total=$('.asset-checkbox:visible').length; const sel=$('.asset-checkbox:visible').filter(function(){ return selectedAssets.has(parseInt($(this).data('id'))); }).length; if(total>0 && sel===total) $('#selectAllCheckbox').prop('checked',true).prop('indeterminate',false); else if(sel>0) $('#selectAllCheckbox').prop('checked',false).prop('indeterminate',true); else $('#selectAllCheckbox').prop('checked',false).prop('indeterminate',false); }
+    function updateBulkActionsBar(){ const cnt=selectedAssets.size; if(cnt>0){ $('#bulkActionsBar').show(); $('#bulkDeleteBtn').show(); $('#selectedCount').text(cnt); } else { $('#bulkActionsBar').hide(); $('#bulkDeleteBtn').hide(); } }
+    function bulkDelete(){ const cnt=selectedAssets.size; if(!cnt) return Swal.fire('Warning','No assets selected','warning');
+        Swal.fire({title:`Delete ${cnt} asset(s)?`,icon:'warning',showCancelButton:true,confirmButtonColor:'#d33',confirmButtonText:'Delete'}).then(res=>{
+            if(res.isConfirmed){ const ids=Array.from(selectedAssets); Swal.fire({title:'Deleting...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+                Promise.all(ids.map(id=>$.ajax({url:`api/assets/${id}`,method:'DELETE'}))).then(()=>{ Swal.fire('Success',`${cnt} assets deleted`,'success'); selectedAssets.clear(); loadAssets(); loadAssignments(); loadReturnForms(); loadCategories(); loadUnassignedAssets(); loadAssetHistory(); }).catch(()=>Swal.fire('Error','Some failed','error'));
+            }
+        });
+    }
+
+    // ---------- DASHBOARD ----------
+    function loadDashboardData(){
+        $.get('api/assets', function(assets){
+            const total=assets.length, totalVal=assets.reduce((s,a)=>s+a.initial_cost+a.other_cost,0), active=assets.filter(a=>!a.disposal_date).length, disposed=assets.filter(a=>a.disposal_date).length;
+            $('#totalAssets').text(total); const curr=currentCompany?currentCompany.base_currency:'$'; $('#totalValue').text(curr+totalVal.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})); $('#activeAssets').text(active); $('#disposedAssets').text(disposed);
+        });
+        $.get('api/assignments', function(r){
+            const assigns=r.assignments||[]; const activeAss=assigns.filter(a=>a.status==='Active'); const returnedThisMonth=assigns.filter(a=>{ if(!a.actual_return_date) return false; const d=new Date(a.actual_return_date); const n=new Date(); return d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear(); }); const overdue=assigns.filter(a=>a.is_overdue);
+            $('#assignedAssets').text(activeAss.length); $('#returnedAssets').text(returnedThisMonth.length); $('#overdueAssets').text(overdue.length);
+        });
+    }
+
+    // ---------- EXPORT / IMPORT ----------
+    function exportExcel(){ window.location.href='/export/excel'; }
+    function downloadTemplate(){ window.location.href='/download/template'; }
+    function importExcel(){ $('#importModal').modal('show'); }
+    function uploadFile(){
+        const file=$('#importFile')[0].files[0]; if(!file) return Swal.fire('Error','Select a file','error');
+        const fd=new FormData(); fd.append('file',file); Swal.fire({title:'Importing...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+        $.ajax({url:'/import/excel',method:'POST',data:fd,processData:false,contentType:false, success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success',r.message,'success'); $('#importModal').modal('hide'); loadAssets(); loadCategories(); loadCategoriesDropdown(); loadUnassignedAssets(); loadAssetHistory(); } else Swal.fire('Error',r.error,'error'); }, error:()=>{ Swal.close(); Swal.fire('Error','Import failed','error'); } });
+    }
+    function refreshData(){ loadAssets(); loadUsers(); loadAssignments(); loadReturnForms(); loadDashboardData(); loadUnassignedAssets(); loadAssetHistory(); Swal.fire('Refreshed','Data updated','success'); }
+
+    // ---------- INIT ----------
+    $(document).ready(function(){
+        loadCurrentCompany(); navigateTo('dashboard'); loadDashboardData(); loadAssets(); loadUsers(); loadUserDropdown();
+        document.getElementById('dataEntryGroup').classList.remove('collapsed');
+        document.getElementById('reportsGroup').classList.remove('collapsed');
+        document.getElementById('downloadsGroup').classList.remove('collapsed');
+    });
+</script>

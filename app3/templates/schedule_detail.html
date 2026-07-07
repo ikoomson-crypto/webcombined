@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h4>Schedule #{{ schedule.id }} - {{ schedule.description }}</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4"><strong>Debit Account:</strong> {{ schedule.debit_account }}</div>
+                    <div class="col-md-4"><strong>Credit Account:</strong> {{ schedule.credit_account }}</div>
+                    <div class="col-md-4"><strong>Transaction Date:</strong> {{ schedule.transaction_date.strftime('%Y-%m-%d') }}</div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-4"><strong>Total Cost:</strong> ${{ "%.2f"|format(schedule.total_cost) }}</div>
+                    <div class="col-md-4"><strong>Periods:</strong> {{ schedule.period_to_amortize }}</div>
+                    <div class="col-md-4"><strong>Start Period:</strong> {{ schedule.amortize_start_period.strftime('%Y-%m-%d') }}</div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-4"><strong>Remaining:</strong> ${{ "%.2f"|format(schedule.remaining_balance) }}</div>
+                    <div class="col-md-4"><strong>Created:</strong> {{ schedule.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header"><h5>Amortization Schedule</h5></div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead><tr><th>Period</th><th>Due Date</th><th>Amount</th><th>Remaining</th><th>Status</th></tr></thead>
+                        <tbody>
+                            {% for entry in amortization_schedule %}
+                            <tr class="{% if entry.status == 'Completed' %}table-success{% else %}table-warning{% endif %}">
+                                <td>{{ entry.period }}</td>
+                                <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                                <td>${{ "%.2f"|format(entry.amount) }}</td>
+                                <td>${{ "%.2f"|format(entry.remaining_balance) }}</td>
+                                <td>{{ entry.status }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-3">
+    <div class="col-md-12">
+        <a href="{{ url_for('schedule_update', pk=schedule.id) }}" class="btn btn-warning">Edit</a>
+        <a href="{{ url_for('schedule_list') }}" class="btn btn-secondary">Back</a>
+    </div>
+</div>
+{% endblock %}

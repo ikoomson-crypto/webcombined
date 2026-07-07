@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Depreciation Schedule - {{ schedule.asset.asset_no }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .container-main {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .header-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            transition: transform 0.3s;
+        }
+
+        .info-card:hover {
+            transform: translateX(5px);
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .depreciation-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .depreciation-card h3 {
+            font-size: 28px;
+            margin: 10px 0;
+        }
+
+        .progress-bar-custom {
+            background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+            height: 30px;
+            border-radius: 15px;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .progress-label {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        .table-depreciation {
+            margin-top: 20px;
+        }
+
+        .table-depreciation th {
+            background-color: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+
+        .table-depreciation tr:hover {
+            background-color: #f0f0f0;
+        }
+
+        .btn-back {
+            margin-bottom: 20px;
+        }
+
+        .status-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .status-active {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .status-disposed {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .btn-back, .no-print {
+                display: none;
+            }
+            .container-main {
+                box-shadow: none;
+                padding: 0;
+            }
+        }
+
+        .summary-stats {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .monthly-breakdown {
+            margin-top: 20px;
+        }
+
+        .monthly-table {
+            font-size: 11px;
+        }
+
+        .monthly-table th {
+            background-color: #34495e;
+        }
+
+        .toggle-btn {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .toggle-btn:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Back Button -->
+        <div class="btn-back no-print">
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Asset Register
+            </a>
+            <a href="/depreciation/schedule" class="btn btn-info">
+                <i class="fas fa-chart-line"></i> View All Schedules
+            </a>
+            <button onclick="window.print()" class="btn btn-primary">
+                <i class="fas fa-print"></i> Print Report
+            </button>
+            <button onclick="exportToExcel()" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Export to Excel
+            </button>
+        </div>
+
+        <div class="container-main">
+            <!-- Header Section -->
+            <div class="header-section">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h2>
+                            <i class="fas fa-chart-line"></i>
+                            Depreciation Schedule (Month-Based)
+                        </h2>
+                        <h4>{{ schedule.asset.asset_no }} - {{ schedule.asset.description }}</h4>
+                        <p class="mb-0">
+                            <span class="status-badge {% if schedule.is_active %}status-active{% else %}status-disposed{% endif %}">
+                                {% if schedule.is_active %}🟢 ACTIVE{% else %}🔴 DISPOSED{% endif %}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <i class="fas fa-calendar-alt fa-3x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asset Information Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-label">
+                            <i class="fas fa-user"></i> User
+                        </div>
+                        <div class="info-value">{{ schedule.asset.user }}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-label">
+                            <i class="fas fa-barcode"></i> Serial Number
+                        </div>
+                        <div class="info-value">{{ schedule.asset.serial_no or 'N/A' }}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-label">
+                            <i class="fas fa-building"></i> Entity
+                        </div>
+                        <div class="info-value">{{ schedule.asset.entity }}</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-label">
+                            <i class="fas fa-tag"></i> Condition
+                        </div>
+                        <div class="info-value">{{ schedule.asset.condition }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Depreciation Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="depreciation-card">
+                        <i class="fas fa-dollar-sign fa-2x"></i>
+                        <h3>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.total_cost) }}</h3>
+                        <p>Total Cost</p>
+                        <small>Initial + Other Costs</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="depreciation-card">
+                        <i class="fas fa-calendar-alt fa-2x"></i>
+                        <h3>{{ "%.2f"|format(schedule.annual_depreciation) }}</h3>
+                        <p>Annual Depreciation</p>
+                        <small>Per Year</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="depreciation-card">
+                        <i class="fas fa-calendar-week fa-2x"></i>
+                        <h3>{{ "%.2f"|format(schedule.monthly_depreciation) }}</h3>
+                        <p>Monthly Depreciation</p>
+                        <small>Fixed per Month</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="depreciation-card">
+                        <i class="fas fa-book fa-2x"></i>
+                        <h3>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.net_book_value) }}</h3>
+                        <p>Net Book Value</p>
+                        <small>Current Value</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Depreciation Progress -->
+            <div class="summary-stats">
+                <h5><i class="fas fa-chart-pie"></i> Depreciation Progress</h5>
+                <div class="progress-bar-custom">
+                    <div class="progress-label">
+                        {{ schedule.depreciation_percentage }}% Depreciated
+                    </div>
+                    <div class="progress" style="height: 30px; border-radius: 15px;">
+                        <div class="progress-bar" role="progressbar"
+                             style="width: {{ schedule.depreciation_percentage }}%;
+                                    background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+                                    border-radius: 15px;"
+                             aria-valuenow="{{ schedule.depreciation_percentage }}"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                            {{ "%.1f"|format(schedule.depreciation_percentage) }}%
+                        </div>
+                    </div>
+                </div>
+                <div class="row text-center mt-3">
+                    <div class="col-4">
+                        <small class="text-muted">Months Elapsed:</small>
+                        <br><strong>{{ schedule.months_elapsed }} months</strong>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Total Months:</small>
+                        <br><strong>{{ schedule.total_months }} months</strong>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Useful Life:</small>
+                        <br><strong>{{ schedule.asset.useful_life_yrs }} years</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Depreciation Chart -->
+            <div class="chart-container">
+                <h5><i class="fas fa-chart-bar"></i> Depreciation Trend</h5>
+                <canvas id="depreciationChart"></canvas>
+            </div>
+
+            <!-- Yearly Breakdown Table -->
+            <h5><i class="fas fa-table"></i> Year-by-Year Depreciation Schedule</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-depreciation">
+                    <thead>
+                        <tr>
+                            <th>Year</th>
+                            <th>Year Start</th>
+                            <th>Year End</th>
+                            <th>Depreciation for Year</th>
+                            <th>Accumulated Depreciation</th>
+                            <th>Net Book Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for breakdown in schedule.yearly_breakdown %}
+                        <tr>
+                            <td><strong>{{ breakdown.year }}</strong></td>
+                            <td>{{ breakdown.year_start }}</td>
+                            <td>{{ breakdown.year_end }}</td>
+                            <td>{{ schedule.asset.currency }} {{ "%.2f"|format(breakdown.depreciation) }}</td>
+                            <td>{{ schedule.asset.currency }} {{ "%.2f"|format(breakdown.accumulated_depreciation) }}</td>
+                            <td>
+                                <strong>{{ schedule.asset.currency }} {{ "%.2f"|format(breakdown.net_book_value) }}</strong>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary">
+                        <tr>
+                            <th colspan="3">Totals</th>
+                            <th>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.yearly_breakdown|sum(attribute='depreciation')) }}</th>
+                            <th>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.accumulated_depreciation) }}</th>
+                            <th>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.net_book_value) }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Monthly Breakdown (Toggle) -->
+            <div class="monthly-breakdown">
+                <h5>
+                    <i class="fas fa-calendar-month"></i> Monthly Depreciation Breakdown
+                    <button class="btn btn-sm btn-outline-info toggle-btn no-print" onclick="toggleMonthlyTable()">
+                        <i class="fas fa-eye"></i> Show/Hide Monthly Details
+                    </button>
+                </h5>
+                <div id="monthlyTable" style="display: none;" class="table-responsive">
+                    <table class="table table-bordered table-sm monthly-table">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Month</th>
+                                <th>Monthly Depreciation</th>
+                                <th>Accumulated Depreciation</th>
+                                <th>Net Book Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ns = namespace(counter=0) %}
+                            {% for breakdown in schedule.yearly_breakdown %}
+                                {% for month_num in range(1, 13) %}
+                                    {% if schedule.asset.disposal_date %}
+                                        {% set disposal_year = schedule.asset.disposal_date.year %}
+                                        {% set disposal_month = schedule.asset.disposal_date.month %}
+                                        {% set current_year = schedule.asset.depreciation_start_date.year + breakdown.year - 1 %}
+                                        {% if current_year > disposal_year or (current_year == disposal_year and month_num > disposal_month) %}
+                                            <!-- Skip months after disposal -->
+                                        {% else %}
+                                            {% set ns.counter = ns.counter + 1 %}
+                                            <tr>
+                                                <td>{{ current_year }}</td>
+                                                <td>{{ month_num }}</td>
+                                                <td class="amount">{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.monthly_depreciation) }}</td>
+                                                <td class="amount">{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.monthly_depreciation * ns.counter) }}</td>
+                                                <td class="amount"><strong>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.total_cost - (schedule.monthly_depreciation * ns.counter)) }}</strong></td>
+                                            </tr>
+                                        {% endif %}
+                                    {% else %}
+                                        {% set ns.counter = ns.counter + 1 %}
+                                        <tr>
+                                            <td>{{ schedule.asset.depreciation_start_date.year + breakdown.year - 1 }}</td>
+                                            <td>{{ month_num }}</td>
+                                            <td class="amount">{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.monthly_depreciation) }}</td>
+                                            <td class="amount">{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.monthly_depreciation * ns.counter) }}</td>
+                                            <td class="amount"><strong>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.total_cost - (schedule.monthly_depreciation * ns.counter)) }}</strong></td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Notes and Information -->
+            <div class="alert alert-info mt-4">
+                <h6><i class="fas fa-info-circle"></i> Depreciation Information (Month-Based Calculation):</h6>
+                <ul class="mb-0">
+                    <li><strong>Method:</strong> Straight-Line Depreciation (Based on Months)</li>
+                    <li><strong>Formula:</strong> (Initial Cost + Other Cost) ÷ Useful Life (Years)</li>
+                    <li><strong>Annual Depreciation Amount:</strong> {{ schedule.asset.currency }} {{ "%.2f"|format(schedule.annual_depreciation) }}</li>
+                    <li><strong>Monthly Depreciation Amount:</strong> {{ schedule.asset.currency }} {{ "%.2f"|format(schedule.monthly_depreciation) }} (Fixed amount each month)</li>
+                    <li><strong>Calculation Basis:</strong> Monthly depreciation = Annual depreciation ÷ 12 (Equal amount each month)</li>
+                    {% if not schedule.is_active %}
+                    <li><strong>Disposal Date:</strong> {{ schedule.asset.disposal_date }}</li>
+                    <li><strong>Partial month depreciation applied for disposal month</strong></li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <!-- Financial Summary -->
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <i class="fas fa-chart-simple"></i> Financial Summary
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td>Initial Cost:</strong>
+                                    <td class="text-end"><strong>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.asset.initial_cost) }}</strong></strong>
+                                </tr>
+                                <tr>
+                                    <td>Other Cost:</strong>
+                                    <td class="text-end"><strong>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.asset.other_cost) }}</strong></strong>
+                                </tr>
+                                <tr class="table-info">
+                                    <td><strong>Total Cost:</strong></strong>
+                                    <td class="text-end"><strong>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.total_cost) }}</strong></strong>
+                                </tr>
+                                <tr>
+                                    <td>Annual Depreciation:</strong>
+                                    <td class="text-end">{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.annual_depreciation) }}</strong>
+                                </tr>
+                                <tr>
+                                    <td>Monthly Depreciation:</strong>
+                                    <td class="text-end">{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.monthly_depreciation) }}</strong>
+                                </tr>
+                                <tr class="table-success">
+                                    <td><strong>Net Book Value:</strong></strong>
+                                    <td class="text-end"><strong>{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.net_book_value) }}</strong></strong>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <i class="fas fa-calculator"></i> Depreciation Calculator
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <label class="form-label">Depreciation per Month:</label>
+                                <input type="text" class="form-control" readonly value="{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.monthly_depreciation) }}">
+                                <small class="text-muted">Fixed amount each month (Annual ÷ 12)</small>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Depreciation per Year:</label>
+                                <input type="text" class="form-control" readonly value="{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.annual_depreciation) }}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Remaining Value:</label>
+                                <input type="text" class="form-control" readonly value="{{ schedule.asset.currency }} {{ "%.2f"|format(schedule.net_book_value) }}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Months Remaining:</label>
+                                <input type="text" class="form-control" readonly value="{{ (schedule.total_months - schedule.months_elapsed)|int }} months">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        $(document).ready(function() {
+            // Create depreciation chart
+            const years = {{ schedule.yearly_breakdown|map(attribute='year')|list|tojson }};
+            const netBookValues = {{ schedule.yearly_breakdown|map(attribute='net_book_value')|list|tojson }};
+            const depreciationAmounts = {{ schedule.yearly_breakdown|map(attribute='depreciation')|list|tojson }};
+
+            const ctx = document.getElementById('depreciationChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [
+                        {
+                            label: 'Net Book Value',
+                            data: netBookValues,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Annual Depreciation',
+                            data: depreciationAmounts,
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            borderDash: [5, 5]
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Asset Depreciation Trend (Month-Based Calculation)'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += '{{ schedule.asset.currency }} ' + context.parsed.y.toFixed(2);
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Amount ({{ schedule.asset.currency }})'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return '{{ schedule.asset.currency }} ' + value.toFixed(0);
+                                }
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Year'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+        function toggleMonthlyTable() {
+            const monthlyTable = document.getElementById('monthlyTable');
+            if (monthlyTable.style.display === 'none') {
+                monthlyTable.style.display = 'block';
+            } else {
+                monthlyTable.style.display = 'none';
+            }
+        }
+
+        function exportToExcel() {
+            // Collect table data for export
+            const tableData = [];
+            const headers = ['Year', 'Year Start', 'Year End', 'Depreciation', 'Accumulated Depreciation', 'Net Book Value'];
+            tableData.push(headers);
+
+            {% for breakdown in schedule.yearly_breakdown %}
+            tableData.push([
+                '{{ breakdown.year }}',
+                '{{ breakdown.year_start }}',
+                '{{ breakdown.year_end }}',
+                '{{ breakdown.depreciation }}',
+                '{{ breakdown.accumulated_depreciation }}',
+                '{{ breakdown.net_book_value }}'
+            ]);
+            {% endfor %}
+
+            // Create CSV
+            let csvContent = "data:text/csv;charset=utf-8,";
+            tableData.forEach(row => {
+                csvContent += row.join(",") + "\n";
+            });
+
+            // Download
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "depreciation_{{ schedule.asset.asset_no }}.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            Swal.fire('Success', 'Depreciation schedule exported to CSV', 'success');
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'p') {
+                e.preventDefault();
+                window.print();
+            }
+        });
+    </script>
+</body>
+</html>

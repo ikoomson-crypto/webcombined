@@ -1,0 +1,22 @@
+<div id="usersView" style="display:none;">
+    <div class="container-main">
+        <h1><i class="fas fa-user-plus" style="color:#4f46e5;"></i> Add User <span class="company-badge" id="usersCompanyBadge">Loading...</span></h1>
+        <div class="card border-0 shadow-sm mb-4"><div class="card-header bg-primary text-white"><i class="fas fa-user-plus"></i> Add / Edit User</div>
+            <div class="card-body">
+                <form id="userForm" onsubmit="return false;">
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label required">Full Name</label><input type="text" class="form-control" id="userFullName" required></div>
+                        <div class="col-md-6"><label class="form-label required">Role</label><select class="form-control" id="userRole"><option value="user">User</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
+                        <div class="col-md-6"><label class="form-label">Department</label><input type="text" class="form-control" id="userDepartment" placeholder="e.g. IT"></div>
+                        <div class="col-md-6"><label class="form-label">Phone</label><input type="text" class="form-control" id="userPhone" placeholder="Phone"></div>
+                        <div class="col-12"><button type="button" class="btn btn-success" onclick="saveUser()"><i class="fas fa-save"></i> Add User</button><button type="button" class="btn btn-secondary ms-2" onclick="resetUserForm()"><i class="fas fa-undo"></i> Reset</button></div>
+                    </div>
+                    <input type="hidden" id="editUserId">
+                </form>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm"><div class="card-header bg-info text-white"><i class="fas fa-list"></i> Users List</div>
+            <div class="card-body"><div class="table-responsive"><table id="usersTable" class="table table-striped" style="width:100%"><thead><tr><th>Name</th><th>Role</th><th>Department</th><th>Phone</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+    </div>
+</div>

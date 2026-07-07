@@ -1,0 +1,57 @@
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <i class="fas fa-cubes fa-2x" style="color:#a5b4fc;"></i>
+        <h3>Asset Register</h3>
+    </div>
+    <div class="company-section">
+        <div class="company-name" id="currentCompanyName"><i class="fas fa-building"></i> Loading...</div>
+        <div class="company-currency" id="currentCompanyCurrency"><i class="fas fa-coins"></i> Base: USD</div>
+        <button class="switch-company-btn" onclick="showCompanyModal()"><i class="fas fa-exchange-alt"></i> Switch Company</button>
+    </div>
+    <div class="sidebar-menu">
+        <div class="menu-item active" onclick="navigateTo('dashboard')"><div class="menu-icon"><i class="fas fa-chart-pie"></i></div><div class="menu-text">Dashboard</div></div>
+
+        <!-- DATA ENTRY GROUP -->
+        <div class="menu-group-header" onclick="toggleMenuGroup('dataEntryGroup')">
+            <div class="menu-icon"><i class="fas fa-database"></i></div>
+            <div class="menu-text">Data Entry</div>
+            <div class="menu-arrow"><i class="fas fa-chevron-down"></i></div>
+        </div>
+        <div id="dataEntryGroup" class="menu-group-items">
+            <div class="menu-item sub-menu" onclick="navigateTo('assets')"><div class="menu-icon"><i class="fas fa-plus-circle"></i></div><div class="menu-text">Add Assets</div></div>
+            <div class="menu-item sub-menu" onclick="navigateTo('categories')"><div class="menu-icon"><i class="fas fa-tag"></i></div><div class="menu-text">Add Category</div></div>
+            <div class="menu-item sub-menu" onclick="navigateTo('assignments')"><div class="menu-icon"><i class="fas fa-undo-alt"></i></div><div class="menu-text">Process Return</div></div>
+            <div class="menu-item sub-menu" onclick="navigateTo('users')"><div class="menu-icon"><i class="fas fa-user-plus"></i></div><div class="menu-text">Add User</div></div>
+            <!-- Renamed from Unassigned Assets to Assign Assets -->
+            <div class="menu-item sub-menu" onclick="navigateTo('unassignedAssets')"><div class="menu-icon"><i class="fas fa-user-check"></i></div><div class="menu-text">Assign Assets</div></div>
+            <div class="menu-item sub-menu" onclick="navigateTo('returnForms')"><div class="menu-icon"><i class="fas fa-edit"></i></div><div class="menu-text">Edit Returns</div></div>
+            <!-- New: Edit Assignments -->
+            <div class="menu-item sub-menu" onclick="navigateTo('editAssignments')"><div class="menu-icon"><i class="fas fa-pen"></i></div><div class="menu-text">Edit Assignments</div></div>
+        </div>
+
+        <!-- REPORTS GROUP -->
+        <div class="menu-group-header" onclick="toggleMenuGroup('reportsGroup')">
+            <div class="menu-icon"><i class="fas fa-chart-line"></i></div>
+            <div class="menu-text">Reports</div>
+            <div class="menu-arrow"><i class="fas fa-chevron-down"></i></div>
+        </div>
+        <div id="reportsGroup" class="menu-group-items">
+            <div class="menu-item sub-menu" onclick="navigateTo('depreciation')"><div class="menu-icon"><i class="fas fa-calendar-alt"></i></div><div class="menu-text">Depreciation</div></div>
+            <div class="menu-item sub-menu" onclick="navigateTo('assetSchedule')"><div class="menu-icon"><i class="fas fa-exchange-alt"></i></div><div class="menu-text">Asset Schedule</div></div>
+            <div class="menu-item sub-menu" onclick="navigateTo('userAssetReport')"><div class="menu-icon"><i class="fas fa-user-check"></i></div><div class="menu-text">User Asset Report</div></div>
+            <div class="menu-item sub-menu" onclick="navigateTo('assetHistory')"><div class="menu-icon"><i class="fas fa-history"></i></div><div class="menu-text">Asset History</div></div>
+        </div>
+
+        <!-- DOWNLOADS GROUP -->
+        <div class="menu-group-header" onclick="toggleMenuGroup('downloadsGroup')">
+            <div class="menu-icon"><i class="fas fa-download"></i></div>
+            <div class="menu-text">Downloads</div>
+            <div class="menu-arrow"><i class="fas fa-chevron-down"></i></div>
+        </div>
+        <div id="downloadsGroup" class="menu-group-items">
+            <div class="menu-item sub-menu" onclick="navigateTo('downloads')"><div class="menu-icon"><i class="fas fa-file-export"></i></div><div class="menu-text">Templates</div></div>
+        </div>
+        <hr>
+        <div class="menu-item" onclick="navigateTo('help')"><div class="menu-icon"><i class="fas fa-question-circle"></i></div><div class="menu-text">Help</div></div>
+    </div>
+</div>

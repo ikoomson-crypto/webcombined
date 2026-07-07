@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><h4>Switch Company</h4></div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label">Select Company</label>
+                        <select name="company" class="form-select">
+                            {% for company in companies %}
+                                <option value="{{ company.id }}" {% if company.id == current_company_id %}selected{% endif %}>
+                                    {{ company.name }} ({{ company.code }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-exchange-alt"></i> Switch</button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+                <hr>
+                <h6>Available Companies:</h6>
+                <ul class="list-group">
+                    {% for company in companies %}
+                    <li class="list-group-item {% if company.id == current_company_id %}active{% endif %}">
+                        {{ company.name }}
+                        {% if company.id == current_company_id %}<span class="badge bg-success">Current</span>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

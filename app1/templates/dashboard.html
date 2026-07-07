@@ -1,0 +1,123 @@
+<!-- This file contains templates for dynamic content rendering -->
+<!-- The actual content is rendered by JavaScript, but we keep it for structure -->
+
+<!-- Template for Supplier Table -->
+<div id="supplierTableTemplate" style="display:none;">
+    <div class="table-container">
+        <div class="mb-3">
+            <button class="btn btn-danger btn-sm" onclick="app.deleteMultipleSuppliers()">
+                <i class="bi bi-trash3"></i> Delete Selected
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="app.selectAllSuppliers()">
+                <i class="bi bi-check-all"></i> Select All
+            </button>
+        </div>
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="selectAllCheckbox" onchange="app.toggleAllCheckboxes(this)"></th>
+                    <th>Name</th>
+                    <th>Address</th>
+                    <th>Telephone</th>
+                    <th>Bank</th>
+                    <th>Account No</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="supplierTableBody">
+                <!-- Dynamic content -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Template for Supplier Payments Table -->
+<div id="supplierPaymentTableTemplate" style="display:none;">
+    <div class="table-container">
+        <div class="mb-3">
+            <button class="btn btn-danger btn-sm" onclick="app.deleteMultipleSupplierPayments()">
+                <i class="bi bi-trash3"></i> Delete Selected
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="app.selectAllSupplierPayments()">
+                <i class="bi bi-check-all"></i> Select All
+            </button>
+        </div>
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="selectAllCheckbox" onchange="app.toggleAllCheckboxes(this)"></th>
+                    <th>Supplier</th>
+                    <th>Description</th>
+                    <th>Invoice Ref</th>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="supplierPaymentTableBody">
+                <!-- Dynamic content -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Template for Customer Payments Table -->
+<div id="customerPaymentTableTemplate" style="display:none;">
+    <div class="table-container">
+        <div class="mb-3">
+            <button class="btn btn-danger btn-sm" onclick="app.deleteMultipleCustomerPayments()">
+                <i class="bi bi-trash3"></i> Delete Selected
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="app.selectAllCustomerPayments()">
+                <i class="bi bi-check-all"></i> Select All
+            </button>
+        </div>
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="selectAllCheckbox" onchange="app.toggleAllCheckboxes(this)"></th>
+                    <th>Customer</th>
+                    <th>Service</th>
+                    <th>Invoice Ref</th>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="customerPaymentTableBody">
+                <!-- Dynamic content -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Template for Liquidity Report -->
+<div id="liquidityReportTemplate" style="display:none;">
+    <div class="card">
+        <div class="card-header">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h6 class="mb-0">Monthly Liquidity Schedule</h6>
+                </div>
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text">Year</span>
+                        <input type="number" class="form-control" id="yearFilter" value="2026">
+                        <button class="btn btn-primary" onclick="app.filterLiquidity()">
+                            <i class="bi bi-filter"></i> Filter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive" id="liquidityTableContainer">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+</div>

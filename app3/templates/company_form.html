@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="fas fa-building"></i> {{ action }} Company</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">Company Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" id="name" class="form-control"
+                                   value="{{ company.name if company else '' }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="code" class="form-label">Company Code <span class="text-danger">*</span></label>
+                            <input type="text" name="code" id="code" class="form-control"
+                                   value="{{ company.code if company else '' }}" required>
+                            <small class="text-muted">Unique identifier for the company</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Address</label>
+                        <textarea name="address" id="address" class="form-control" rows="3">{{ company.address if company else '' }}</textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Phone</label>
+                            <input type="text" name="phone" id="phone" class="form-control"
+                                   value="{{ company.phone if company else '' }}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" name="email" id="email" class="form-control"
+                                   value="{{ company.email if company else '' }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="logo" class="form-label">Company Logo</label>
+                        {% if company and company.logo %}
+                            <div class="mb-2">
+                                <img src="{{ url_for('static', filename='uploads/' + company.logo) }}"
+                                     alt="{{ company.name }}" style="max-width: 100px; max-height: 100px;">
+                            </div>
+                        {% endif %}
+                        <input type="file" name="logo" id="logo" class="form-control" accept="image/*">
+                        <small class="text-muted">Upload a logo image (PNG, JPG, JPEG, GIF)</small>
+                    </div>
+                    {% if action == 'Edit' %}
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_active" id="is_active" class="form-check-input"
+                               {% if company and company.is_active %}checked{% endif %}>
+                        <label for="is_active" class="form-check-label">Active</label>
+                    </div>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary">{{ action }}</button>
+                    <a href="{{ url_for('company_list') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

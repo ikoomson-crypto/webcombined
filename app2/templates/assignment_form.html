@@ -1,0 +1,123 @@
+<!-- Asset Assignment Modal -->
+<div class="modal fade" id="assignmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus"></i> Assign Asset
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignmentForm">
+                    <div class="mb-3">
+                        <label class="form-label">Asset</label>
+                        <input type="text" class="form-control" id="assignAssetInfo" readonly>
+                        <input type="hidden" id="assignAssetId">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Assign To</label>
+                        <input type="text" class="form-control" id="assignTo" required placeholder="User name or email">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Assigned Date</label>
+                        <input type="date" class="form-control" id="assignDate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Expected Return Date</label>
+                        <input type="date" class="form-control" id="assignExpectedReturn">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" id="assignNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveAssignment()">
+                    <i class="fas fa-save"></i> Assign Asset
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Return Form Modal -->
+<div class="modal fade" id="returnModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-undo-alt"></i> Asset Return Form
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Please complete this form when returning the asset.
+                </div>
+                <form id="returnForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Asset</label>
+                            <input type="text" class="form-control" id="returnAssetInfo" readonly>
+                            <input type="hidden" id="returnAssignmentId">
+                            <input type="hidden" id="returnAssetId">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Returned By</label>
+                            <input type="text" class="form-control" id="returnedBy" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Return Date</label>
+                            <input type="date" class="form-control" id="returnDate" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">Condition</label>
+                            <select class="form-control" id="returnCondition" required>
+                                <option value="New">🆕 New</option>
+                                <option value="Good">✅ Good</option>
+                                <option value="Fair">⚠️ Fair</option>
+                                <option value="Poor">📉 Poor</option>
+                                <option value="Damaged">🔧 Damaged</option>
+                            </select>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Damage Description</label>
+                            <textarea class="form-control" id="returnDamageDesc" rows="2" placeholder="Describe any damage or issues"></textarea>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="returnMaintenance">
+                                <label class="form-check-label" for="returnMaintenance">Maintenance Required</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Received By</label>
+                            <input type="text" class="form-control" id="returnReceivedBy">
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Additional Notes</label>
+                            <textarea class="form-control" id="returnNotes" rows="2"></textarea>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">Signature (Type your name)</label>
+                            <input type="text" class="form-control" id="returnSignature" placeholder="Type your full name as signature">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-success" onclick="saveReturn()">
+                    <i class="fas fa-check"></i> Confirm Return
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

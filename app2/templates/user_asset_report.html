@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Asset Report - Asset Register</title>
+    <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container-main {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+        }
+        .report-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .report-title {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+        .report-period {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .user-card {
+            border-left: 4px solid #667eea;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+            transition: all 0.3s;
+        }
+        .user-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .user-card .card-header {
+            background: white;
+            border-bottom: 2px solid #667eea;
+        }
+        .user-stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .user-stat {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .user-stat .label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+        }
+        .user-stat .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .filter-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .btn-back {
+            margin-bottom: 20px;
+        }
+        .no-assets {
+            color: #999;
+            font-style: italic;
+            padding: 10px;
+        }
+        .stats-card {
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            color: white;
+        }
+        .stats-card h3 {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 10px 0 5px;
+        }
+        .stats-card p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        .return-status-badge {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .return-status-returned {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .return-status-overdue {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .return-status-pending {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+        .return-status-on-time {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .return-status-not-assigned {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .filter-card, .btn-back, .btn, .no-print {
+                display: none;
+            }
+            .container-main {
+                box-shadow: none;
+                padding: 0;
+            }
+            .user-card {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container container-main">
+        <!-- Back and Action Buttons -->
+        <div class="btn-back no-print">
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Print Report
+            </button>
+            <button class="btn btn-success" onclick="exportPDF()">
+                <i class="fas fa-file-pdf"></i> Export PDF
+            </button>
+        </div>
+
+        <!-- Report Header -->
+        <div class="report-header">
+            <div class="company-name">{{ company.name }}</div>
+            <div class="report-title">User Asset Report</div>
+            <div class="report-period">
+                Generated: {{ generated_date }}
+                | Currency: {{ company.base_currency }}
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-card no-print">
+            <h5><i class="fas fa-filter"></i> Filter by User</h5>
+            <div class="row">
+                <div class="col-md-8">
+                    <select class="form-control" id="userFilter">
+                        <option value="all">All Users</option>
+                        <!-- Users will be populated by JavaScript -->
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100" onclick="applyFilter()">
+                        <i class="fas fa-search"></i> Apply Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Content -->
+        <div id="reportContent">
+            <div class="text-center" id="loadingIndicator">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p>Loading report data...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        // Pass data from Flask to JavaScript
+        const userData = {{ user_assets|tojson|safe }};
+        const companyName = "{{ company.name }}";
+        const companyCurrency = "{{ company.base_currency }}";
+
+        function applyFilter() {
+            const userId = $('#userFilter').val();
+            loadReport(userId);
+        }
+
+        function loadReport(userId) {
+            $('#loadingIndicator').show();
+            $('#reportContent').html('<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Loading report data...</p></div>');
+
+            let url = '/api/reports/user-assets';
+            if (userId && userId !== 'all') {
+                url += '?user_id=' + userId;
+            }
+
+            $.get(url, function(response) {
+                $('#loadingIndicator').hide();
+                if (response.success) {
+                    displayReport(response);
+                } else {
+                    $('#reportContent').html('<div class="alert alert-danger">Error loading report: ' + (response.error || 'Unknown error') + '</div>');
+                }
+            }).fail(function(xhr) {
+                $('#loadingIndicator').hide();
+                const errorMsg = xhr.responseJSON?.error || 'Failed to load report data. Please try again.';
+                $('#reportContent').html('<div class="alert alert-danger">' + errorMsg + '</div>');
+            });
+        }
+
+        function getReturnStatus(asset, assignments) {
+    // Find all assignments for this asset
+    const assetAssignments = assignments.filter(a => a.asset_id === asset.id);
+
+    // If no assignments, return Not Assigned
+    if (!assetAssignments || assetAssignments.length === 0) {
+        return { status: 'Not Assigned', class: 'return-status-not-assigned', label: 'Not Assigned' };
+    }
+
+    // Check if there's an ACTIVE assignment for this asset
+    const activeAssignment = assetAssignments.find(a => a.status === 'Active');
+
+    // If there's an active assignment, check its return status
+    if (activeAssignment) {
+        // Check if overdue
+        if (activeAssignment.expected_return_date) {
+            const expectedDate = new Date(activeAssignment.expected_return_date);
+            const today = new Date();
+            if (expectedDate < today) {
+                return { status: 'Overdue', class: 'return-status-overdue', label: 'Overdue' };
+            } else {
+                return { status: 'Pending', class: 'return-status-pending', label: 'Pending' };
+            }
+        }
+        return { status: 'Active', class: 'return-status-pending', label: 'Active' };
+    }
+
+    // If no active assignment, check if there's a returned assignment
+    const returnedAssignment = assetAssignments.find(a => a.status === 'Returned' || a.actual_return_date);
+    if (returnedAssignment) {
+        return { status: 'Returned', class: 'return-status-returned', label: 'Returned' };
+    }
+
+    return { status: 'Not Assigned', class: 'return-status-not-assigned', label: 'Not Assigned' };
+}
+
+        function displayReport(response) {
+    const data = response.data || [];
+    const company = response.company || { name: companyName, base_currency: companyCurrency };
+    const generatedDate = response.generated_date || new Date().toLocaleString();
+    const allAssignments = response.assignments || [];
+
+    let html = '';
+
+    // Summary Cards
+    const totalUsers = data.length;
+    const totalAssets = data.reduce((sum, d) => sum + (d.assets ? d.assets.length : 0), 0);
+    const totalValue = data.reduce((sum, d) => sum + (d.total_value || 0), 0);
+
+    // Calculate overdue count - only for current users
+    const overdueCount = data.reduce((sum, d) => {
+        if (d.assets) {
+            return sum + d.assets.filter(a => a.status === 'Overdue').length;
+        }
+        return sum;
+    }, 0);
+
+    const returnedCount = data.reduce((sum, d) => {
+        if (d.assets) {
+            return sum + d.assets.filter(a => a.status === 'Returned').length;
+        }
+        return sum;
+    }, 0);
+
+    const pendingCount = data.reduce((sum, d) => {
+        if (d.assets) {
+            return sum + d.assets.filter(a => a.status === 'Pending' || a.status === 'Active').length;
+        }
+        return sum;
+    }, 0);
+
+    html += `
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-users fa-2x"></i>
+                    <h3>${totalUsers}</h3>
+                    <p>Total Users</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">
+                    <i class="fas fa-boxes fa-2x"></i>
+                    <h3>${totalAssets}</h3>
+                    <p>Total Assets</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <i class="fas fa-check-circle fa-2x"></i>
+                    <h3>${returnedCount}</h3>
+                    <p>Returned Assets</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card" style="background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%);">
+                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    <h3>${overdueCount}</h3>
+                    <p>Overdue Returns</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // User Cards
+    if (data.length === 0) {
+        html += `
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle"></i> No users found with assets.
+            </div>
+        `;
+    } else {
+        data.forEach(item => {
+            const user = item.user || {};
+            const assets = item.assets || [];
+            const totalValue = item.total_value || 0;
+
+            const roleBadge = user.role === 'admin' ? 'bg-danger' :
+                             user.role === 'manager' ? 'bg-warning' : 'bg-info';
+
+            // Calculate return stats for this user - using the status from API
+            const userOverdue = assets.filter(a => a.status === 'Overdue').length;
+            const userReturned = assets.filter(a => a.status === 'Returned').length;
+            const userPending = assets.filter(a => a.status === 'Pending' || a.status === 'Active').length;
+
+            html += `
+                <div class="card user-card">
+                    <div class="card-header">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-user-circle"></i> ${escapeHtml(user.full_name || 'Unknown User')}
+                                    <span class="badge ${roleBadge} ms-2">${escapeHtml(user.role || 'user')}</span>
+                                </h5>
+                                <small class="text-muted">${escapeHtml(user.department || 'No department')} ${user.phone ? '| ' + escapeHtml(user.phone) : ''}</small>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="user-stats float-md-end">
+                                    <div class="user-stat">
+                                        <div class="label">Total Assets</div>
+                                        <div class="value">${assets.length}</div>
+                                    </div>
+                                    <div class="user-stat">
+                                        <div class="label">Returned</div>
+                                        <div class="value" style="color:#10b981;">${userReturned}</div>
+                                    </div>
+                                    <div class="user-stat">
+                                        <div class="label">Pending</div>
+                                        <div class="value" style="color:#f59e0b;">${userPending}</div>
+                                    </div>
+                                    <div class="user-stat">
+                                        <div class="label">Overdue</div>
+                                        <div class="value" style="color:#ef4444;">${userOverdue}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        ${assets.length > 0 ? `
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Asset No.</th>
+                                            <th>Category</th>
+                                            <th>Description</th>
+                                            <th>Serial No.</th>
+                                            <th>Condition</th>
+                                            <th>Assigned Date</th>
+                                            <th>Expected Return</th>
+                                            <th>Actual Return</th>
+                                            <th>Return Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${assets.map(asset => {
+                                            const statusMap = {
+                                                'Returned': 'return-status-returned',
+                                                'Overdue': 'return-status-overdue',
+                                                'Pending': 'return-status-pending',
+                                                'Active': 'return-status-pending'
+                                            };
+                                            const statusClass = statusMap[asset.status] || 'return-status-not-assigned';
+
+                                            return `
+                                                <tr>
+                                                    <td><strong>${escapeHtml(asset.asset_no || '-')}</strong></td>
+                                                    <td>${escapeHtml(asset.category || 'Uncategorized')}</td>
+                                                    <td>${escapeHtml(asset.description || '-')}</td>
+                                                    <td>${escapeHtml(asset.serial_no || '-')}</td>
+                                                    <td>${escapeHtml(asset.condition || '-')}</td>
+                                                    <td>${asset.assigned_date || '-'}</td>
+                                                    <td>${asset.expected_return_date || '-'}</td>
+                                                    <td>${asset.actual_return_date || '-'}</td>
+                                                    <td>
+                                                        <span class="return-status-badge ${statusClass}">
+                                                            ${asset.status || 'Not Assigned'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : `
+                            <div class="no-assets text-center">
+                                <i class="fas fa-info-circle"></i> No assets found for this user.
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    // Footer
+    html += `
+        <div class="footer-note text-center text-muted" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; font-size: 12px;">
+            <p>Report generated on ${generatedDate} | ${escapeHtml(company.name)}</p>
+            <p>This report shows all assets assigned to each user with return status.</p>
+        </div>
+    `;
+
+    $('#reportContent').html(html);
+}
+        function formatNumber(num) {
+            if (isNaN(num)) return '0.00';
+            return num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        function exportPDF() {
+            const userId = $('#userFilter').val();
+            let url = '/reports/user-assets/export/pdf';
+            if (userId && userId !== 'all') {
+                url += '?user_id=' + userId;
+            }
+            window.open(url, '_blank');
+        }
+
+        $(document).ready(function() {
+            // Populate user filter dropdown from userData
+            const filterSelect = $('#userFilter');
+            if (userData && userData.length > 0) {
+                userData.forEach(item => {
+                    if (item.user) {
+                        filterSelect.append(`<option value="${item.user.id}">${escapeHtml(item.user.full_name)} (${escapeHtml(item.user.role)})</option>`);
+                    }
+                });
+            }
+
+            // Load all users by default
+            loadReport('all');
+        });
+    </script>
+</body>
+</html>

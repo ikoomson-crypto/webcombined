@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asset Schedule Report - Asset Register</title>
+    <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        .container-main {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            overflow-x: auto;
+        }
+        h1 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        .filter-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .report-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        .company-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .report-title {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .report-period {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .asset-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-bottom: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-width: 800px;
+        }
+        .asset-table th {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 10px;
+            text-align: center;
+            font-weight: bold;
+            border: 1px solid #34495e;
+            vertical-align: middle;
+        }
+        .asset-table td {
+            padding: 10px 8px;
+            border: 1px solid #dee2e6;
+            vertical-align: middle;
+        }
+        .category-header {
+            background-color: #34495e;
+            color: white;
+            text-align: center;
+        }
+        .section-header {
+            background-color: #2c3e50;
+        }
+        .row-label {
+            background-color: #e8eaf6;
+            font-weight: bold;
+        }
+        .sub-row {
+            background-color: #ffffff;
+        }
+        .sub-row-indent {
+            padding-left: 25px !important;
+        }
+        .amount {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+        .total-row {
+            background-color: #e8eaf6;
+            font-weight: bold;
+        }
+        .nbv-value {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .depreciation-value {
+            color: #e74c3c;
+        }
+        .footer-note {
+            font-size: 10px;
+            color: #7f8c8d;
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+        }
+        .btn-back {
+            margin-bottom: 20px;
+        }
+        .grand-total-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .horizontal-scroll {
+            overflow-x: auto;
+        }
+        .disposal-text {
+            color: #dc3545;
+            font-size: 10px;
+        }
+        .asset-detail-row {
+            background-color: #f9f9f9;
+        }
+        .asset-detail-row:hover {
+            background-color: #f0f0f0;
+        }
+        .detail-indent {
+            padding-left: 30px !important;
+        }
+        .cost-section {
+            background-color: #e3f2fd;
+        }
+        .depn-section {
+            background-color: #fff3e0;
+        }
+        .currency-row {
+            background-color: #f0f4ff;
+            font-weight: normal;
+        }
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .filter-card, .btn-back, .btn, .no-print {
+                display: none;
+            }
+            .container-main {
+                padding: 0;
+                box-shadow: none;
+                overflow-x: visible;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container container-main">
+        <div class="btn-back no-print">
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print"></i> Print Report
+            </button>
+        </div>
+
+        <div class="filter-card no-print">
+            <h5><i class="fas fa-calendar-alt"></i> Report Filters</h5>
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label class="form-label required">Start Date</label>
+                    <input type="date" class="form-control" id="startDate">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label required">End Date</label>
+                    <input type="date" class="form-control" id="endDate">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Entity</label>
+                    <select class="form-control" id="entity">
+                        <option value="all">All Entities</option>
+                        {% for entity in entities %}
+                        <option value="{{ entity }}">{{ entity }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label class="form-label">Category</label>
+                    <select class="form-control" id="category">
+                        <option value="all">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="text-center">
+                <button class="btn btn-primary" onclick="generateReport()">
+                    <i class="fas fa-chart-line"></i> Generate Report
+                </button>
+                <button class="btn btn-success" onclick="exportReport()" id="exportBtn" style="display:none;">
+                    <i class="fas fa-file-excel"></i> Export to Excel
+                </button>
+                <button class="btn btn-secondary" onclick="resetFilters()">
+                    <i class="fas fa-undo"></i> Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Report Results -->
+        <div id="reportResults" style="display:none;">
+            <div id="reportContent"></div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        let currentReportData = null;
+
+        function formatNumber(num) {
+            return num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function generateReport() {
+            const startDate = $('#startDate').val();
+            const endDate = $('#endDate').val();
+            const entity = $('#entity').val();
+            const category = $('#category').val();
+
+            if (!startDate || !endDate) {
+                Swal.fire('Error', 'Please select both Start Date and End Date', 'error');
+                return;
+            }
+
+            if (new Date(startDate) > new Date(endDate)) {
+                Swal.fire('Error', 'Start Date must be before End Date', 'error');
+                return;
+            }
+
+            Swal.fire({
+                title: 'Generating Report...',
+                text: 'Please wait',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: '/api/reports/asset-movement',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    entity: entity,
+                    category: category
+                }),
+                success: function(response) {
+                    Swal.close();
+                    if (response.success) {
+                        currentReportData = response;
+                        displayReport(response);
+                        $('#exportBtn').show();
+                    } else {
+                        Swal.fire('Error', response.error, 'error');
+                    }
+                },
+                error: function() {
+                    Swal.close();
+                    Swal.fire('Error', 'Failed to generate report', 'error');
+                }
+            });
+        }
+
+        function displayReport(response) {
+            const categories = response.categories;
+            const totals = response.grand_totals;
+            const filters = response.filters;
+
+            // Detect currency from first asset (if available)
+            let displayCurrency = 'USD';
+            if (categories.length > 0 && categories[0].assets.length > 0) {
+                displayCurrency = categories[0].assets[0].currency;
+            }
+
+            let html = `
+                <div class="report-header">
+                    <div class="company-name">FIXED ASSET SCHEDULE</div>
+                    <div class="report-title">Asset Cost, Depreciation & Net Book Value Analysis</div>
+                    <div class="report-period">
+                        Period: ${filters.start_date} to ${filters.end_date} |
+                        Entity: ${filters.entity} |
+                        Category: ${filters.category}
+                    </div>
+                    <div class="report-period">Currency: ${displayCurrency}</div>
+                    <div class="report-period">Generated: ${response.report_date}</div>
+                </div>
+            `;
+
+            // Summary Cards
+            html += `
+                <div class="row mb-4 no-print">
+                    <div class="col-md-4">
+                        <div class="grand-total-card">
+                            <i class="fas fa-dollar-sign fa-2x"></i>
+                            <h4>Total Cost</h4>
+                            <h3>${displayCurrency} ${formatNumber(totals.cost_closing)}</h3>
+                            <small>Opening: ${formatNumber(totals.cost_opening)} | Additions: ${formatNumber(totals.cost_additions)}</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="grand-total-card">
+                            <i class="fas fa-chart-line fa-2x"></i>
+                            <h4>Total Depreciation</h4>
+                            <h3>${displayCurrency} ${formatNumber(totals.depn_closing)}</h3>
+                            <small>Period Depreciation: ${formatNumber(totals.depn_period)}</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="grand-total-card">
+                            <i class="fas fa-book fa-2x"></i>
+                            <h4>Total Net Book Value</h4>
+                            <h3>${displayCurrency} ${formatNumber(totals.nbv_closing)}</h3>
+                            <small>Opening NBV: ${formatNumber(totals.nbv_opening)}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Build horizontal table with VERTICAL rows for Opening, Additions, Closing
+            html += `<div class="horizontal-scroll"><table class="asset-table">`;
+
+            // Row 1: Category Headers (across the top)
+            html += `<thead>`;
+            html += `<tr class="category-header">`;
+            html += `<th style="width: 200px;">DESCRIPTION</th>`;
+            categories.forEach(cat => {
+                html += `<th colspan="1" style="text-align: center; font-size: 14px;">${escapeHtml(cat.category)}</th>`;
+            });
+            html += `<th colspan="1" style="text-align: center; font-size: 14px; background-color: #2c3e50;">GRAND TOTAL</th>`;
+            html += `</tr>`;
+            html += `</thead>`;
+
+            html += `<tbody>`;
+
+            // ======================== CURRENCY ROW ========================
+            html += `<tr class="currency-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-money-bill-wave"></i> Currency</td>`;
+            categories.forEach(cat => {
+                let catCurrency = 'USD';
+                if (cat.assets.length > 0) {
+                    catCurrency = cat.assets[0].currency;
+                }
+                html += `<td class="amount"><strong>${catCurrency}</strong></td>`;
+            });
+            html += `<td class="amount"><strong>${displayCurrency}</strong></td>`;
+            html += `</tr>`;
+
+            // ======================== SECTION 1: COST ========================
+            html += `<tr class="row-label"><td colspan="${categories.length + 2}" style="background-color: #2c3e50; color: white; text-align: left; padding-left: 15px;"><strong><i class="fas fa-dollar-sign"></i> COST</strong></td></tr>`;
+
+            // Row: Opening Balance (under COST)
+            html += `<tr class="sub-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-arrow-right"></i> Opening Balance</td>`;
+            categories.forEach(cat => {
+                html += `<td class="amount">${formatNumber(cat.totals.cost_opening)}</td>`;
+            });
+            html += `<td class="amount"><strong>${formatNumber(totals.cost_opening)}</strong></td>`;
+            html += `</tr>`;
+
+            // Row: Additions (under COST)
+            html += `<tr class="sub-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-plus-circle"></i> Additions</td>`;
+            categories.forEach(cat => {
+                let additionsText = formatNumber(cat.totals.cost_additions);
+                if (cat.totals.cost_disposals > 0) {
+                    additionsText += `<br><span class="disposal-text">(Disposals: ${formatNumber(cat.totals.cost_disposals)})</span>`;
+                }
+                html += `<td class="amount">${additionsText}</td>`;
+            });
+            let grandAdditionsText = formatNumber(totals.cost_additions);
+            if (totals.cost_disposals > 0) {
+                grandAdditionsText += `<br><span class="disposal-text">(Disposals: ${formatNumber(totals.cost_disposals)})</span>`;
+            }
+            html += `<td class="amount"><strong>${grandAdditionsText}</strong></td>`;
+            html += `</tr>`;
+
+            // Row: Closing Balance (under COST)
+            html += `<tr class="total-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-check-circle"></i> Closing Balance</td>`;
+            categories.forEach(cat => {
+                html += `<td class="amount"><strong>${formatNumber(cat.totals.cost_closing)}</strong></td>`;
+            });
+            html += `<td class="amount"><strong>${formatNumber(totals.cost_closing)}</strong></td>`;
+            html += `</tr>`;
+
+            // Spacer row
+            html += `<tr style="background-color: #ecf0f1;"><td colspan="${categories.length + 2}" style="padding: 3px;"></td></tr>`;
+
+            // ======================== SECTION 2: ACCUMULATED DEPRECIATION ========================
+            html += `<tr class="row-label"><td colspan="${categories.length + 2}" style="background-color: #2c3e50; color: white; text-align: left; padding-left: 15px;"><strong><i class="fas fa-chart-line"></i> ACCUMULATED DEPRECIATION</strong></td></tr>`;
+
+            // Row: Opening Balance (under DEPRECIATION)
+            html += `<tr class="sub-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-arrow-right"></i> Opening Balance</td>`;
+            categories.forEach(cat => {
+                html += `<td class="amount">${formatNumber(cat.totals.depn_opening)}</td>`;
+            });
+            html += `<td class="amount"><strong>${formatNumber(totals.depn_opening)}</strong></td>`;
+            html += `</tr>`;
+
+            // Row: Period Depreciation (under DEPRECIATION)
+            html += `<tr class="sub-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-chart-line"></i> Period Depreciation</td>`;
+            categories.forEach(cat => {
+                html += `<td class="amount depreciation-value">${formatNumber(cat.totals.depn_period)}</td>`;
+            });
+            html += `<td class="amount depreciation-value"><strong>${formatNumber(totals.depn_period)}</strong></td>`;
+            html += `</tr>`;
+
+            // Row: Closing Balance (under DEPRECIATION)
+            html += `<tr class="total-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-check-circle"></i> Closing Balance</td>`;
+            categories.forEach(cat => {
+                html += `<td class="amount"><strong>${formatNumber(cat.totals.depn_closing)}</strong></td>`;
+            });
+            html += `<td class="amount"><strong>${formatNumber(totals.depn_closing)}</strong></td>`;
+            html += `</tr>`;
+
+            // Spacer row
+            html += `<tr style="background-color: #ecf0f1;"><td colspan="${categories.length + 2}" style="padding: 3px;"></td></tr>`;
+
+            // ======================== SECTION 3: NET BOOK VALUE ========================
+            html += `<tr class="row-label"><td colspan="${categories.length + 2}" style="background-color: #2c3e50; color: white; text-align: left; padding-left: 15px;"><strong><i class="fas fa-book"></i> NET BOOK VALUE</strong></td></tr>`;
+
+            // Row: Opening NBV
+            html += `<tr class="sub-row">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-arrow-right"></i> Opening Net Book Value</td>`;
+            categories.forEach(cat => {
+                html += `<td class="amount">${formatNumber(cat.totals.nbv_opening)}</td>`;
+            });
+            html += `<td class="amount"><strong>${formatNumber(totals.nbv_opening)}</strong></td>`;
+            html += `</tr>`;
+
+            // Row: Closing NBV
+            html += `<tr class="total-row nbv-value">`;
+            html += `<td class="row-label" style="padding-left: 20px;"><i class="fas fa-book"></i> Closing Net Book Value</td>`;
+            categories.forEach(cat => {
+                html += `<td class="amount nbv-value"><strong>${formatNumber(cat.totals.nbv_closing)}</strong></td>`;
+            });
+            html += `<td class="amount nbv-value"><strong>${formatNumber(totals.nbv_closing)}</strong></td>`;
+            html += `</tr>`;
+
+            // ======================== DETAILS SECTION (Expandable) ========================
+            html += `<tr style="background-color: #ecf0f1;"><td colspan="${categories.length + 2}" style="padding: 10px; text-align: center;">
+                        <button class="btn btn-sm btn-info" onclick="toggleAllDetails()">
+                            <i class="fas fa-eye"></i> Show/Hide Asset Details
+                        </button>
+                     </td></tr>`;
+
+            // Asset details (hidden by default)
+            categories.forEach((cat, idx) => {
+                // Category header for details
+                html += `<tr id="detail-header-${idx}" style="display: none; background-color: #34495e;">`;
+                html += `<td colspan="${categories.length + 2}" style="color: white; padding: 8px;"><strong><i class="fas fa-folder-open"></i> ${escapeHtml(cat.category)} - Asset Breakdown</strong></td>`;
+                html += `</tr>`;
+
+                // Assets in this category
+                cat.assets.forEach(asset => {
+                    // Asset name row
+                    html += `<tr id="detail-asset-${idx}-${asset.asset_id}" style="display: none;" class="asset-detail-row">`;
+                    html += `<td class="detail-indent"><strong>${escapeHtml(asset.asset_no)}</strong> - ${escapeHtml(asset.description)}<br><small class="text-muted">User: ${escapeHtml(asset.user)} | Currency: ${asset.currency}</small></td>`;
+
+                    // Values across categories (only its own category has values)
+                    categories.forEach((cat2, idx2) => {
+                        if (idx === idx2) {
+                            html += `<td class="amount">${asset.currency} ${formatNumber(asset.cost_closing)}</td>`;
+                        } else {
+                            html += `<td class="amount">-</td>`;
+                        }
+                    });
+                    html += `<td class="amount">${asset.currency} ${formatNumber(asset.cost_closing)}</td>`;
+                    html += `</tr>`;
+
+                    // Depreciation row for this asset
+                    html += `<tr id="detail-depn-${idx}-${asset.asset_id}" style="display: none;" class="asset-detail-row">`;
+                    html += `<td class="detail-indent"><small class="text-muted">&nbsp;&nbsp;&nbsp;<i class="fas fa-chart-line"></i> Accumulated Depreciation</small></td>`;
+                    categories.forEach((cat2, idx2) => {
+                        if (idx === idx2) {
+                            html += `<td class="amount depreciation-value">${asset.currency} ${formatNumber(asset.depn_closing)}</td>`;
+                        } else {
+                            html += `<td class="amount">-</td>`;
+                        }
+                    });
+                    html += `<td class="amount depreciation-value">${asset.currency} ${formatNumber(asset.depn_closing)}</td>`;
+                    html += `</tr>`;
+
+                    // NBV row for this asset
+                    html += `<tr id="detail-nbv-${idx}-${asset.asset_id}" style="display: none;" class="asset-detail-row">`;
+                    html += `<td class="detail-indent"><small class="text-muted nbv-value">&nbsp;&nbsp;&nbsp;<i class="fas fa-book"></i> Net Book Value</small></td>`;
+                    categories.forEach((cat2, idx2) => {
+                        if (idx === idx2) {
+                            html += `<td class="amount nbv-value">${asset.currency} ${formatNumber(asset.nbv_closing)}</td>`;
+                        } else {
+                            html += `<td class="amount">-</td>`;
+                        }
+                    });
+                    html += `<td class="amount nbv-value">${asset.currency} ${formatNumber(asset.nbv_closing)}</td>`;
+                    html += `</tr>`;
+                });
+            });
+
+            html += `
+                </tbody>
+                </table></div>
+            `;
+
+            // Footer Notes
+            html += `
+                <div class="footer-note">
+                    <p><strong>Notes:</strong></p>
+                    <ul>
+                        <li><strong>Opening Balance:</strong> Asset values at the beginning of the period</li>
+                        <li><strong>Additions:</strong> Assets purchased/acquired during the period</li>
+                        <li><strong>Disposals:</strong> Assets sold/written off during the period (shown in parentheses)</li>
+                        <li><strong>Period Depreciation:</strong> Depreciation charged during the period (straight-line method)</li>
+                        <li><strong>Closing Balance:</strong> Asset values at the end of the period</li>
+                        <li><strong>Net Book Value = Cost - Accumulated Depreciation</strong></li>
+                        <li><strong>Currency:</strong> All amounts are shown in the respective currency for each category</li>
+                    </ul>
+                    <p>This report is system-generated and does not require a signature.</p>
+                </div>
+            `;
+
+            $('#reportContent').html(html);
+            $('#reportResults').show();
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        let detailsVisible = false;
+
+        function toggleAllDetails() {
+            detailsVisible = !detailsVisible;
+            const display = detailsVisible ? 'table-row' : 'none';
+
+            $('[id^="detail-header-"], [id^="detail-asset-"], [id^="detail-depn-"], [id^="detail-nbv-"]').each(function() {
+                $(this).css('display', display);
+            });
+
+            const btnText = detailsVisible ? 'Hide Asset Details' : 'Show Asset Details';
+            $('button:contains("Show/Hide Asset Details")').html(`<i class="fas fa-eye"></i> ${btnText}`);
+        }
+
+        function exportReport() {
+            if (!currentReportData) return;
+
+            const startDate = $('#startDate').val();
+            const endDate = $('#endDate').val();
+            const entity = $('#entity').val();
+            const category = $('#category').val();
+
+            Swal.fire({
+                title: 'Exporting...',
+                text: 'Please wait',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: '/reports/asset-movement/export/excel',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    entity: entity,
+                    category: category
+                }),
+                xhrFields: {
+                    responseType: 'blob'
+                },
+                success: function(blob) {
+                    Swal.close();
+                    const link = document.createElement('a');
+                    const url = window.URL.createObjectURL(blob);
+                    link.href = url;
+                    link.download = `asset_schedule_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+
+                    Swal.fire('Success', 'Report exported successfully!', 'success');
+                },
+                error: function() {
+                    Swal.close();
+                    Swal.fire('Error', 'Failed to export report', 'error');
+                }
+            });
+        }
+
+        function resetFilters() {
+            const today = new Date().toISOString().split('T')[0];
+            const lastMonth = new Date();
+            lastMonth.setMonth(lastMonth.getMonth() - 1);
+            const lastMonthDate = lastMonth.toISOString().split('T')[0];
+
+            $('#startDate').val(lastMonthDate);
+            $('#endDate').val(today);
+            $('#entity').val('all');
+            $('#category').val('all');
+            $('#reportResults').hide();
+            $('#exportBtn').hide();
+            detailsVisible = false;
+        }
+
+        $(document).ready(function() {
+            const today = new Date().toISOString().split('T')[0];
+            const lastMonth = new Date();
+            lastMonth.setMonth(lastMonth.getMonth() - 1);
+            const lastMonthDate = lastMonth.toISOString().split('T')[0];
+
+            $('#startDate').val(lastMonthDate);
+            $('#endDate').val(today);
+        });
+    </script>
+</body>
+</html>
