@@ -1,6 +1,5 @@
-from werkzeug.middleware.dispatcher import DispatcherMiddleware
-from werkzeug.serving import run_simple
 from flask import Flask
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
 
 from app1.app import app as app1
 from app2.app import app as app2
@@ -13,29 +12,31 @@ main_app = Flask(__name__)
 @main_app.route("/")
 def home():
     return """
-    <h2>Main Dashboard</h2>
+    <h2>Web Application Portal</h2>
     <ul>
-        <li><a href="/app1">Application 1</a></li>
-        <li><a href="/app2">Application 2</a></li>
-        <li><a href="/app3">Application 3</a></li>
+        <li><a href="/app1/">Payment System</a></li>
+        <li><a href="/app2/">HR System</a></li>
+        <li><a href="/app3/">Inventory System</a></li>
     </ul>
     """
 
 
-application = DispatcherMiddleware(
+app = DispatcherMiddleware(
     main_app,
     {
         "/app1": app1,
         "/app2": app2,
-        "/app3": app3,
+        "/app3": app3
     }
 )
 
 
 if __name__ == "__main__":
+    from werkzeug.serving import run_simple
+
     run_simple(
         "localhost",
         5000,
-        application,
+        app,
         use_reloader=True
     )
