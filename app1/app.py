@@ -27,19 +27,10 @@ if os.environ.get('DATABASE_URL'):
 else:
     # Use SQLite locally
     def get_database_path():
-        try:
-            user_profile = os.environ.get('USERPROFILE', 'C:\\Users\\Default')
-            local_path = Path(user_profile) / 'AppData' / 'Local' / 'PaymentScheduler'
-            local_path.mkdir(parents=True, exist_ok=True)
-            db_file = local_path / 'payment_system.db'
-            db_file.touch(exist_ok=True)
-            return str(db_file.absolute())
-        except (PermissionError, OSError):
-            temp_dir = Path(tempfile.gettempdir()) / 'PaymentScheduler'
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            db_file = temp_dir / 'payment_system.db'
-            return str(db_file.absolute())
-
+        # Store database in the project folder
+        project_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+        db_file = project_dir / 'payment_system.db'
+        return str(db_file.absolute())
 
     database_path = get_database_path()
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{database_path}'
