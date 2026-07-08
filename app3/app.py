@@ -48,7 +48,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize extensions
-from app3.models import db, Company, PrepaymentSchedule, AmortizationEntry
+from models import db, Company, PrepaymentSchedule, AmortizationEntry
 db.init_app(app)
 
 
