@@ -37,9 +37,9 @@
         else if(view==='downloads') { document.getElementById('downloadsView').style.display='block'; }
         else if(view==='unassignedAssets') { document.getElementById('unassignedAssetsView').style.display='block'; loadUnassignedAssets(); }
         else if(view==='assetHistory') { document.getElementById('assetHistoryView').style.display='block'; loadAssetHistory(); }
-        else if(view==='depreciation') { window.location.href='/depreciation/schedule'; }
-        else if(view==='assetSchedule') { window.location.href='/reports/asset-movement'; }
-        else if(view==='userAssetReport') { window.location.href='/reports/user-assets'; }
+        else if(view==='depreciation') { window.location.href='/app2/depreciation/schedule'; }
+        else if(view==='assetSchedule') { window.location.href='/app2/reports/asset-movement'; }
+        else if(view==='userAssetReport') { window.location.href='/app2/reports/user-assets'; }
         else if(view==='help') { Swal.fire({title:'Help', html:`<div style='text-align:left'><h6>Companies</h6><ul><li>Switch via sidebar</li><li>Create/edit companies</li></ul><h6>Users</h6><ul><li>Add/edit/activate/deactivate</li><li>Roles: admin, manager, user</li></ul><h6>Assignments</h6><ul><li>Assign assets to users</li><li>Return with condition & signature</li><li>Attach files to returns</li></ul><h6>Unassigned Assets</h6><ul><li>View all unassigned assets</li><li>Click Assign to assign to a user</li></ul><h6>Asset History</h6><ul><li>View complete history of each asset</li><li>Shows past and current users</li></ul></div>`, icon:'info'}); }
     }
 
@@ -57,9 +57,9 @@
     else if(view==='unassignedAssets') { document.getElementById('unassignedAssetsView').style.display='block'; loadUnassignedAssets(); }
     else if(view==='assetHistory') { document.getElementById('assetHistoryView').style.display='block'; loadAssetHistory(); }
     else if(view==='editAssignments') { document.getElementById('editAssignmentsView').style.display='block'; loadEditAssignments(); }
-    else if(view==='depreciation') { window.location.href='/depreciation/schedule'; }
-    else if(view==='assetSchedule') { window.location.href='/reports/asset-movement'; }
-    else if(view==='userAssetReport') { window.location.href='/reports/user-assets'; }
+    else if(view==='depreciation') { window.location.href='/app2/depreciation/schedule'; }
+    else if(view==='assetSchedule') { window.location.href='/app2/reports/asset-movement'; }
+    else if(view==='userAssetReport') { window.location.href='/app2/reports/user-assets'; }
     else if(view==='help') { Swal.fire({title:'Help', html:`<div style='text-align:left'><h6>Companies</h6><ul><li>Switch via sidebar</li><li>Create/edit companies</li></ul><h6>Users</h6><ul><li>Add/edit/activate/deactivate</li><li>Roles: admin, manager, user</li></ul><h6>Assignments</h6><ul><li>Assign assets to users</li><li>Return with condition & signature</li><li>Attach files to returns</li></ul><h6>Assign Assets</h6><ul><li>View all unassigned assets</li><li>Click Assign to assign to a user</li></ul><h6>Edit Assignments</h6><ul><li>View and edit existing assignments</li><li>Change assigned user, dates, or delete</li></ul><h6>Asset History</h6><ul><li>View complete history of each asset</li><li>Shows past and current users</li></ul></div>`, icon:'info'}); }
 }
 
@@ -845,13 +845,13 @@ function deleteAssignment(assignmentId) {
 
     // ---------- EXPORT HISTORY PDF ----------
     function exportHistoryPDF() {
-        const searchValue = $('#historySearchInput').val() || '';
-        let url = '/reports/asset-history/export/pdf';
-        if (searchValue) {
-            url += '?search=' + encodeURIComponent(searchValue);
-        }
-        window.open(url, '_blank');
+    const searchValue = $('#historySearchInput').val() || '';
+    let url = '/app2/reports/asset-history/export/pdf';
+    if (searchValue) {
+        url += '?search=' + encodeURIComponent(searchValue);
     }
+    window.open(url, '_blank');
+}
 
     // ---------- BULK ----------
     function toggleAssetSelection(id){ if(selectedAssets.has(id)) selectedAssets.delete(id); else selectedAssets.add(id); updateBulkActionsBar(); updateSelectAllCheckbox(); }
@@ -881,14 +881,14 @@ function deleteAssignment(assignmentId) {
     }
 
     // ---------- EXPORT / IMPORT ----------
-    function exportExcel(){ window.location.href='/export/excel'; }
-    function downloadTemplate(){ window.location.href='/download/template'; }
+    function exportExcel(){ window.location.href='/app2/export/excel'; }
+    function downloadTemplate(){ window.location.href='/app2/download/template/asset-import'; }
     function importExcel(){ $('#importModal').modal('show'); }
     function uploadFile(){
-        const file=$('#importFile')[0].files[0]; if(!file) return Swal.fire('Error','Select a file','error');
-        const fd=new FormData(); fd.append('file',file); Swal.fire({title:'Importing...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
-        $.ajax({url:'/import/excel',method:'POST',data:fd,processData:false,contentType:false, success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success',r.message,'success'); $('#importModal').modal('hide'); loadAssets(); loadCategories(); loadCategoriesDropdown(); loadUnassignedAssets(); loadAssetHistory(); } else Swal.fire('Error',r.error,'error'); }, error:()=>{ Swal.close(); Swal.fire('Error','Import failed','error'); } });
-    }
+    const file=$('#importFile')[0].files[0]; if(!file) return Swal.fire('Error','Select a file','error');
+    const fd=new FormData(); fd.append('file',file); Swal.fire({title:'Importing...',allowOutsideClick:false,didOpen:()=>Swal.showLoading()});
+    $.ajax({url:'/app2/import/excel',method:'POST',data:fd,processData:false,contentType:false, success:function(r){ Swal.close(); if(r.success){ Swal.fire('Success',r.message,'success'); $('#importModal').modal('hide'); loadAssets(); loadCategories(); loadCategoriesDropdown(); loadUnassignedAssets(); loadAssetHistory(); } else Swal.fire('Error',r.error,'error'); }, error:()=>{ Swal.close(); Swal.fire('Error','Import failed','error'); } });
+}
     function refreshData(){ loadAssets(); loadUsers(); loadAssignments(); loadReturnForms(); loadDashboardData(); loadUnassignedAssets(); loadAssetHistory(); Swal.fire('Refreshed','Data updated','success'); }
 
     // ---------- INIT ----------

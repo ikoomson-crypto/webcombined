@@ -1,12 +1,202 @@
 <div id="downloadsView" style="display:none;">
     <div class="container-main">
         <h1><i class="fas fa-download" style="color:#4f46e5;"></i> Templates <span class="company-badge" id="downloadsCompanyBadge">Loading...</span></h1>
-        <div class="row g-4 mt-2">
-            <div class="col-md-3"><div class="card download-card p-3 text-center"><i class="fas fa-boxes fa-3x text-primary mb-2"></i><h6>Asset Import</h6><p class="small text-muted">Bulk import assets</p><a href="/download/template/asset-import" class="btn btn-sm btn-primary"><i class="fas fa-download"></i> Download</a></div></div>
-            <div class="col-md-3"><div class="card download-card p-3 text-center"><i class="fas fa-user-plus fa-3x text-success mb-2"></i><h6>Assignment</h6><p class="small text-muted">Bulk assign</p><a href="/download/template/assignment" class="btn btn-sm btn-success"><i class="fas fa-download"></i> Download</a></div></div>
-            <div class="col-md-3"><div class="card download-card p-3 text-center"><i class="fas fa-undo-alt fa-3x text-warning mb-2"></i><h6>Return Form</h6><p class="small text-muted">Bulk returns</p><a href="/download/template/return-form" class="btn btn-sm btn-warning"><i class="fas fa-download"></i> Download</a></div></div>
-            <div class="col-md-3"><div class="card download-card p-3 text-center"><i class="fas fa-truck fa-3x text-info mb-2"></i><h6>Supplier</h6><p class="small text-muted">Supplier import</p><a href="/download/template/supplier" class="btn btn-sm btn-info"><i class="fas fa-download"></i> Download</a></div></div>
+
+        <!-- Horizontal Scrolling Cards -->
+        <div class="d-flex gap-4 mt-3 pb-3" style="flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;">
+
+            <!-- Asset Import Template -->
+            <div class="card download-card p-4 text-center" style="min-width: 200px; flex-shrink: 0; border-radius: 16px; border: 1px solid #e2e8f0; transition: all 0.3s; background: white;">
+                <i class="fas fa-boxes fa-3x text-primary mb-3"></i>
+                <h6 class="fw-bold">Asset Import</h6>
+                <p class="small text-muted">Bulk import assets</p>
+                <a href="/app2/download/template/asset-import" class="btn btn-sm btn-primary w-100 mt-2">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+
+            <!-- Assignment Template -->
+            <div class="card download-card p-4 text-center" style="min-width: 200px; flex-shrink: 0; border-radius: 16px; border: 1px solid #e2e8f0; transition: all 0.3s; background: white;">
+                <i class="fas fa-user-plus fa-3x text-success mb-3"></i>
+                <h6 class="fw-bold">Assignment</h6>
+                <p class="small text-muted">Bulk assign assets</p>
+                <a href="/app2/download/template/assignment" class="btn btn-sm btn-success w-100 mt-2">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+
+            <!-- Return Form Template -->
+            <div class="card download-card p-4 text-center" style="min-width: 200px; flex-shrink: 0; border-radius: 16px; border: 1px solid #e2e8f0; transition: all 0.3s; background: white;">
+                <i class="fas fa-undo-alt fa-3x text-warning mb-3"></i>
+                <h6 class="fw-bold">Return Form</h6>
+                <p class="small text-muted">Bulk returns processing</p>
+                <a href="/app2/download/template/return-form" class="btn btn-sm btn-warning w-100 mt-2">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+
+            <!-- Supplier Template -->
+            <div class="card download-card p-4 text-center" style="min-width: 200px; flex-shrink: 0; border-radius: 16px; border: 1px solid #e2e8f0; transition: all 0.3s; background: white;">
+                <i class="fas fa-truck fa-3x text-info mb-3"></i>
+                <h6 class="fw-bold">Supplier</h6>
+                <p class="small text-muted">Supplier import</p>
+                <a href="/app2/download/template/supplier" class="btn btn-sm btn-info w-100 mt-2">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+
+            <!-- Equipment Template (Extra) -->
+            <div class="card download-card p-4 text-center" style="min-width: 200px; flex-shrink: 0; border-radius: 16px; border: 1px solid #e2e8f0; transition: all 0.3s; background: white;">
+                <i class="fas fa-tools fa-3x text-secondary mb-3"></i>
+                <h6 class="fw-bold">Equipment</h6>
+                <p class="small text-muted">Equipment catalog</p>
+                <a href="/app2/download/template/equipment" class="btn btn-sm btn-secondary w-100 mt-2">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
+
+            <!-- Location Template (Extra) -->
+            <div class="card download-card p-4 text-center" style="min-width: 200px; flex-shrink: 0; border-radius: 16px; border: 1px solid #e2e8f0; transition: all 0.3s; background: white;">
+                <i class="fas fa-map-marker-alt fa-3x text-danger mb-3"></i>
+                <h6 class="fw-bold">Location</h6>
+                <p class="small text-muted">Location management</p>
+                <a href="/app2/download/template/location" class="btn btn-sm btn-danger w-100 mt-2">
+                    <i class="fas fa-download"></i> Download
+                </a>
+            </div>
         </div>
-        <div class="card mt-4 border-0 shadow-sm"><div class="card-header bg-secondary text-white"><i class="fas fa-info-circle"></i> How to use</div><div class="card-body small"><ul><li>Fill data in Excel, keep column headers</li><li>Date format: YYYY-MM-DD</li><li>Remove example rows before import</li></ul></div></div>
+
+        <!-- How to Use Section -->
+        <div class="card mt-4 border-0 shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <i class="fas fa-info-circle"></i> How to use templates
+            </div>
+            <div class="card-body small">
+                <ul class="mb-0">
+                    <li><i class="fas fa-check-circle text-success me-2"></i> Fill data in Excel, keep column headers</li>
+                    <li><i class="fas fa-check-circle text-success me-2"></i> Date format: YYYY-MM-DD</li>
+                    <li><i class="fas fa-check-circle text-success me-2"></i> Remove example rows before import</li>
+                    <li><i class="fas fa-check-circle text-success me-2"></i> Required fields must be filled</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Quick Import Section -->
+        <div class="card mt-4 border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-file-import"></i> Quick Import
+            </div>
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-8">
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="quickImportFile" accept=".xlsx,.xls">
+                            <label class="input-group-text"><i class="fas fa-file-excel"></i></label>
+                        </div>
+                        <small class="text-muted">Upload your filled template here</small>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-success w-100" onclick="quickImport()">
+                            <i class="fas fa-upload"></i> Import Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- Quick Import Script -->
+<script>
+function quickImport() {
+    const file = $('#quickImportFile')[0].files[0];
+    if (!file) {
+        Swal.fire('Error', 'Please select a file to import', 'error');
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    Swal.fire({
+        title: 'Importing...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+    });
+
+    $.ajax({
+        url: '/app2/import/excel',
+        method: 'POST',
+        data: fd,
+        processData: false,
+        contentType: false,
+        success: function(r) {
+            Swal.close();
+            if (r.success) {
+                Swal.fire('Success', r.message, 'success');
+                $('#quickImportFile').val('');
+                loadAssets();
+                loadCategories();
+                loadCategoriesDropdown();
+                loadUnassignedAssets();
+                loadAssetHistory();
+            } else {
+                Swal.fire('Error', r.error, 'error');
+            }
+        },
+        error: function() {
+            Swal.close();
+            Swal.fire('Error', 'Import failed. Please try again.', 'error');
+        }
+    });
+}
+</script>
+
+<style>
+.download-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.12) !important;
+    border-color: #667eea !important;
+}
+
+.download-card .btn {
+    transition: all 0.3s;
+}
+
+.download-card .btn:hover {
+    transform: scale(1.05);
+}
+
+/* Custom scrollbar styling */
+.d-flex.overflow-auto::-webkit-scrollbar {
+    height: 8px;
+}
+
+.d-flex.overflow-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.d-flex.overflow-auto::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+.d-flex.overflow-auto::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .download-card {
+        min-width: 160px !important;
+        padding: 16px !important;
+    }
+    .download-card i {
+        font-size: 2rem !important;
+    }
+    .download-card h6 {
+        font-size: 0.9rem !important;
+    }
+}
+</style>

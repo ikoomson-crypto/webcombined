@@ -170,7 +170,7 @@
 <body>
     <div class="container container-main">
         <div class="btn-back no-print">
-            <a href="/" class="btn btn-secondary">
+            <a href="/app2/" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Dashboard
             </a>
             <button class="btn btn-primary" onclick="window.print()">
@@ -264,7 +264,7 @@
             });
 
             $.ajax({
-                url: '/api/reports/asset-movement',
+                url: '/app2/api/reports/asset-movement',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
@@ -596,7 +596,7 @@
             });
 
             $.ajax({
-                url: '/reports/asset-movement/export/excel',
+                url: '/app2/reports/asset-movement/export/excel',
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
