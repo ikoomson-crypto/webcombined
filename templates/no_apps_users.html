@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users Without Apps - Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f1f5f9;
+        }
+        .navbar-custom {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            padding: 15px 0;
+        }
+        .navbar-custom .navbar-brand {
+            color: white;
+            font-weight: 700;
+        }
+        .container-main {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        .no-apps-card {
+            border-left: 4px solid #f59e0b;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        .no-apps-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .btn-actions {
+            padding: 6px 16px;
+        }
+        .stats-box {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .stats-box .stat {
+            text-align: center;
+            padding: 10px;
+        }
+        .stats-box .stat .number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        .stats-box .stat .label {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-custom">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-cubes me-2"></i>Admin Panel
+            </a>
+            <div class="d-flex gap-3 align-items-center">
+                <a href="{{ url_for('manage_users') }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-arrow-left"></i> Back to Users
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="container-main">
+            <h4 class="mb-4">
+                <i class="fas fa-exclamation-triangle text-warning me-2"></i>Users Without App Access
+                <span class="badge bg-warning text-dark">{{ users|length }}</span>
+            </h4>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Stats -->
+            <div class="stats-box">
+                <div class="row">
+                    <div class="col-md-4 stat">
+                        <div class="number">{{ users|length }}</div>
+                        <div class="label">Users Without Apps</div>
+                    </div>
+                    <div class="col-md-4 stat">
+                        <div class="number">{{ users|selectattr('is_active', 'equalto', true)|list|length }}</div>
+                        <div class="label">Active Users</div>
+                    </div>
+                    <div class="col-md-4 stat">
+                        <div class="number">{{ users|selectattr('is_active', 'equalto', false)|list|length }}</div>
+                        <div class="label">Inactive Users</div>
+                    </div>
+                </div>
+            </div>
+
+            {% if users %}
+                <p class="text-muted mb-4">These users have registered but have no applications assigned. Click <strong>Assign Apps</strong> to give them access.</p>
+
+                {% for user in users %}
+                <div class="card no-apps-card">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-4">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-user-circle"></i>
+                                    <strong>{{ user.full_name }}</strong>
+                                    {% if not user.is_active %}
+                                        <span class="badge bg-danger ms-2">Inactive</span>
+                                    {% endif %}
+                                </h6>
+                                <small class="text-muted">@{{ user.username }}</small>
+                            </div>
+                            <div class="col-md-3">
+                                <i class="fas fa-envelope me-1"></i> {{ user.email }}
+                            </div>
+                            <div class="col-md-3">
+                                <span class="badge bg-warning text-dark">
+                                    <i class="fas fa-clock"></i> Needs App Assignment
+                                </span>
+                            </div>
+                            <div class="col-md-2 text-end">
+                                <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-primary btn-sm btn-actions">
+                                    <i class="fas fa-edit"></i> Assign Apps
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                    <h5>All users have app access</h5>
+                    <p class="text-muted">No users without applications assigned.</p>
+                    <a href="{{ url_for('manage_users') }}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Users
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
