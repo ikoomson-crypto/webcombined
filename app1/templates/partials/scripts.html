@@ -1,5 +1,6 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     // ============================================================
     // MAIN CLASS
@@ -355,6 +356,494 @@
                 </div>
             `;
             container.innerHTML = html;
+        }
+
+        // ============================================================
+        // CASHFLOW REPORT WITH HORIZONTAL MONTHS & DETAILED ITEMS
+        // ============================================================
+        renderCashflowReport(data) {
+            const container = document.getElementById('contentArea');
+
+            const months = data.months || [];
+            const rowData = data.row_data || {};
+            const monthlyData = data.monthly_data || {};
+
+            const totalInflows = data.total_inflows || 0;
+            const totalOutflows = data.total_outflows || 0;
+            const totalNet = data.total_net || 0;
+
+            const currency = this.currentCompany?.currency || 'GHS';
+
+            // Filter data by status
+            const filteredMonthlyData = {};
+            months.forEach(month => {
+                const m = monthlyData[month] || {};
+                filteredMonthlyData[month] = {
+                    ...m,
+                    inflow_items: (m.inflow_items || []).filter(item =>
+                        this.currentStatusFilter === 'all' || item.status === this.currentStatusFilter
+                    ),
+                    outflow_items: (m.outflow_items || []).filter(item =>
+                        this.currentStatusFilter === 'all' || item.status === this.currentStatusFilter
+                    )
+                };
+            });
+
+            // Collect unique inflow descriptions
+            const allInflowDescriptions = [];
+            months.forEach(month => {
+                const items = filteredMonthlyData[month]?.inflow_items || [];
+                items.forEach(item => {
+                    const desc = item.description || 'Customer Payment';
+                    if (!allInflowDescriptions.includes(desc)) {
+                        allInflowDescriptions.push(desc);
+                    }
+                });
+            });
+            allInflowDescriptions.sort();
+
+            // Collect unique outflow descriptions
+            const allOutflowDescriptions = [];
+            months.forEach(month => {
+                const items = filteredMonthlyData[month]?.outflow_items || [];
+                items.forEach(item => {
+                    const desc = item.description || 'Supplier Payment';
+                    if (!allOutflowDescriptions.includes(desc)) {
+                        allOutflowDescriptions.push(desc);
+                    }
+                });
+            });
+            allOutflowDescriptions.sort();
+
+            const monthOrderDisplay = months.length > 0 ?
+                `<span class="month-order">(${months.length} months - ${months[0]} to ${months[months.length-1]})</span>` : '';
+
+            let html = `
+                <div class="fade-in">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h5 class="mb-0">
+                                        <i class="bi bi-cash-stack"></i> Cashflow Report
+                                        <small class="text-muted ms-2">${data.start_date} to ${data.end_date}</small>
+                                        ${monthOrderDisplay}
+                                    </h5>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <button class="btn btn-success btn-sm me-2" onclick="app.exportCashflowExcel()">
+                                        <i class="bi bi-file-earmark-excel"></i> Export Excel
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="app.exportCashflowPDF()">
+                                        <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Filters -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <label class="form-label">Start Date</label>
+                                    <input type="date" class="form-control" id="startDate" value="${data.start_date}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">End Date</label>
+                                    <input type="date" class="form-control" id="endDate" value="${data.end_date}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Opening Balance</label>
+                                    <input type="number" class="form-control" id="openingBalance" step="0.01" value="${data.opening_balance}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button class="btn btn-primary w-100" onclick="app.runCashflowReport()">
+                                        <i class="bi bi-play-fill"></i> Run Report
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Status Filter -->
+                            <div class="row mb-4">
+                                <div class="col-md-12">
+                                    <label class="form-label">Filter by Status</label>
+                                    <div class="status-filter">
+                                        <button class="btn btn-outline-secondary ${this.currentStatusFilter === 'all' ? 'active-filter' : ''}"
+                                                onclick="app.setStatusFilter('all')">
+                                            All
+                                        </button>
+                                        <button class="btn btn-outline-success ${this.currentStatusFilter === 'Paid' ? 'active-filter' : ''}"
+                                                onclick="app.setStatusFilter('Paid')">
+                                            Paid
+                                        </button>
+                                        <button class="btn btn-outline-warning ${this.currentStatusFilter === 'Pending' ? 'active-filter' : ''}"
+                                                onclick="app.setStatusFilter('Pending')">
+                                            Pending
+                                        </button>
+                                        <button class="btn btn-outline-danger ${this.currentStatusFilter === 'Overdue' ? 'active-filter' : ''}"
+                                                onclick="app.setStatusFilter('Overdue')">
+                                            Overdue
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Currency Header -->
+                            <div class="currency-header">
+                                <i class="bi bi-currency-dollar"></i> Currency: ${currency}
+                            </div>
+
+                            <!-- Summary Cards -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-3">
+                                    <div class="summary-card bg-success">
+                                        <h6>Opening Balance</h6>
+                                        <h4>${this.formatCurrency(data.opening_balance)}</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="summary-card bg-info">
+                                        <h6>Total Inflows</h6>
+                                        <h4>${this.formatCurrency(totalInflows)}</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="summary-card bg-warning">
+                                        <h6>Total Outflows</h6>
+                                        <h4>${this.formatCurrency(totalOutflows)}</h4>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="summary-card ${totalNet >= 0 ? 'bg-success' : 'bg-danger'}">
+                                        <h6>Net Cashflow</h6>
+                                        <h4>${this.formatCurrency(totalNet)}</h4>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- ========================================================== -->
+                            <!-- HORIZONTAL MONTHLY TABLE WITH DETAILS                       -->
+                            <!-- ========================================================== -->
+                            <div class="table-responsive">
+                                <table class="table table-hover table-bordered">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th style="min-width: 180px;">Category / Description</th>
+                                            ${months.map(m => `<th class="text-center" style="min-width: 120px;">${m}</th>`).join('')}
+                                            <th class="text-end" style="min-width: 120px;">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Opening Balance Row -->
+                                        <tr class="table-secondary">
+                                            <td><strong>Opening Balance</strong></td>
+                                            ${rowData.opening_balances?.map(val => `
+                                                <td class="text-end">${this.formatCurrency(val)}</td>
+                                            `).join('')}
+                                            <td class="text-end"><strong>${this.formatCurrency(data.opening_balance)}</strong></td>
+                                        </tr>
+
+                                        <!-- Inflows Header -->
+                                        <tr class="table-success">
+                                            <td><strong><i class="bi bi-arrow-down-circle"></i> INFLOWS</strong></td>
+                                            ${rowData.inflows?.map(val => `
+                                                <td class="text-end"><strong>${this.formatCurrency(val)}</strong></td>
+                                            `).join('')}
+                                            <td class="text-end"><strong>${this.formatCurrency(totalInflows)}</strong></td>
+                                        </tr>
+
+                                        <!-- Inflow Details - Each description as a row -->
+                                        ${allInflowDescriptions.length > 0 ? allInflowDescriptions.map(desc => {
+                                            let descTotal = 0;
+                                            months.forEach(month => {
+                                                const items = filteredMonthlyData[month]?.inflow_items || [];
+                                                const item = items.find(i => (i.description || 'Customer Payment') === desc);
+                                                if (item) descTotal += item.amount;
+                                            });
+                                            return `
+                                                <tr class="detail-row">
+                                                    <td style="padding-left: 30px;">
+                                                        <span class="text-muted">${desc}</span>
+                                                    </td>
+                                                    ${months.map(month => {
+                                                        const items = filteredMonthlyData[month]?.inflow_items || [];
+                                                        const item = items.find(i => (i.description || 'Customer Payment') === desc);
+                                                        const amount = item ? item.amount : 0;
+                                                        const status = item ? item.status : '';
+                                                        const customer = item ? item.customer : '';
+                                                        return `
+                                                            <td class="text-end">
+                                                                ${amount > 0 ? `
+                                                                    <span class="text-success fw-bold">${this.formatCurrency(amount)}</span>
+                                                                    <br>
+                                                                    <small class="text-muted">${customer}</small>
+                                                                    <br>
+                                                                    <span class="badge ${status === 'Paid' ? 'bg-success' : status === 'Pending' ? 'bg-warning' : 'bg-danger'}">
+                                                                        ${status || 'Pending'}
+                                                                    </span>
+                                                                ` : '-'}
+                                                            </td>
+                                                        `;
+                                                    }).join('')}
+                                                    <td class="text-end">
+                                                        ${descTotal > 0 ? `<strong class="text-success">${this.formatCurrency(descTotal)}</strong>` : '-'}
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('') : `
+                                            <tr class="detail-row">
+                                                <td style="padding-left: 30px;" colspan="${months.length + 2}" class="text-muted text-center">
+                                                    No inflow transactions found
+                                                </td>
+                                            </tr>
+                                        `}
+
+                                        <!-- Outflows Header -->
+                                        <tr class="table-danger">
+                                            <td><strong><i class="bi bi-arrow-up-circle"></i> OUTFLOWS</strong></td>
+                                            ${rowData.outflows?.map(val => `
+                                                <td class="text-end"><strong>${this.formatCurrency(val)}</strong></td>
+                                            `).join('')}
+                                            <td class="text-end"><strong>${this.formatCurrency(totalOutflows)}</strong></td>
+                                        </tr>
+
+                                        <!-- Outflow Details - Each description as a row -->
+                                        ${allOutflowDescriptions.length > 0 ? allOutflowDescriptions.map(desc => {
+                                            let descTotal = 0;
+                                            months.forEach(month => {
+                                                const items = filteredMonthlyData[month]?.outflow_items || [];
+                                                const item = items.find(i => (i.description || 'Supplier Payment') === desc);
+                                                if (item) descTotal += item.amount;
+                                            });
+                                            return `
+                                                <tr class="detail-row">
+                                                    <td style="padding-left: 30px;">
+                                                        <span class="text-muted">${desc}</span>
+                                                    </td>
+                                                    ${months.map(month => {
+                                                        const items = filteredMonthlyData[month]?.outflow_items || [];
+                                                        const item = items.find(i => (i.description || 'Supplier Payment') === desc);
+                                                        const amount = item ? item.amount : 0;
+                                                        const status = item ? item.status : '';
+                                                        const supplier = item ? item.supplier : '';
+                                                        return `
+                                                            <td class="text-end">
+                                                                ${amount > 0 ? `
+                                                                    <span class="text-danger fw-bold">${this.formatCurrency(amount)}</span>
+                                                                    <br>
+                                                                    <small class="text-muted">${supplier}</small>
+                                                                    <br>
+                                                                    <span class="badge ${status === 'Paid' ? 'bg-success' : status === 'Pending' ? 'bg-warning' : 'bg-danger'}">
+                                                                        ${status || 'Pending'}
+                                                                    </span>
+                                                                ` : '-'}
+                                                            </td>
+                                                        `;
+                                                    }).join('')}
+                                                    <td class="text-end">
+                                                        ${descTotal > 0 ? `<strong class="text-danger">${this.formatCurrency(descTotal)}</strong>` : '-'}
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('') : `
+                                            <tr class="detail-row">
+                                                <td style="padding-left: 30px;" colspan="${months.length + 2}" class="text-muted text-center">
+                                                    No outflow transactions found
+                                                </td>
+                                            </tr>
+                                        `}
+
+                                        <!-- Net Row -->
+                                        <tr class="table-info">
+                                            <td><strong><i class="bi bi-calculator"></i> NET</strong></td>
+                                            ${rowData.net?.map(val => `
+                                                <td class="text-end ${val >= 0 ? 'text-success' : 'text-danger'}">
+                                                    <strong>${this.formatCurrency(val)}</strong>
+                                                </td>
+                                            `).join('')}
+                                            <td class="text-end ${totalNet >= 0 ? 'text-success' : 'text-danger'}">
+                                                <strong>${this.formatCurrency(totalNet)}</strong>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Closing Balance Row -->
+                                        <tr class="table-secondary">
+                                            <td><strong>Closing Balance</strong></td>
+                                            ${rowData.closing_balances?.map(val => `
+                                                <td class="text-end">${this.formatCurrency(val)}</td>
+                                            `).join('')}
+                                            <td class="text-end"><strong>${this.formatCurrency(data.closing_balance)}</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- No Data Warning -->
+                            ${totalInflows === 0 && totalOutflows === 0 ? `
+                            <div class="alert alert-warning mt-3">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>No payments found in this date range</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>Make sure you have added supplier payments and customer payments</li>
+                                    <li>Ensure payments have a <strong>Due Date</strong> or <strong>Invoice Date</strong> set</li>
+                                    <li>Try expanding the date range</li>
+                                </ul>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+        }
+
+        // ============================================================
+        // CASHFLOW EXPORT FUNCTIONS
+        // ============================================================
+        exportCashflowExcel() {
+            const startDate = document.getElementById('startDate')?.value;
+            const endDate = document.getElementById('endDate')?.value;
+            const openingBalance = document.getElementById('openingBalance')?.value || 0;
+
+            if (!startDate || !endDate) {
+                this.showError('Please select start and end dates');
+                return;
+            }
+
+            Swal.fire({
+                title: 'Exporting Excel...',
+                text: 'Please wait while your report is generated.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: 'api/reports/cashflow/export/excel',
+                method: 'POST',
+                data: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    opening_balance: parseFloat(openingBalance) || 0
+                }),
+                contentType: 'application/json',
+                xhrFields: {
+                    responseType: 'blob'
+                },
+                success: (data, status, xhr) => {
+                    Swal.close();
+
+                    const contentType = xhr.getResponseHeader('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            try {
+                                const response = JSON.parse(reader.result);
+                                app.showError(response.error || 'Failed to export Excel');
+                            } catch (e) {
+                                app.showError('Failed to export Excel');
+                            }
+                        };
+                        reader.readAsText(data);
+                        return;
+                    }
+
+                    const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `cashflow_report_${new Date().toISOString().slice(0,10)}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+
+                    this.showSuccess('Excel report exported successfully!');
+                },
+                error: (err) => {
+                    Swal.close();
+                    let errorMsg = 'Failed to export Excel';
+                    if (err.responseJSON && err.responseJSON.error) {
+                        errorMsg = err.responseJSON.error;
+                    }
+                    this.showError(errorMsg);
+                    console.error('Error:', err);
+                }
+            });
+        }
+
+        exportCashflowPDF() {
+            const startDate = document.getElementById('startDate')?.value;
+            const endDate = document.getElementById('endDate')?.value;
+            const openingBalance = document.getElementById('openingBalance')?.value || 0;
+
+            if (!startDate || !endDate) {
+                this.showError('Please select start and end dates');
+                return;
+            }
+
+            Swal.fire({
+                title: 'Exporting PDF...',
+                text: 'Please wait while your report is generated.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: 'api/reports/cashflow/export/pdf',
+                method: 'POST',
+                data: JSON.stringify({
+                    start_date: startDate,
+                    end_date: endDate,
+                    opening_balance: parseFloat(openingBalance) || 0
+                }),
+                contentType: 'application/json',
+                xhrFields: {
+                    responseType: 'blob'
+                },
+                success: (data, status, xhr) => {
+                    Swal.close();
+
+                    const contentType = xhr.getResponseHeader('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            try {
+                                const response = JSON.parse(reader.result);
+                                app.showError(response.error || 'Failed to export PDF');
+                            } catch (e) {
+                                app.showError('Failed to export PDF');
+                            }
+                        };
+                        reader.readAsText(data);
+                        return;
+                    }
+
+                    const blob = new Blob([data], { type: 'application/pdf' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `cashflow_report_${new Date().toISOString().slice(0,10)}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+
+                    this.showSuccess('PDF report exported successfully!');
+                },
+                error: (err) => {
+                    Swal.close();
+                    let errorMsg = 'Failed to export PDF';
+                    if (err.responseJSON && err.responseJSON.error) {
+                        errorMsg = err.responseJSON.error;
+                    }
+                    this.showError(errorMsg);
+                    console.error('Error:', err);
+                }
+            });
         }
 
         // ============================================================
@@ -1092,7 +1581,7 @@
                 url: `api/companies/${companyId}`,
                 method: 'DELETE',
                 success: (response) => {
-                    this.showCompanyManagement();
+                    this.loadPage('companies');
                     this.showSuccess(response.message);
                 },
                 error: (err) => {
@@ -1111,7 +1600,7 @@
                 data: JSON.stringify({ is_active: true }),
                 contentType: 'application/json',
                 success: () => {
-                    this.showCompanyManagement();
+                    this.loadPage('companies');
                     this.loadCompanyInfo();
                     this.showSuccess('Company activated successfully');
                 },
@@ -1124,317 +1613,6 @@
         // ============================================================
         // REPORTS
         // ============================================================
-        renderCashflowReport(data) {
-            const container = document.getElementById('contentArea');
-
-            const months = data.months || [];
-            const rowData = data.row_data || {};
-            const monthlyData = data.monthly_data || {};
-
-            const totalInflows = data.total_inflows || 0;
-            const totalOutflows = data.total_outflows || 0;
-            const totalNet = data.total_net || 0;
-
-            const currency = this.currentCompany?.currency || 'GHS';
-
-            const filteredMonthlyData = {};
-            months.forEach(month => {
-                const m = monthlyData[month] || {};
-                filteredMonthlyData[month] = {
-                    ...m,
-                    inflow_items: (m.inflow_items || []).filter(item =>
-                        this.currentStatusFilter === 'all' || item.status === this.currentStatusFilter
-                    ),
-                    outflow_items: (m.outflow_items || []).filter(item =>
-                        this.currentStatusFilter === 'all' || item.status === this.currentStatusFilter
-                    )
-                };
-            });
-
-            const allInflowDescriptions = [];
-            months.forEach(month => {
-                const items = filteredMonthlyData[month]?.inflow_items || [];
-                items.forEach(item => {
-                    const desc = item.description || 'Customer Payment';
-                    if (!allInflowDescriptions.includes(desc)) {
-                        allInflowDescriptions.push(desc);
-                    }
-                });
-            });
-
-            const allOutflowDescriptions = [];
-            months.forEach(month => {
-                const items = filteredMonthlyData[month]?.outflow_items || [];
-                items.forEach(item => {
-                    const desc = item.description || 'Supplier Payment';
-                    if (!allOutflowDescriptions.includes(desc)) {
-                        allOutflowDescriptions.push(desc);
-                    }
-                });
-            });
-
-            allInflowDescriptions.sort();
-            allOutflowDescriptions.sort();
-
-            const monthOrderDisplay = months.length > 0 ?
-                `<span class="month-order">(${months.length} months - ${months[0]} to ${months[months.length-1]})</span>` : '';
-
-            let html = `
-                <div class="fade-in">
-                    <div class="card">
-                        <div class="card-header">
-                            <div class="row align-items-center">
-                                <div class="col-md-12">
-                                    <h5 class="mb-0">
-                                        <i class="bi bi-cash-stack"></i> Cashflow Report
-                                        <small class="text-muted ms-2">${data.start_date} to ${data.end_date}</small>
-                                        ${monthOrderDisplay}
-                                    </h5>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="row g-3 mb-4">
-                                <div class="col-md-3">
-                                    <label class="form-label">Start Date</label>
-                                    <input type="date" class="form-control" id="startDate" value="${data.start_date}">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">End Date</label>
-                                    <input type="date" class="form-control" id="endDate" value="${data.end_date}">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Opening Balance</label>
-                                    <input type="number" class="form-control" id="openingBalance" step="0.01" value="${data.opening_balance}">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">&nbsp;</label>
-                                    <button class="btn btn-primary w-100" onclick="app.runCashflowReport()">
-                                        <i class="bi bi-play-fill"></i> Run Report
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="row mb-4">
-                                <div class="col-md-12">
-                                    <label class="form-label">Filter by Status</label>
-                                    <div class="status-filter">
-                                        <button class="btn btn-outline-secondary ${this.currentStatusFilter === 'all' ? 'active-filter' : ''}"
-                                                onclick="app.setStatusFilter('all')">
-                                            All
-                                        </button>
-                                        <button class="btn btn-outline-success ${this.currentStatusFilter === 'Paid' ? 'active-filter' : ''}"
-                                                onclick="app.setStatusFilter('Paid')">
-                                            Paid
-                                        </button>
-                                        <button class="btn btn-outline-warning ${this.currentStatusFilter === 'Pending' ? 'active-filter' : ''}"
-                                                onclick="app.setStatusFilter('Pending')">
-                                            Pending
-                                        </button>
-                                        <button class="btn btn-outline-danger ${this.currentStatusFilter === 'Overdue' ? 'active-filter' : ''}"
-                                                onclick="app.setStatusFilter('Overdue')">
-                                            Overdue
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="currency-header">
-                                <i class="bi bi-currency-dollar"></i> Currency: ${currency}
-                            </div>
-
-                            <div class="row g-3 mb-4">
-                                <div class="col-md-3">
-                                    <div class="summary-card bg-success">
-                                        <h6>Opening Balance</h6>
-                                        <h4>${this.formatCurrency(data.opening_balance)}</h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="summary-card bg-info">
-                                        <h6>Total Inflows</h6>
-                                        <h4>${this.formatCurrency(totalInflows)}</h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="summary-card bg-warning">
-                                        <h6>Total Outflows</h6>
-                                        <h4>${this.formatCurrency(totalOutflows)}</h4>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="summary-card ${totalNet >= 0 ? 'bg-success' : 'bg-danger'}">
-                                        <h6>Net Cashflow</h6>
-                                        <h4>${this.formatCurrency(totalNet)}</h4>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="table-responsive">
-                                <table class="table table-hover table-bordered">
-                                    <thead class="table-dark">
-                                        <tr>
-                                            <th style="min-width: 200px;">Category / Description</th>
-                                            ${months.map(m => `<th class="text-center">${m}</th>`).join('')}
-                                            <th class="text-end">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr class="table-secondary">
-                                            <td><strong>Opening Balance</strong></td>
-                                            ${rowData.opening_balances?.map(val => `
-                                                <td class="text-end">${this.formatCurrency(val)}</td>
-                                            `).join('')}
-                                            <td class="text-end"><strong>${this.formatCurrency(data.opening_balance)}</strong></td>
-                                        </tr>
-
-                                        <tr class="table-success">
-                                            <td><strong><i class="bi bi-arrow-down-circle"></i> Inflows</strong></td>
-                                            ${rowData.inflows?.map(val => `
-                                                <td class="text-end"><strong>${this.formatCurrency(val)}</strong></td>
-                                            `).join('')}
-                                            <td class="text-end"><strong>${this.formatCurrency(totalInflows)}</strong></td>
-                                        </tr>
-
-                                        ${allInflowDescriptions.length > 0 ? allInflowDescriptions.map(desc => {
-                                            let descTotal = 0;
-                                            months.forEach(month => {
-                                                const items = filteredMonthlyData[month]?.inflow_items || [];
-                                                const item = items.find(i => (i.description || 'Customer Payment') === desc);
-                                                if (item) descTotal += item.amount;
-                                            });
-                                            return `
-                                                <tr class="detail-row">
-                                                    <td style="padding-left: 30px;">
-                                                        <span class="text-muted">${desc}</span>
-                                                    </td>
-                                                    ${months.map(month => {
-                                                        const items = filteredMonthlyData[month]?.inflow_items || [];
-                                                        const item = items.find(i => (i.description || 'Customer Payment') === desc);
-                                                        const amount = item ? item.amount : 0;
-                                                        const status = item ? item.status : '';
-                                                        const customer = item ? item.customer : '';
-                                                        return `
-                                                            <td class="text-end">
-                                                                ${amount > 0 ? `
-                                                                    <span class="text-success">${this.formatCurrency(amount)}</span>
-                                                                    <br>
-                                                                    <small class="text-muted">${customer}</small>
-                                                                    <br>
-                                                                    <span class="badge ${status === 'Paid' ? 'bg-success' : status === 'Pending' ? 'bg-warning' : 'bg-danger'}">
-                                                                        ${status || 'Pending'}
-                                                                    </span>
-                                                                ` : '-'}
-                                                            </td>
-                                                        `;
-                                                    }).join('')}
-                                                    <td class="text-end">
-                                                        ${descTotal > 0 ? `<strong class="text-success">${this.formatCurrency(descTotal)}</strong>` : '-'}
-                                                    </td>
-                                                </tr>
-                                            `;
-                                        }).join('') : `
-                                            <tr class="detail-row">
-                                                <td style="padding-left: 30px;" colspan="${months.length + 2}" class="text-muted text-center">
-                                                    No inflow transactions found
-                                                </td>
-                                            </tr>
-                                        `}
-
-                                        <tr class="table-danger">
-                                            <td><strong><i class="bi bi-arrow-up-circle"></i> Outflows</strong></td>
-                                            ${rowData.outflows?.map(val => `
-                                                <td class="text-end"><strong>${this.formatCurrency(val)}</strong></td>
-                                            `).join('')}
-                                            <td class="text-end"><strong>${this.formatCurrency(totalOutflows)}</strong></td>
-                                        </tr>
-
-                                        ${allOutflowDescriptions.length > 0 ? allOutflowDescriptions.map(desc => {
-                                            let descTotal = 0;
-                                            months.forEach(month => {
-                                                const items = filteredMonthlyData[month]?.outflow_items || [];
-                                                const item = items.find(i => (i.description || 'Supplier Payment') === desc);
-                                                if (item) descTotal += item.amount;
-                                            });
-                                            return `
-                                                <tr class="detail-row">
-                                                    <td style="padding-left: 30px;">
-                                                        <span class="text-muted">${desc}</span>
-                                                    </td>
-                                                    ${months.map(month => {
-                                                        const items = filteredMonthlyData[month]?.outflow_items || [];
-                                                        const item = items.find(i => (i.description || 'Supplier Payment') === desc);
-                                                        const amount = item ? item.amount : 0;
-                                                        const status = item ? item.status : '';
-                                                        const supplier = item ? item.supplier : '';
-                                                        return `
-                                                            <td class="text-end">
-                                                                ${amount > 0 ? `
-                                                                    <span class="text-danger">${this.formatCurrency(amount)}</span>
-                                                                    <br>
-                                                                    <small class="text-muted">${supplier}</small>
-                                                                    <br>
-                                                                    <span class="badge ${status === 'Paid' ? 'bg-success' : status === 'Pending' ? 'bg-warning' : 'bg-danger'}">
-                                                                        ${status || 'Pending'}
-                                                                    </span>
-                                                                ` : '-'}
-                                                            </td>
-                                                        `;
-                                                    }).join('')}
-                                                    <td class="text-end">
-                                                        ${descTotal > 0 ? `<strong class="text-danger">${this.formatCurrency(descTotal)}</strong>` : '-'}
-                                                    </td>
-                                                </tr>
-                                            `;
-                                        }).join('') : `
-                                            <tr class="detail-row">
-                                                <td style="padding-left: 30px;" colspan="${months.length + 2}" class="text-muted text-center">
-                                                    No outflow transactions found
-                                                </td>
-                                            </tr>
-                                        `}
-
-                                        <tr class="table-info">
-                                            <td><strong><i class="bi bi-calculator"></i> Net</strong></td>
-                                            ${rowData.net?.map(val => `
-                                                <td class="text-end ${val >= 0 ? 'text-success' : 'text-danger'}">
-                                                    <strong>${this.formatCurrency(val)}</strong>
-                                                </td>
-                                            `).join('')}
-                                            <td class="text-end ${totalNet >= 0 ? 'text-success' : 'text-danger'}">
-                                                <strong>${this.formatCurrency(totalNet)}</strong>
-                                            </td>
-                                        </tr>
-
-                                        <tr class="table-secondary">
-                                            <td><strong>Closing Balance</strong></td>
-                                            ${rowData.closing_balances?.map(val => `
-                                                <td class="text-end">${this.formatCurrency(val)}</td>
-                                            `).join('')}
-                                            <td class="text-end"><strong>${this.formatCurrency(data.closing_balance)}</strong></td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            ${totalInflows === 0 && totalOutflows === 0 ? `
-                            <div class="alert alert-warning mt-3">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                <strong>No payments found in this date range</strong>
-                                <ul class="mb-0 mt-2">
-                                    <li>Make sure you have added supplier payments and customer payments</li>
-                                    <li>Ensure payments have a <strong>Due Date</strong> or <strong>Invoice Date</strong> set</li>
-                                    <li>Try expanding the date range</li>
-                                </ul>
-                            </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-            container.innerHTML = html;
-        }
-
         setStatusFilter(status) {
             this.currentStatusFilter = status;
             const startDate = document.getElementById('startDate')?.value;
@@ -2426,7 +2604,7 @@
                 success: (response) => {
                     loading.classList.remove('active');
                     app.modalInstance.hide();
-                    app.showCompanyManagement();
+                    app.loadPage('companies');
                     app.loadCompanyInfo();
                     app.showSuccess(response.message || (isUpdate ? 'Company updated successfully' : 'Company created successfully'));
                 },

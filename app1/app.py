@@ -679,6 +679,657 @@ def handle_supplier_payment(payment_id):
         db.session.commit()
         return jsonify({'message': 'Payment deleted successfully'})
 
+# ============ CASHFLOW REPORT EXPORT ROUTES ============
+@app.route('/api/reports/cashflow/export/excel', methods=['POST'])
+def export_cashflow_excel():
+    try:
+        company_id = get_active_company_id()
+        if not company_id:
+            return jsonify({'error': 'No active company'}), 400
+
+        data = request.json
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+        opening_balance = float(data.get('opening_balance', 0))
+
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        else:
+            start_date = datetime(datetime.now().year, 1, 1).date()
+
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            end_date = datetime.now().date()
+
+        # Get the cashflow data
+        supplier_payments = SupplierPayment.query.filter(
+            SupplierPayment.company_id == company_id,
+            db.or_(
+                db.and_(
+                    SupplierPayment.due_date >= start_date,
+                    SupplierPayment.due_date <= end_date
+                ),
+                db.and_(
+                    SupplierPayment.invoice_date >= start_date,
+                    SupplierPayment.invoice_date <= end_date
+                )
+            )
+        ).all()
+
+        customer_payments = CustomerPayment.query.filter(
+            CustomerPayment.company_id == company_id,
+            db.or_(
+                db.and_(
+                    CustomerPayment.due_date >= start_date,
+                    CustomerPayment.due_date <= end_date
+                ),
+                db.and_(
+                    CustomerPayment.invoice_date >= start_date,
+                    CustomerPayment.invoice_date <= end_date
+                )
+            )
+        ).all()
+
+        # Build monthly data
+        month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        year = start_date.year
+
+        monthly_data = {}
+        for month_key in month_order:
+            month_num = month_order.index(month_key) + 1
+            monthly_data[month_key] = {
+                'month': month_key,
+                'full_month': datetime(year, month_num, 1).strftime('%B'),
+                'year': year,
+                'month_index': month_num,
+                'opening_balance': 0,
+                'inflows': 0,
+                'outflows': 0,
+                'net': 0,
+                'closing_balance': 0,
+                'inflow_items': [],
+                'outflow_items': []
+            }
+
+        for payment in supplier_payments:
+            date_to_use = payment.due_date if payment.due_date else payment.invoice_date
+            if date_to_use:
+                month_key = date_to_use.strftime('%b')
+                if month_key in monthly_data:
+                    monthly_data[month_key]['outflows'] += payment.amount
+                    description = payment.payment_description or 'Supplier Payment'
+                    monthly_data[month_key]['outflow_items'].append({
+                        'description': description,
+                        'supplier': payment.supplier.name if payment.supplier else 'Unknown',
+                        'amount': payment.amount,
+                        'date': date_to_use.isoformat(),
+                        'status': payment.status or 'Pending'
+                    })
+
+        for payment in customer_payments:
+            date_to_use = payment.due_date if payment.due_date else payment.invoice_date
+            if date_to_use:
+                month_key = date_to_use.strftime('%b')
+                if month_key in monthly_data:
+                    monthly_data[month_key]['inflows'] += payment.amount
+                    description = payment.service_description or 'Customer Payment'
+                    monthly_data[month_key]['inflow_items'].append({
+                        'description': description,
+                        'customer': payment.customer.name if payment.customer else 'Unknown',
+                        'amount': payment.amount,
+                        'date': date_to_use.isoformat(),
+                        'status': payment.status or 'Pending'
+                    })
+
+        # Calculate running balances
+        running_balance = opening_balance
+        chronological_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+        active_months = []
+        for month_key in chronological_months:
+            month_num = chronological_months.index(month_key) + 1
+            month_date = datetime(year, month_num, 1).date()
+            if month_date >= start_date.replace(day=1) and month_date <= end_date:
+                active_months.append(month_key)
+
+        for month_key in active_months:
+            monthly_data[month_key]['opening_balance'] = running_balance
+            monthly_data[month_key]['net'] = monthly_data[month_key]['inflows'] - monthly_data[month_key]['outflows']
+            running_balance += monthly_data[month_key]['net']
+            monthly_data[month_key]['closing_balance'] = running_balance
+
+        company = Company.query.get(company_id)
+        currency = company.currency if company else 'GHS'
+
+        # Create Excel file
+        filename = f'cashflow_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        filepath = os.path.join(app.config['EXPORT_FOLDER'], filename)
+        os.makedirs(app.config['EXPORT_FOLDER'], exist_ok=True)
+
+        with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
+            # ========== SHEET 1: SUMMARY ==========
+            total_inflows = sum(m['inflows'] for m in monthly_data.values())
+            total_outflows = sum(m['outflows'] for m in monthly_data.values())
+            total_net = sum(m['net'] for m in monthly_data.values())
+
+            summary_data = {
+                'Metric': ['Start Date', 'End Date', 'Opening Balance', 'Total Inflows', 'Total Outflows',
+                           'Net Cashflow', 'Closing Balance'],
+                'Value': [
+                    start_date_str,
+                    end_date_str,
+                    opening_balance,
+                    total_inflows,
+                    total_outflows,
+                    total_net,
+                    running_balance
+                ]
+            }
+            summary_df = pd.DataFrame(summary_data)
+            summary_df.to_excel(writer, sheet_name='Summary', index=False)
+
+            # ========== SHEET 2: HORIZONTAL CASHFLOW REPORT ==========
+            # Build the horizontal report - THIS IS THE FIXED PART
+            report_data = []
+
+            # Get all unique inflow and outflow descriptions
+            all_inflow_descs = set()
+            for month in active_months:
+                for item in monthly_data[month]['inflow_items']:
+                    all_inflow_descs.add(item['description'])
+            all_inflow_descs = sorted(all_inflow_descs)
+
+            all_outflow_descs = set()
+            for month in active_months:
+                for item in monthly_data[month]['outflow_items']:
+                    all_outflow_descs.add(item['description'])
+            all_outflow_descs = sorted(all_outflow_descs)
+
+            # Build the horizontal data structure
+            # Each row will be a dictionary with 'Category' and each month as keys
+
+            # 1. Opening Balance
+            row = {'Category': 'OPENING BALANCE'}
+            for month in active_months:
+                row[month] = monthly_data[month]['opening_balance']
+            row['Total'] = opening_balance
+            report_data.append(row)
+
+            # 2. Inflows Header
+            row = {'Category': 'INFLOWS'}
+            for month in active_months:
+                row[month] = monthly_data[month]['inflows']
+            row['Total'] = total_inflows
+            report_data.append(row)
+
+            # 3. Inflow Details - Each description as a row (indented)
+            for desc in all_inflow_descs:
+                row = {'Category': f'  {desc}'}
+                desc_total = 0
+                for month in active_months:
+                    items = monthly_data[month]['inflow_items']
+                    item = next((i for i in items if i['description'] == desc), None)
+                    amount = item['amount'] if item else 0
+                    row[month] = amount
+                    desc_total += amount
+                row['Total'] = desc_total
+                report_data.append(row)
+
+            # 4. Outflows Header
+            row = {'Category': 'OUTFLOWS'}
+            for month in active_months:
+                row[month] = monthly_data[month]['outflows']
+            row['Total'] = total_outflows
+            report_data.append(row)
+
+            # 5. Outflow Details - Each description as a row (indented)
+            for desc in all_outflow_descs:
+                row = {'Category': f'  {desc}'}
+                desc_total = 0
+                for month in active_months:
+                    items = monthly_data[month]['outflow_items']
+                    item = next((i for i in items if i['description'] == desc), None)
+                    amount = item['amount'] if item else 0
+                    row[month] = amount
+                    desc_total += amount
+                row['Total'] = desc_total
+                report_data.append(row)
+
+            # 6. Net
+            row = {'Category': 'NET'}
+            for month in active_months:
+                row[month] = monthly_data[month]['net']
+            row['Total'] = total_net
+            report_data.append(row)
+
+            # 7. Closing Balance
+            row = {'Category': 'CLOSING BALANCE'}
+            for month in active_months:
+                row[month] = monthly_data[month]['closing_balance']
+            row['Total'] = running_balance
+            report_data.append(row)
+
+            # Create DataFrame for horizontal report
+            df_horizontal = pd.DataFrame(report_data)
+
+            # Write to Excel
+            df_horizontal.to_excel(writer, sheet_name='Cashflow Report', index=False)
+
+            # ========== SHEET 3: INFLOW DETAILS WITH STATUS ==========
+            inflow_rows = []
+            for month in active_months:
+                for item in monthly_data[month]['inflow_items']:
+                    inflow_rows.append({
+                        'Month': month,
+                        'Customer': item.get('customer', ''),
+                        'Description': item.get('description', ''),
+                        'Amount': item.get('amount', 0),
+                        'Date': item.get('date', ''),
+                        'Status': item.get('status', '')
+                    })
+            if inflow_rows:
+                inflow_df = pd.DataFrame(inflow_rows)
+                inflow_df.to_excel(writer, sheet_name='Inflow Details', index=False)
+
+            # ========== SHEET 4: OUTFLOW DETAILS WITH STATUS ==========
+            outflow_rows = []
+            for month in active_months:
+                for item in monthly_data[month]['outflow_items']:
+                    outflow_rows.append({
+                        'Month': month,
+                        'Supplier': item.get('supplier', ''),
+                        'Description': item.get('description', ''),
+                        'Amount': item.get('amount', 0),
+                        'Date': item.get('date', ''),
+                        'Status': item.get('status', '')
+                    })
+            if outflow_rows:
+                outflow_df = pd.DataFrame(outflow_rows)
+                outflow_df.to_excel(writer, sheet_name='Outflow Details', index=False)
+
+            # Format Excel sheets - Auto-adjust column widths
+            for sheet_name in writer.sheets:
+                worksheet = writer.sheets[sheet_name]
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 30)
+                    worksheet.column_dimensions[column_letter].width = adjusted_width
+
+        return send_file(filepath, as_attachment=True, download_name=filename)
+
+    except Exception as e:
+        print(f"Excel export error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 400
+@app.route('/api/reports/cashflow/export/pdf', methods=['POST'])
+def export_cashflow_pdf():
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import landscape, letter
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+
+        company_id = get_active_company_id()
+        if not company_id:
+            return jsonify({'error': 'No active company'}), 400
+
+        data = request.json
+        start_date_str = data.get('start_date')
+        end_date_str = data.get('end_date')
+        opening_balance = float(data.get('opening_balance', 0))
+
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        else:
+            start_date = datetime(datetime.now().year, 1, 1).date()
+
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+        else:
+            end_date = datetime.now().date()
+
+        # Get the cashflow data
+        supplier_payments = SupplierPayment.query.filter(
+            SupplierPayment.company_id == company_id,
+            db.or_(
+                db.and_(
+                    SupplierPayment.due_date >= start_date,
+                    SupplierPayment.due_date <= end_date
+                ),
+                db.and_(
+                    SupplierPayment.invoice_date >= start_date,
+                    SupplierPayment.invoice_date <= end_date
+                )
+            )
+        ).all()
+
+        customer_payments = CustomerPayment.query.filter(
+            CustomerPayment.company_id == company_id,
+            db.or_(
+                db.and_(
+                    CustomerPayment.due_date >= start_date,
+                    CustomerPayment.due_date <= end_date
+                ),
+                db.and_(
+                    CustomerPayment.invoice_date >= start_date,
+                    CustomerPayment.invoice_date <= end_date
+                )
+            )
+        ).all()
+
+        # Build monthly data
+        month_order = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        year = start_date.year
+
+        monthly_data = {}
+        for month_key in month_order:
+            month_num = month_order.index(month_key) + 1
+            monthly_data[month_key] = {
+                'month': month_key,
+                'full_month': datetime(year, month_num, 1).strftime('%B'),
+                'year': year,
+                'month_index': month_num,
+                'opening_balance': 0,
+                'inflows': 0,
+                'outflows': 0,
+                'net': 0,
+                'closing_balance': 0,
+                'inflow_items': [],
+                'outflow_items': []
+            }
+
+        for payment in supplier_payments:
+            date_to_use = payment.due_date if payment.due_date else payment.invoice_date
+            if date_to_use:
+                month_key = date_to_use.strftime('%b')
+                if month_key in monthly_data:
+                    monthly_data[month_key]['outflows'] += payment.amount
+                    description = payment.payment_description or 'Supplier Payment'
+                    monthly_data[month_key]['outflow_items'].append({
+                        'description': description,
+                        'supplier': payment.supplier.name if payment.supplier else 'Unknown',
+                        'amount': payment.amount,
+                        'date': date_to_use.isoformat(),
+                        'status': payment.status or 'Pending'
+                    })
+
+        for payment in customer_payments:
+            date_to_use = payment.due_date if payment.due_date else payment.invoice_date
+            if date_to_use:
+                month_key = date_to_use.strftime('%b')
+                if month_key in monthly_data:
+                    monthly_data[month_key]['inflows'] += payment.amount
+                    description = payment.service_description or 'Customer Payment'
+                    monthly_data[month_key]['inflow_items'].append({
+                        'description': description,
+                        'customer': payment.customer.name if payment.customer else 'Unknown',
+                        'amount': payment.amount,
+                        'date': date_to_use.isoformat(),
+                        'status': payment.status or 'Pending'
+                    })
+
+        # Calculate running balances
+        running_balance = opening_balance
+        chronological_months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+        active_months = []
+        for month_key in chronological_months:
+            month_num = chronological_months.index(month_key) + 1
+            month_date = datetime(year, month_num, 1).date()
+            if month_date >= start_date.replace(day=1) and month_date <= end_date:
+                active_months.append(month_key)
+
+        for month_key in active_months:
+            monthly_data[month_key]['opening_balance'] = running_balance
+            monthly_data[month_key]['net'] = monthly_data[month_key]['inflows'] - monthly_data[month_key]['outflows']
+            running_balance += monthly_data[month_key]['net']
+            monthly_data[month_key]['closing_balance'] = running_balance
+
+        company = Company.query.get(company_id)
+        currency = company.currency if company else 'GHS'
+
+        # Generate PDF
+        filename = f'cashflow_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
+        filepath = os.path.join(app.config['EXPORT_FOLDER'], filename)
+        os.makedirs(app.config['EXPORT_FOLDER'], exist_ok=True)
+
+        doc = SimpleDocTemplate(filepath, pagesize=landscape(letter))
+        styles = getSampleStyleSheet()
+        elements = []
+
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            alignment=TA_CENTER,
+            spaceAfter=20
+        )
+        elements.append(Paragraph(f"Cashflow Report", title_style))
+        elements.append(Paragraph(f"Company: {company.name}", styles['Normal']))
+        elements.append(Paragraph(f"Period: {start_date_str} to {end_date_str}", styles['Normal']))
+        elements.append(Paragraph(f"Currency: {currency}", styles['Normal']))
+        elements.append(Paragraph(f"Generated: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+        elements.append(Spacer(1, 12))
+
+        # ========== SUMMARY TABLE ==========
+        total_inflows = sum(m['inflows'] for m in monthly_data.values())
+        total_outflows = sum(m['outflows'] for m in monthly_data.values())
+        total_net = sum(m['net'] for m in monthly_data.values())
+
+        summary_data = [
+            ['Metric', 'Amount'],
+            ['Opening Balance', f"{currency} {format_currency(opening_balance)}"],
+            ['Total Inflows', f"{currency} {format_currency(total_inflows)}"],
+            ['Total Outflows', f"{currency} {format_currency(total_outflows)}"],
+            ['Net Cashflow', f"{currency} {format_currency(total_net)}"],
+            ['Closing Balance', f"{currency} {format_currency(running_balance)}"]
+        ]
+
+        summary_table = Table(summary_data, colWidths=[2.5 * inch, 2 * inch])
+        summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8f4f8')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ]))
+        elements.append(summary_table)
+        elements.append(Spacer(1, 20))
+
+        # ========== HORIZONTAL CASHFLOW TABLE ==========
+        elements.append(Paragraph("Cashflow Report - Monthly Breakdown", styles['Heading2']))
+        elements.append(Spacer(1, 10))
+
+        # Build table data
+        table_data = []
+
+        # Header row with months
+        header = ['Category / Description']
+        for month in active_months:
+            header.append(month)
+        header.append('Total')
+        table_data.append(header)
+
+        # Opening Balance
+        row = ['OPENING BALANCE']
+        for month in active_months:
+            row.append(f"{currency} {format_currency(monthly_data[month]['opening_balance'])}")
+        row.append(f"{currency} {format_currency(opening_balance)}")
+        table_data.append(row)
+
+        # Inflows Header
+        row = ['INFLOWS']
+        for month in active_months:
+            row.append(f"{currency} {format_currency(monthly_data[month]['inflows'])}")
+        row.append(f"{currency} {format_currency(total_inflows)}")
+        table_data.append(row)
+
+        # Inflow Details
+        all_inflow_descs = set()
+        for month in active_months:
+            for item in monthly_data[month]['inflow_items']:
+                all_inflow_descs.add(item['description'])
+        all_inflow_descs = sorted(all_inflow_descs)
+
+        for desc in all_inflow_descs:
+            row = [f'  {desc}']
+            desc_total = 0
+            for month in active_months:
+                items = monthly_data[month]['inflow_items']
+                item = next((i for i in items if i['description'] == desc), None)
+                if item:
+                    amount = item['amount']
+                    desc_total += amount
+                    customer = item.get('customer', '')
+                    status = item.get('status', '')
+                    row.append(f"{currency} {format_currency(amount)}")
+                else:
+                    row.append('-')
+            row.append(f"{currency} {format_currency(desc_total)}")
+            table_data.append(row)
+
+        # Outflows Header
+        row = ['OUTFLOWS']
+        for month in active_months:
+            row.append(f"{currency} {format_currency(monthly_data[month]['outflows'])}")
+        row.append(f"{currency} {format_currency(total_outflows)}")
+        table_data.append(row)
+
+        # Outflow Details
+        all_outflow_descs = set()
+        for month in active_months:
+            for item in monthly_data[month]['outflow_items']:
+                all_outflow_descs.add(item['description'])
+        all_outflow_descs = sorted(all_outflow_descs)
+
+        for desc in all_outflow_descs:
+            row = [f'  {desc}']
+            desc_total = 0
+            for month in active_months:
+                items = monthly_data[month]['outflow_items']
+                item = next((i for i in items if i['description'] == desc), None)
+                if item:
+                    amount = item['amount']
+                    desc_total += amount
+                    supplier = item.get('supplier', '')
+                    status = item.get('status', '')
+                    row.append(f"{currency} {format_currency(amount)}")
+                else:
+                    row.append('-')
+            row.append(f"{currency} {format_currency(desc_total)}")
+            table_data.append(row)
+
+        # Net
+        row = ['NET']
+        for month in active_months:
+            net = monthly_data[month]['net']
+            row.append(f"{currency} {format_currency(net)}")
+        row.append(f"{currency} {format_currency(total_net)}")
+        table_data.append(row)
+
+        # Closing Balance
+        row = ['CLOSING BALANCE']
+        for month in active_months:
+            row.append(f"{currency} {format_currency(monthly_data[month]['closing_balance'])}")
+        row.append(f"{currency} {format_currency(running_balance)}")
+        table_data.append(row)
+
+        # Create table with appropriate column widths
+        col_width = 0.8 * inch
+        col_widths = [1.5 * inch]
+        for _ in active_months:
+            col_widths.append(col_width)
+        col_widths.append(0.8 * inch)
+
+        table = Table(table_data, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            # Header
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+
+            # Opening Balance - Light Blue
+            ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor('#e3f2fd')),
+            ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+
+            # Inflows Header - Green
+            ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#c8e6c9')),
+            ('FONTNAME', (0, 2), (-1, 2), 'Helvetica-Bold'),
+
+            # Inflow Details - Light Green
+            ('BACKGROUND', (0, 3), (-1, 3 + len(all_inflow_descs) - 1), colors.HexColor('#f1f8e9')),
+
+            # Outflows Header - Red
+            ('BACKGROUND', (0, 4 + len(all_inflow_descs)), (-1, 4 + len(all_inflow_descs)), colors.HexColor('#ffcdd2')),
+            ('FONTNAME', (0, 4 + len(all_inflow_descs)), (-1, 4 + len(all_inflow_descs)), 'Helvetica-Bold'),
+
+            # Outflow Details - Light Red
+            ('BACKGROUND', (0, 5 + len(all_inflow_descs)), (-1, -3), colors.HexColor('#fbe9e7')),
+
+            # Net - Blue
+            ('BACKGROUND', (0, -2), (-1, -2), colors.HexColor('#bbdefb')),
+            ('FONTNAME', (0, -2), (-1, -2), 'Helvetica-Bold'),
+
+            # Closing Balance - Light Blue
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e3f2fd')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+
+            # Grid
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+
+            # Font size for all cells
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+
+        elements.append(table)
+
+        # Footer
+        elements.append(Spacer(1, 30))
+        elements.append(Paragraph(
+            f"Report generated on {datetime.now().strftime('%d/%m/%Y %H:%M')} | {company.name}",
+            styles['Normal']
+        ))
+
+        # Build PDF
+        doc.build(elements)
+
+        return send_file(filepath, as_attachment=True, download_name=filename)
+
+    except ImportError as e:
+        print(f"ReportLab not installed: {str(e)}")
+        return jsonify({'error': 'PDF library not installed. Please run: pip install reportlab'}), 500
+    except Exception as e:
+        print(f"PDF export error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 400
 
 # ============ MULTIPLE DELETE FOR SUPPLIER PAYMENTS ============
 @app.route('/api/supplier-payments/delete-multiple', methods=['POST'])
