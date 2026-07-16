@@ -38,7 +38,7 @@
         }
         .app-checkboxes {
             display: flex;
-            gap: 20px;
+            gap: 12px;
             flex-wrap: wrap;
         }
         .app-checkboxes .form-check {
@@ -46,9 +46,24 @@
             padding: 10px 15px;
             border-radius: 8px;
             border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+            flex: 1 1 auto;
+            min-width: 140px;
         }
         .app-checkboxes .form-check:hover {
             border-color: #667eea;
+            background: #f1f5f9;
+        }
+        .app-checkboxes .form-check input:checked + label {
+            color: #667eea;
+        }
+        .app-checkboxes .form-check label {
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        .app-checkboxes .form-check label i {
+            margin-right: 6px;
         }
         .status-badge {
             padding: 3px 12px;
@@ -72,6 +87,16 @@
             color: #1e293b;
             font-size: 14px;
             border-left: 4px solid #667eea;
+        }
+        .info-box i {
+            color: #667eea;
+        }
+        .app-section-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .app-section-disabled .form-check {
+            background: #f1f5f9 !important;
         }
     </style>
 </head>
@@ -164,26 +189,20 @@
                 <div class="mb-4" id="appAccessSection">
                     <label class="form-label">App Access</label>
                     <div class="app-checkboxes">
+                        {% for app_id, app_info in apps.items() %}
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="app1_access" name="app1_access" {% if 'app1' in access_apps or user.is_admin %}checked{% endif %}>
-                            <label class="form-check-label" for="app1_access">
-                                <i class="fas fa-credit-card text-primary"></i> Liquidity Schedule
+                            <input type="checkbox" class="form-check-input" id="{{ app_id }}_access" name="{{ app_id }}_access"
+                                   {% if app_id in access_apps or user.is_admin %}checked{% endif %}>
+                            <label class="form-check-label" for="{{ app_id }}_access">
+                                <i class="fas {{ app_info.icon }} text-{{ app_info.color }}"></i> {{ app_info.name }}
                             </label>
                         </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="app2_access" name="app2_access" {% if 'app2' in access_apps or user.is_admin %}checked{% endif %}>
-                            <label class="form-check-label" for="app2_access">
-                                <i class="fas fa-boxes text-success"></i> Asset Register
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="app3_access" name="app3_access" {% if 'app3' in access_apps or user.is_admin %}checked{% endif %}>
-                            <label class="form-check-label" for="app3_access">
-                                <i class="fas fa-cubes text-info"></i> Prepayment
-                            </label>
-                        </div>
+                        {% endfor %}
                     </div>
-                    <small class="text-muted">Admins automatically get access to all apps. Uncheck all to remove app access.</small>
+                    <small class="text-muted mt-2 d-block">
+                        <i class="fas fa-info-circle"></i> Admins automatically get access to all apps.
+                        Uncheck all to remove app access.
+                    </small>
                 </div>
 
                 <button type="submit" class="btn btn-primary w-100">
@@ -197,11 +216,27 @@
         document.getElementById('is_admin').addEventListener('change', function() {
             const section = document.getElementById('appAccessSection');
             const checkboxes = section.querySelectorAll('input[type="checkbox"]');
+
             if (this.checked) {
-                section.style.opacity = '0.5';
+                // Admin: Disable section and check all apps
+                section.classList.add('app-section-disabled');
                 checkboxes.forEach(cb => cb.checked = true);
             } else {
-                section.style.opacity = '1';
+                // Regular user: Enable section
+                section.classList.remove('app-section-disabled');
+                // Don't uncheck automatically - preserve existing selections
+            }
+        });
+
+        // Initialize: If admin checkbox is checked, disable the section
+        document.addEventListener('DOMContentLoaded', function() {
+            const adminCheckbox = document.getElementById('is_admin');
+            const section = document.getElementById('appAccessSection');
+
+            if (adminCheckbox.checked) {
+                section.classList.add('app-section-disabled');
+                // Ensure all checkboxes are checked for admin
+                section.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
             }
         });
     </script>

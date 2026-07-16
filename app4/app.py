@@ -218,11 +218,11 @@ class LineItemForm(FlaskForm):
     withholding_tax_rate = FloatField('WHT Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)], default=0.0)
     vat_rate = FloatField('VAT Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)], default=0.0)
 
-
 class PaymentForm(FlaskForm):
     supplier_id = SelectField('Supplier', coerce=int, validators=[DataRequired()])
     invoice_number = StringField('Invoice Number', validators=[Optional(), Length(max=50)])
     currency = SelectField('Currency', choices=[
+        ('', '-- Select Currency --'),  # <-- ADD EMPTY OPTION FIRST
         ('USD', 'USD - US Dollar'),
         ('EUR', 'EUR - Euro'),
         ('GBP', 'GBP - British Pound'),
@@ -241,30 +241,38 @@ class PaymentForm(FlaskForm):
         ('TZS', 'TZS - Tanzanian Shilling'),
         ('UGX', 'UGX - Ugandan Shilling'),
         ('ZMW', 'ZMW - Zambian Kwacha')
-    ], validators=[DataRequired()])
+    ], validators=[DataRequired()], default='')  # <-- Set default to empty
     exchange_rate = FloatField('Exchange Rate (1 USD = ?)', validators=[Optional(), NumberRange(min=0.01)], default=1.0)
     payment_date = DateField('Payment Date', format='%Y-%m-%d', validators=[Optional()])
     description = TextAreaField('Payment Description', validators=[Optional()])
     reference = StringField('Reference Number', validators=[Optional()])
 
+    # Signature fields
     prepared_by_id = SelectField('Prepared By', coerce=int, validators=[Optional()])
     approved_by_id = SelectField('Approved By', coerce=int, validators=[Optional()])
     received_by_id = SelectField('Received By', coerce=int, validators=[Optional()])
 
+    # Source Bank field
     source_bank_id = SelectField('Source Bank', coerce=int, validators=[Optional()])
 
+    # Line items
     line_items = FieldList(FormField(LineItemForm), min_entries=1)
 
     def __init__(self, *args, **kwargs):
         super(PaymentForm, self).__init__(*args, **kwargs)
         active_company = Company.query.filter_by(is_active=True).first()
 
+        # Supplier choices - Add empty option at the top
         if active_company:
-            self.supplier_id.choices = [(s.id, s.name) for s in
-                                        Supplier.query.filter_by(company_id=active_company.id).all()]
+            suppliers = Supplier.query.filter_by(company_id=active_company.id).all()
+            # Sort suppliers alphabetically
+            suppliers = sorted(suppliers, key=lambda s: s.name.lower())
+            # Add empty option first
+            self.supplier_id.choices = [(0, '-- Select Supplier --')] + [(s.id, s.name) for s in suppliers]
         else:
-            self.supplier_id.choices = []
+            self.supplier_id.choices = [(0, '-- No suppliers available --')]
 
+        # Signature choices
         default_choices = [(0, '-- Select --')]
 
         if active_company:
@@ -283,6 +291,7 @@ class PaymentForm(FlaskForm):
                 self.approved_by_id.choices = [(0, '-- No signatures available --')]
                 self.received_by_id.choices = [(0, '-- No signatures available --')]
 
+            # Bank choices - Add empty option at the top
             banks = Bank.query.filter_by(
                 company_id=active_company.id,
                 is_active=True
@@ -298,7 +307,6 @@ class PaymentForm(FlaskForm):
             self.approved_by_id.choices = [(0, '-- Select --')]
             self.received_by_id.choices = [(0, '-- Select --')]
             self.source_bank_id.choices = [(0, '-- Select Bank --')]
-
 
 class SupplierForm(FlaskForm):
     name = StringField('Supplier Name', validators=[DataRequired(), Length(max=100)])
@@ -1642,9 +1650,7 @@ def add_payment():
 
     form = PaymentForm()
 
-    if not form.payment_date.data:
-        form.payment_date.data = datetime.now().date()
-
+    # Only add one empty line item - NO default date set
     if len(form.line_items) == 0:
         form.line_items.append_entry()
 
@@ -1679,7 +1685,7 @@ def add_payment():
             flash('Please add at least one line item with a description.', 'warning')
             return render_template('add_payment.html', form=form, active_company=active_company)
 
-        if not form.supplier_id.data:
+        if not form.supplier_id.data or form.supplier_id.data == 0:
             flash('Please select a supplier.', 'warning')
             return render_template('add_payment.html', form=form, active_company=active_company)
 
@@ -1688,6 +1694,7 @@ def add_payment():
             return render_template('add_payment.html', form=form, active_company=active_company)
 
         try:
+            # Generate unique transaction number
             existing_payments = Payment.query.with_entities(Payment.transaction_number).all()
             existing_numbers = set()
             for p in existing_payments:
@@ -1705,13 +1712,20 @@ def add_payment():
             transaction_number = f'PMT-{str(seq).zfill(3)}'
             print(f"Generated transaction number: {transaction_number}")
 
+            # Parse payment date - if empty, use None (will default in model)
+            payment_date = None
+            if form.payment_date.data:
+                payment_date = form.payment_date.data
+            else:
+                payment_date = datetime.now().date()
+
             payment = Payment(
                 transaction_number=transaction_number,
                 supplier_id=form.supplier_id.data,
                 invoice_number=form.invoice_number.data,
                 currency=form.currency.data,
                 exchange_rate=form.exchange_rate.data or 1.0,
-                payment_date=form.payment_date.data or datetime.now().date(),
+                payment_date=payment_date,
                 description=form.description.data,
                 reference=form.reference.data,
                 prepared_by_id=form.prepared_by_id.data if form.prepared_by_id.data != 0 else None,
@@ -1779,7 +1793,6 @@ def add_payment():
             flash(f'Error saving payment: {str(e)}', 'danger')
 
     return render_template('add_payment.html', form=form, active_company=active_company)
-
 
 @app.route('/bulk_delete_payments', methods=['POST'])
 def bulk_delete_payments():

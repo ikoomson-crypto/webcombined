@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timezone  # <-- ADD timezone here
 import os
 import re
 import sqlite3
@@ -13,6 +13,43 @@ from app1.app import app as app1
 from app2.app import app as app2
 from app3.app import app as app3
 from app4.app import app as app4
+
+
+# ========== APP CONFIGURATION ==========
+# Define all available apps in one place - Add new apps here!
+AVAILABLE_APPS = {
+    'app1': {
+        'name': 'Liquidity Schedule',
+        'icon': 'fa-credit-card',
+        'color': 'primary',
+        'description': 'Payment and liquidity management',
+        'route': '/app1/'
+    },
+    'app2': {
+        'name': 'Asset Register',
+        'icon': 'fa-boxes',
+        'color': 'success',
+        'description': 'Asset tracking and management',
+        'route': '/app2/'
+    },
+    'app3': {
+        'name': 'Prepayment',
+        'icon': 'fa-cubes',
+        'color': 'info',
+        'description': 'Prepayment schedule management',
+        'route': '/app3/'
+    },
+    'app4': {
+        'name': 'Payment Voucher',
+        'icon': 'fa-money-bill-wave',
+        'color': 'warning',
+        'description': 'Payment Voucher System',
+        'route': '/app4/'
+    }
+}
+
+# Get list of app names for easy reference
+APP_NAMES = list(AVAILABLE_APPS.keys())
 
 
 # ========== AUTH MODELS ==========
@@ -45,9 +82,9 @@ class User(db.Model):
         return self.app_access.filter_by(app_name=app_name, has_access=True).first() is not None
 
     def get_accessible_apps(self):
-        """Get list of apps user has access to"""
+        """Get list of apps user has access to - Dynamic"""
         if self.is_admin:
-            return ['app1', 'app2', 'app3','app4',]
+            return APP_NAMES  # Use the dynamic list
         return [access.app_name for access in self.app_access.filter_by(has_access=True).all()]
 
     def has_any_app_access(self):
@@ -118,7 +155,7 @@ def login_required(f):
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('login'))
 
-        user = User.query.get(session['user_id'])
+        user = db.session.get(User, session['user_id'])
         if not user:
             session.clear()
             flash('User not found. Please log in again.', 'warning')
@@ -160,7 +197,7 @@ def app_access_required(app_name):
                 flash('Please log in to access this page.', 'warning')
                 return redirect(url_for('login'))
 
-            user = User.query.get(session['user_id'])
+            user = db.session.get(User, session['user_id'])
             if not user or not user.is_active:
                 session.clear()
                 flash('Your account is inactive or not found.', 'danger')
@@ -203,7 +240,8 @@ def create_app():
             db.session.add(admin)
             db.session.flush()
 
-            for app_name in ['app1', 'app2', 'app3','app4']:
+            # Give admin access to all apps dynamically
+            for app_name in APP_NAMES:
                 access = UserAppAccess(user_id=admin.id, app_name=app_name, has_access=True)
                 db.session.add(access)
 
@@ -333,7 +371,7 @@ def login():
             session['full_name'] = user.full_name
             session['is_admin'] = user.is_admin
 
-            # Update last login
+            # Update last login - FIXED: using datetime.utcnow()
             user.last_login = datetime.utcnow()
             db.session.commit()
 
@@ -359,7 +397,7 @@ def logout():
 @main_app.route('/dashboard')
 @login_required
 def dashboard():
-    user = User.query.get(session['user_id'])
+    user = db.session.get(User, session['user_id'])
     if not user:
         session.clear()
         flash('Session expired. Please log in again.', 'warning')
@@ -368,27 +406,22 @@ def dashboard():
     accessible_apps = user.get_accessible_apps()
     has_apps = user.has_any_app_access() or user.is_admin
 
-    app_info = {
-        'app1': {'name': 'Liquidity Schedule', 'icon': 'fa-credit-card', 'color': 'primary',
-                 'description': 'Payment and liquidity management'},
-        'app2': {'name': 'Asset Register', 'icon': 'fa-boxes', 'color': 'success',
-                 'description': 'Asset tracking and management'},
-        'app3': {'name': 'Prepayment', 'icon': 'fa-cubes', 'color': 'info',
-                 'description': 'Prepayment schedule management'},
-        'app4': {'name': 'Payment Voucher', 'icon': 'fa-cubes', 'color': 'info',
-                 'description': 'Payment Voucher System'}
-    }
-
     apps = []
     for app_name in accessible_apps:
-        info = app_info.get(app_name, {'name': app_name, 'icon': 'fa-app', 'color': 'secondary', 'description': ''})
+        info = AVAILABLE_APPS.get(app_name, {
+            'name': app_name,
+            'icon': 'fa-app',
+            'color': 'secondary',
+            'description': '',
+            'route': f'/{app_name}/'
+        })
         apps.append({
             'id': app_name,
             'name': info['name'],
             'icon': info['icon'],
             'color': info['color'],
             'description': info['description'],
-            'url': f'/{app_name}/'
+            'url': info['route']
         })
 
     return render_template('dashboard.html',
@@ -452,36 +485,36 @@ def create_user():
         db.session.add(user)
         db.session.flush()
 
-        app1_access = request.form.get('app1_access') == 'on'
-        app2_access = request.form.get('app2_access') == 'on'
-        app3_access = request.form.get('app3_access') == 'on'
-        app4_access = request.form.get('app4_access') == 'on'
+        # Dynamically check all apps
+        app_access = {}
+        for app_name in APP_NAMES:
+            app_access[app_name] = request.form.get(f'{app_name}_access') == 'on'
 
-        if not any([app1_access, app2_access, app3_access]) and not is_admin:
+        # Check if at least one app is selected (unless admin)
+        if not any(app_access.values()) and not is_admin:
             flash('Please assign at least one app access.', 'danger')
             db.session.rollback()
             return render_template('create_user.html')
 
-        if app1_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app1', has_access=True))
-        if app2_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app2', has_access=True))
-        if app3_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app3', has_access=True))
-        if app4_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app4', has_access=True))
+        # Assign app access dynamically
+        for app_name in APP_NAMES:
+            if app_access.get(app_name, False):
+                db.session.add(UserAppAccess(user_id=user.id, app_name=app_name, has_access=True))
 
         db.session.commit()
         flash(f'User {username} created successfully!', 'success')
         return redirect(url_for('manage_users'))
 
-    return render_template('create_user.html')
+    return render_template('create_user.html', apps=AVAILABLE_APPS)
 
 
 @main_app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def edit_user(user_id):
-    user = User.query.get_or_404(user_id)
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('User not found.', 'danger')
+        return redirect(url_for('manage_users'))
 
     if request.method == 'POST':
         user.full_name = request.form.get('full_name', '').strip()
@@ -494,40 +527,46 @@ def edit_user(user_id):
             valid, msg = validate_password(new_password)
             if not valid:
                 flash(msg, 'danger')
-                return render_template('edit_user.html', user=user, access_apps=[])
+                return render_template('edit_user.html', user=user, access_apps=[], apps=AVAILABLE_APPS)
             user.set_password(new_password)
 
-        app1_access = request.form.get('app1_access') == 'on'
-        app2_access = request.form.get('app2_access') == 'on'
-        app3_access = request.form.get('app3_access') == 'on'
-        app4_access = request.form.get('app4_access') == 'on'
+        # Dynamically check all apps
+        app_access = {}
+        for app_name in APP_NAMES:
+            app_access[app_name] = request.form.get(f'{app_name}_access') == 'on'
 
+        # Remove existing access
         UserAppAccess.query.filter_by(user_id=user.id).delete()
 
+        # Add new access dynamically
         if user.is_admin:
-            app1_access = app2_access = app3_access = True
-
-        if app1_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app1', has_access=True))
-        if app2_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app2', has_access=True))
-        if app3_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app3', has_access=True))
-        if app4_access:
-            db.session.add(UserAppAccess(user_id=user.id, app_name='app3', has_access=True))
+            # Admin gets all apps
+            for app_name in APP_NAMES:
+                db.session.add(UserAppAccess(user_id=user.id, app_name=app_name, has_access=True))
+        else:
+            # Regular user gets selected apps
+            for app_name in APP_NAMES:
+                if app_access.get(app_name, False):
+                    db.session.add(UserAppAccess(user_id=user.id, app_name=app_name, has_access=True))
 
         db.session.commit()
         flash(f'User {user.username} updated successfully!', 'success')
         return redirect(url_for('manage_users'))
 
+    # Get current app access
     access_apps = [a.app_name for a in user.app_access.filter_by(has_access=True).all()]
-    return render_template('edit_user.html', user=user, access_apps=access_apps)
+
+    return render_template('edit_user.html', user=user, access_apps=access_apps, apps=AVAILABLE_APPS)
 
 
 @main_app.route('/admin/users/<int:user_id>/toggle', methods=['POST'])
 @admin_required
 def toggle_user(user_id):
-    user = User.query.get_or_404(user_id)
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('User not found.', 'danger')
+        return redirect(url_for('manage_users'))
+
     if user.id == session['user_id']:
         flash('You cannot deactivate yourself.', 'danger')
         return redirect(url_for('manage_users'))
@@ -561,6 +600,7 @@ application = DispatcherMiddleware(
 
 app = application
 
+
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
 
@@ -573,9 +613,8 @@ if __name__ == "__main__":
     print("✅ No approval needed - users can log in immediately")
     print("📱 Users must be assigned apps by admin to access them")
     print("📁 Apps mounted:")
-    print("   - /app1/ - Liquidity Schedule")
-    print("   - /app2/ - Asset Register")
-    print("   - /app3/ - Prepayment")
+    for app_id, app_info in AVAILABLE_APPS.items():
+        print(f"   - {app_info['route']} - {app_info['name']}")
     print("🌐 Access at: http://localhost:5000")
     print("=" * 60)
 

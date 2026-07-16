@@ -38,7 +38,7 @@
         }
         .app-checkboxes {
             display: flex;
-            gap: 20px;
+            gap: 12px;
             flex-wrap: wrap;
         }
         .app-checkboxes .form-check {
@@ -46,9 +46,24 @@
             padding: 10px 15px;
             border-radius: 8px;
             border: 1px solid #e2e8f0;
+            transition: all 0.3s ease;
+            flex: 1 1 auto;
+            min-width: 140px;
         }
         .app-checkboxes .form-check:hover {
             border-color: #667eea;
+            background: #f1f5f9;
+        }
+        .app-checkboxes .form-check input:checked + label {
+            color: #667eea;
+        }
+        .app-checkboxes .form-check label {
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        .app-checkboxes .form-check label i {
+            margin-right: 6px;
         }
         .info-box {
             background: #fef3c7;
@@ -58,6 +73,22 @@
             color: #92400e;
             font-size: 14px;
             border-left: 4px solid #f59e0b;
+        }
+        .info-box i {
+            color: #f59e0b;
+        }
+        .app-section-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .app-section-disabled .form-check {
+            background: #f1f5f9 !important;
+        }
+        .badge-app {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 4px;
         }
     </style>
 </head>
@@ -85,6 +116,7 @@
             <div class="info-box">
                 <i class="fas fa-info-circle me-2"></i>
                 New users will not have any app access until you assign them below.
+                <strong>Admins automatically get access to all apps.</strong>
             </div>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -131,26 +163,19 @@
                 <div class="mb-4" id="appAccessSection">
                     <label class="form-label">App Access</label>
                     <div class="app-checkboxes">
+                        {% for app_id, app_info in apps.items() %}
                         <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="app1_access" name="app1_access">
-                            <label class="form-check-label" for="app1_access">
-                                <i class="fas fa-credit-card text-primary"></i> Liquidity Schedule
+                            <input type="checkbox" class="form-check-input" id="{{ app_id }}_access" name="{{ app_id }}_access">
+                            <label class="form-check-label" for="{{ app_id }}_access">
+                                <i class="fas {{ app_info.icon }} text-{{ app_info.color }}"></i> {{ app_info.name }}
                             </label>
                         </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="app2_access" name="app2_access">
-                            <label class="form-check-label" for="app2_access">
-                                <i class="fas fa-boxes text-success"></i> Asset Register
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input type="checkbox" class="form-check-input" id="app3_access" name="app3_access">
-                            <label class="form-check-label" for="app3_access">
-                                <i class="fas fa-cubes text-info"></i> Prepayment
-                            </label>
-                        </div>
+                        {% endfor %}
                     </div>
-                    <small class="text-muted">Admins automatically get access to all apps</small>
+                    <small class="text-muted mt-2 d-block">
+                        <i class="fas fa-info-circle"></i> Admins automatically get access to all apps.
+                        Uncheck all to remove app access for regular users.
+                    </small>
                 </div>
 
                 <button type="submit" class="btn btn-primary w-100">
@@ -163,11 +188,26 @@
     <script>
         document.getElementById('is_admin').addEventListener('change', function() {
             const section = document.getElementById('appAccessSection');
+            const checkboxes = section.querySelectorAll('input[type="checkbox"]');
+
             if (this.checked) {
-                section.style.opacity = '0.5';
-                section.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+                // Admin: Disable section and check all apps
+                section.classList.add('app-section-disabled');
+                checkboxes.forEach(cb => cb.checked = true);
             } else {
-                section.style.opacity = '1';
+                // Regular user: Enable section and uncheck all apps
+                section.classList.remove('app-section-disabled');
+                checkboxes.forEach(cb => cb.checked = false);
+            }
+        });
+
+        // Initialize: If admin checkbox is checked by default, handle it
+        document.addEventListener('DOMContentLoaded', function() {
+            const adminCheckbox = document.getElementById('is_admin');
+            if (adminCheckbox.checked) {
+                const section = document.getElementById('appAccessSection');
+                section.classList.add('app-section-disabled');
+                section.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
             }
         });
     </script>
