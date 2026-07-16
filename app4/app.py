@@ -26,7 +26,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-app4-secret-key-ch
 
 # ============ DATABASE CONFIGURATION ============
 # Check if we're on Render (production) or local
-if os.environ.get('DATABASE_URL_APP4'):
+if os.environ.get('DATABASE_URL'):
     # Use PostgreSQL on Render
     database_url = os.environ.get('DATABASE_URL_APP4')
     if database_url and database_url.startswith('postgres://'):
