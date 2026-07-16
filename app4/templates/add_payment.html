@@ -3,7 +3,7 @@
 {% block content %}
 <h2 class="mb-3">Add New Payment</h2>
 
-<form method="POST" id="paymentForm">
+<form method="POST" id="paymentForm" enctype="multipart/form-data">
     {{ form.hidden_tag() }}
 
     <div class="row g-2">
@@ -79,6 +79,32 @@
                 {% for error in form.description.errors %}
                     <div class="text-danger small">{{ error }}</div>
                 {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ATTACHMENT SECTION ===== -->
+    <div class="row g-2">
+        <div class="col-md-6">
+            <div class="mb-2">
+                {{ form.attachment.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.attachment(class="form-control form-control-sm", accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx") }}
+                <small class="text-muted" style="font-size: 0.7rem;">
+                    <i class="bi bi-paperclip"></i>
+                    Allowed: PDF, Images (JPG, PNG, GIF), Word (DOC, DOCX), Excel (XLS, XLSX) | Max: 16MB
+                </small>
+                {% for error in form.attachment.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="mb-2">
+                <label class="form-label" style="font-size: 0.85rem;">&nbsp;</label>
+                <div class="alert alert-info py-1 mb-0" style="font-size: 0.75rem;">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Tip:</strong> Upload supporting documents like invoices, receipts, or approval forms.
+                </div>
             </div>
         </div>
     </div>
@@ -281,8 +307,12 @@
     {% endif %}
 
     <div class="mt-2">
-        <button type="submit" class="btn btn-primary btn-sm">Add Payment</button>
-        <a href="{{ url_for('payments') }}" class="btn btn-secondary btn-sm">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-circle"></i> Add Payment
+        </button>
+        <a href="{{ url_for('payments') }}" class="btn btn-secondary btn-sm">
+            <i class="bi bi-x-circle"></i> Cancel
+        </a>
     </div>
 </form>
 
@@ -347,8 +377,69 @@
     </div>
 </div>
 
+<!-- Attachment Preview Script -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===== ATTACHMENT PREVIEW =====
+    const attachmentInput = document.querySelector('input[type="file"][name="attachment"]');
+    if (attachmentInput) {
+        attachmentInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                // Check file size (16MB max)
+                if (file.size > 16 * 1024 * 1024) {
+                    Swal.fire('Error', 'File size exceeds 16MB limit.', 'error');
+                    this.value = '';
+                    return;
+                }
+
+                // Check file type
+                const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif',
+                                     'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                     'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+
+                if (!allowedTypes.includes(file.type)) {
+                    Swal.fire('Error', 'File type not allowed. Please upload PDF, Images, Word, or Excel files.', 'error');
+                    this.value = '';
+                    return;
+                }
+
+                // Show file info
+                const sizeKB = (file.size / 1024).toFixed(1);
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                const sizeDisplay = sizeMB > 1 ? `${sizeMB} MB` : `${sizeKB} KB`;
+
+                // Create or update file info display
+                let infoDiv = document.querySelector('.attachment-file-info');
+                if (!infoDiv) {
+                    infoDiv = document.createElement('div');
+                    infoDiv.className = 'attachment-file-info alert alert-success py-1 mt-1';
+                    infoDiv.style.fontSize = '0.75rem';
+                    this.parentNode.appendChild(infoDiv);
+                }
+                infoDiv.innerHTML = `
+                    <i class="bi bi-check-circle"></i>
+                    <strong>File selected:</strong> ${file.name}
+                    <span class="text-muted">(${sizeDisplay})</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger ms-2" id="clearAttachment">
+                        <i class="bi bi-x"></i> Clear
+                    </button>
+                `;
+
+                // Add clear button functionality
+                document.getElementById('clearAttachment').addEventListener('click', function() {
+                    attachmentInput.value = '';
+                    const infoDiv = document.querySelector('.attachment-file-info');
+                    if (infoDiv) infoDiv.remove();
+                });
+            } else {
+                const infoDiv = document.querySelector('.attachment-file-info');
+                if (infoDiv) infoDiv.remove();
+            }
+        });
+    }
+
+    // ===== LINE ITEMS LOGIC =====
     const lineItemsContainer = document.getElementById('lineItemsContainer');
     const addButton = document.getElementById('addLineItem');
     const template = document.getElementById('lineItemTemplate');
@@ -413,7 +504,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     element.remove();
                     calculateAllTotals();
                 } else {
-                    alert('You must have at least one line item.');
+                    Swal.fire('Warning', 'You must have at least one line item.', 'warning');
                 }
             });
         }
@@ -441,8 +532,65 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial calculation
     calculateAllTotals();
 
-    // NOTE: Exchange rate is now manual - no auto-fill
-    // User enters the exchange rate for the selected currency
+    // ===== FORM VALIDATION =====
+    const paymentForm = document.getElementById('paymentForm');
+    paymentForm.addEventListener('submit', function(e) {
+        // Check if at least one line item has a description
+        const descriptions = document.querySelectorAll('.line-item input[name$="-description"]');
+        let hasValidItem = false;
+        descriptions.forEach(input => {
+            if (input.value.trim() !== '') {
+                hasValidItem = true;
+            }
+        });
+
+        if (!hasValidItem) {
+            e.preventDefault();
+            Swal.fire('Error', 'Please add at least one line item with a description.', 'error');
+            return false;
+        }
+
+        // Check if supplier is selected
+        const supplierSelect = document.querySelector('select[name="supplier_id"]');
+        if (supplierSelect && (supplierSelect.value === '' || supplierSelect.value === '0')) {
+            e.preventDefault();
+            Swal.fire('Error', 'Please select a supplier.', 'error');
+            return false;
+        }
+
+        // Check if currency is selected
+        const currencySelect = document.querySelector('select[name="currency"]');
+        if (currencySelect && currencySelect.value === '') {
+            e.preventDefault();
+            Swal.fire('Error', 'Please select a currency.', 'error');
+            return false;
+        }
+    });
 });
 </script>
+
+<style>
+/* Attachment file info styling */
+.attachment-file-info {
+    font-size: 0.75rem;
+}
+.attachment-file-info .btn {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.5rem;
+}
+
+/* Line item styling */
+.line-item {
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+}
+.line-item:hover {
+    border-color: #667eea !important;
+    background-color: #f0f4ff;
+}
+.line-item .alert-info {
+    background-color: #e8f4fd;
+    border-color: #b8d4f0;
+}
+</style>
 {% endblock %}

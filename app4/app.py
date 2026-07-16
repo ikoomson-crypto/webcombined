@@ -47,12 +47,14 @@ app.config['SQLALCHEMY_ECHO'] = False
 base_dir = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(base_dir, 'static/uploads/logos')
 app.config['SIGNATURE_FOLDER'] = os.path.join(base_dir, 'static/uploads/signatures')
-app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
+app.config['ATTACHMENT_FOLDER'] = os.path.join(base_dir, 'static/uploads/attachments')
+app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'pdf', 'doc', 'docx', 'xls', 'xlsx'}
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
 # Ensure upload directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['SIGNATURE_FOLDER'], exist_ok=True)
+os.makedirs(app.config['ATTACHMENT_FOLDER'], exist_ok=True)
 
 # Initialize database
 db = SQLAlchemy(app)
@@ -168,6 +170,13 @@ class Payment(db.Model):
     description = db.Column(db.Text)
     reference = db.Column(db.String(100))
 
+    # ===== ATTACHMENT FIELDS =====
+    attachment_filename = db.Column(db.String(200))
+    attachment_original_name = db.Column(db.String(200))
+    attachment_size = db.Column(db.Integer)  # in bytes
+    attachment_uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Signature fields
     prepared_by_id = db.Column(db.Integer, db.ForeignKey('authorized_signature.id'))
     approved_by_id = db.Column(db.Integer, db.ForeignKey('authorized_signature.id'))
     received_by_id = db.Column(db.Integer, db.ForeignKey('authorized_signature.id'))
@@ -206,6 +215,36 @@ class PaymentLineItem(db.Model):
     net_amount = db.Column(db.Float, default=0.0)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+# ==================== ATTACHMENT HELPER FUNCTIONS ====================
+
+def get_attachment_url(filename):
+    """Get the URL for an attachment"""
+    if filename:
+        return url_for('static', filename=f'uploads/attachments/{filename}')
+    return None
+
+
+def delete_attachment_file(filename):
+    """Delete an attachment file"""
+    if filename:
+        file_path = os.path.join(app.config['ATTACHMENT_FOLDER'], filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return True
+    return False
+
+
+def format_file_size(size_bytes):
+    """Format file size in human readable format"""
+    if not size_bytes:
+        return 'N/A'
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} GB"
 
 
 # ==================== FORMS ====================
@@ -262,6 +301,14 @@ class PaymentForm(FlaskForm):
     description = TextAreaField('Payment Description', validators=[Optional()])
     reference = StringField('Reference Number', validators=[Optional()])
 
+    # ===== ATTACHMENT FIELD =====
+    attachment = FileField('Attachment', validators=[
+        Optional(),
+        FileAllowed(['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx', 'xls', 'xlsx'],
+                    'Allowed: PDF, Images, Word, Excel')
+    ])
+
+    # Signature fields
     prepared_by_id = SelectField('Prepared By', coerce=int, validators=[Optional()])
     approved_by_id = SelectField('Approved By', coerce=int, validators=[Optional()])
     received_by_id = SelectField('Received By', coerce=int, validators=[Optional()])
@@ -1718,7 +1765,7 @@ def add_payment():
             transaction_number = f'PMT-{str(seq).zfill(3)}'
             print(f"Generated transaction number: {transaction_number}")
 
-            # Parse payment date - if empty, use None (will default in model)
+            # Parse payment date
             payment_date = None
             if form.payment_date.data:
                 payment_date = form.payment_date.data
@@ -1740,6 +1787,22 @@ def add_payment():
                 source_bank_id=form.source_bank_id.data if form.source_bank_id.data != 0 else None,
                 company_id=active_company.id
             )
+
+            # ===== HANDLE ATTACHMENT =====
+            if form.attachment.data and allowed_file(form.attachment.data.filename):
+                file = form.attachment.data
+                original_filename = secure_filename(file.filename)
+                # Generate unique filename
+                name_parts = original_filename.rsplit('.', 1)
+                unique_filename = f"{name_parts[0]}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{name_parts[1] if len(name_parts) > 1 else 'pdf'}"
+
+                file_path = os.path.join(app.config['ATTACHMENT_FOLDER'], unique_filename)
+                file.save(file_path)
+
+                payment.attachment_filename = unique_filename
+                payment.attachment_original_name = original_filename
+                payment.attachment_size = os.path.getsize(file_path)
+                payment.attachment_uploaded_at = datetime.now()
 
             total_gross = 0
             total_wht = 0
@@ -1891,6 +1954,34 @@ def edit_payment(payment_id):
             payment.received_by_id = form.received_by_id.data if form.received_by_id.data != 0 else None
             payment.source_bank_id = form.source_bank_id.data if form.source_bank_id.data != 0 else None
 
+            # ===== HANDLE ATTACHMENT UPDATE =====
+            # Check if attachment should be removed
+            if request.form.get('remove_attachment') == 'on' and payment.attachment_filename:
+                delete_attachment_file(payment.attachment_filename)
+                payment.attachment_filename = None
+                payment.attachment_original_name = None
+                payment.attachment_size = None
+                payment.attachment_uploaded_at = None
+
+            # Check if new attachment is uploaded
+            if form.attachment.data and allowed_file(form.attachment.data.filename):
+                # Delete old attachment if exists
+                if payment.attachment_filename:
+                    delete_attachment_file(payment.attachment_filename)
+
+                file = form.attachment.data
+                original_filename = secure_filename(file.filename)
+                name_parts = original_filename.rsplit('.', 1)
+                unique_filename = f"{name_parts[0]}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{name_parts[1] if len(name_parts) > 1 else 'pdf'}"
+
+                file_path = os.path.join(app.config['ATTACHMENT_FOLDER'], unique_filename)
+                file.save(file_path)
+
+                payment.attachment_filename = unique_filename
+                payment.attachment_original_name = original_filename
+                payment.attachment_size = os.path.getsize(file_path)
+                payment.attachment_uploaded_at = datetime.now()
+
             for item in payment.line_items:
                 db.session.delete(item)
             payment.line_items.clear()
@@ -1944,6 +2035,11 @@ def edit_payment(payment_id):
 @app.route('/delete_payment/<int:payment_id>')
 def delete_payment(payment_id):
     payment = Payment.query.get_or_404(payment_id)
+
+    # Delete attachment if exists
+    if payment.attachment_filename:
+        delete_attachment_file(payment.attachment_filename)
+
     db.session.delete(payment)
     db.session.commit()
     flash('Payment deleted successfully!', 'success')
@@ -2043,6 +2139,52 @@ def download_payment_template():
     except Exception as e:
         flash(f'Error generating template: {str(e)}', 'danger')
         return redirect(url_for('import_payments'))
+
+
+# ==================== ATTACHMENT ROUTES ====================
+
+@app.route('/download_attachment/<int:payment_id>')
+def download_attachment(payment_id):
+    """Download the attachment for a payment"""
+    payment = Payment.query.get_or_404(payment_id)
+
+    if not payment.attachment_filename:
+        flash('No attachment found for this payment.', 'warning')
+        return redirect(url_for('payments'))
+
+    file_path = os.path.join(app.config['ATTACHMENT_FOLDER'], payment.attachment_filename)
+
+    if not os.path.exists(file_path):
+        flash('Attachment file not found.', 'danger')
+        return redirect(url_for('payments'))
+
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=payment.attachment_original_name or payment.attachment_filename
+    )
+
+
+@app.route('/delete_attachment/<int:payment_id>', methods=['POST'])
+def delete_attachment_route(payment_id):
+    """Delete the attachment for a payment"""
+    payment = Payment.query.get_or_404(payment_id)
+
+    if not payment.attachment_filename:
+        return jsonify({'success': False, 'message': 'No attachment found'})
+
+    # Delete the file
+    if delete_attachment_file(payment.attachment_filename):
+        # Clear attachment fields
+        payment.attachment_filename = None
+        payment.attachment_original_name = None
+        payment.attachment_size = None
+        payment.attachment_uploaded_at = None
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Attachment deleted successfully'})
+    else:
+        return jsonify({'success': False, 'message': 'Failed to delete attachment file'})
 
 
 # ==================== REPORT ROUTES ====================
@@ -2292,6 +2434,11 @@ def download_pdf_voucher(payment_id):
     if payment.description:
         payment_details.append(f'<b>Description:</b> {payment.description[:40]}...' if len(
             payment.description) > 40 else f'<b>Description:</b> {payment.description}')
+
+    # Add attachment info if exists
+    if payment.attachment_filename:
+        payment_details.append(f'<b>Attachment:</b> {payment.attachment_original_name or payment.attachment_filename}')
+        payment_details.append(f'<b>Attachment Size:</b> {format_file_size(payment.attachment_size)}')
 
     max_rows = max(len(trans_details), len(supplier_details), len(payment_details))
 

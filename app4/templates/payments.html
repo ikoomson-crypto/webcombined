@@ -103,6 +103,7 @@
                 <th>VAT Total</th>
                 <th>Net Amount</th>
                 <th>Payment Date</th>
+                <th>Attachment</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -128,6 +129,30 @@
                 <td>{{ "{:,.2f}".format(payment.total_vat_amount or 0) }}</td>
                 <td><strong>{{ "{:,.2f}".format(payment.total_net_amount or 0) }}</strong></td>
                 <td>{{ payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else 'N/A' }}</td>
+
+                <!-- ===== ATTACHMENT COLUMN ===== -->
+                <td>
+                    {% if payment.attachment_filename %}
+                        <div class="d-flex align-items-center gap-1">
+                            <a href="{{ url_for('download_attachment', payment_id=payment.id) }}"
+                               class="btn btn-sm btn-info"
+                               title="Download Attachment: {{ payment.attachment_original_name or payment.attachment_filename }}">
+                                <i class="bi bi-paperclip"></i>
+                            </a>
+                            <button onclick="deleteAttachment({{ payment.id }})"
+                                    class="btn btn-sm btn-danger"
+                                    title="Delete Attachment">
+                                <i class="bi bi-x"></i>
+                            </button>
+                            <span class="text-muted small" style="font-size: 0.65rem;">
+                                {{ payment.attachment_original_name[:15] + '...' if payment.attachment_original_name|length > 15 else payment.attachment_original_name }}
+                            </span>
+                        </div>
+                    {% else %}
+                        <span class="text-muted small">No file</span>
+                    {% endif %}
+                </td>
+
                 <td>
                     <a href="{{ url_for('download_pdf_voucher', payment_id=payment.id) }}"
                        class="btn btn-sm btn-success" title="Download PDF Voucher">
@@ -139,14 +164,14 @@
                     </a>
                     <a href="{{ url_for('delete_payment', payment_id=payment.id) }}"
                        class="btn btn-sm btn-danger" title="Delete Payment"
-                       onclick="return confirm('Are you sure you want to delete this payment?')">
+                       onclick="return confirm('Are you sure you want to delete this payment? The attachment will also be deleted.')">
                         <i class="bi bi-trash"></i>
                     </a>
                 </td>
             </tr>
             <!-- Collapsible row for line items -->
             <tr>
-                <td colspan="13" class="p-0">
+                <td colspan="14" class="p-0">
                     <div class="collapse" id="paymentItems{{ payment.id }}">
                         <div class="card card-body m-2">
                             <h6 class="mb-3">Line Items for Transaction: {{ payment.transaction_number }}</h6>
@@ -200,6 +225,9 @@
                                     <strong>Reference:</strong> {{ payment.reference or 'N/A' }} |
                                     <strong>Description:</strong> {{ payment.description or 'N/A' }} |
                                     <strong>Source Bank:</strong> {{ payment.source_bank.name if payment.source_bank else 'N/A' }}
+                                    {% if payment.attachment_filename %}
+                                        | <strong>Attachment:</strong> {{ payment.attachment_original_name or payment.attachment_filename }}
+                                    {% endif %}
                                 </small>
                             </div>
                         </div>
@@ -328,40 +356,124 @@ function bulkDelete() {
     const count = checkboxes.length;
 
     if (count === 0) {
-        alert('Please select at least one payment to delete.');
+        Swal.fire('Warning', 'Please select at least one payment to delete.', 'warning');
         return;
     }
 
-    if (!confirm('Are you sure you want to delete ' + count + ' payment(s)? This action cannot be undone.')) {
-        return;
-    }
+    Swal.fire({
+        title: 'Delete ' + count + ' payment(s)?',
+        text: 'This action cannot be undone. Attachments will also be deleted.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete them!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const ids = [];
+            checkboxes.forEach(function(checkbox) {
+                ids.push(checkbox.value);
+            });
 
-    const ids = [];
-    checkboxes.forEach(function(checkbox) {
-        ids.push(checkbox.value);
-    });
+            Swal.fire({
+                title: 'Deleting...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
 
-    // Send AJAX request
-    fetch('{{ url_for("bulk_delete_payments") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ payment_ids: ids })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            location.reload();
-        } else {
-            alert('Error: ' + data.message);
+            fetch('{{ url_for("bulk_delete_payments") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ payment_ids: ids })
+            })
+            .then(response => response.json())
+            .then(data => {
+                Swal.close();
+                if (data.success) {
+                    Swal.fire('Success', data.message, 'success');
+                    location.reload();
+                } else {
+                    Swal.fire('Error', data.message || 'An error occurred.', 'error');
+                }
+            })
+            .catch(error => {
+                Swal.close();
+                console.error('Error:', error);
+                Swal.fire('Error', 'An error occurred while deleting payments.', 'error');
+            });
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while deleting payments.');
+    });
+}
+
+// ===== ATTACHMENT FUNCTIONS =====
+function deleteAttachment(paymentId) {
+    Swal.fire({
+        title: 'Delete Attachment?',
+        text: 'This will permanently delete the attached file.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            Swal.fire({
+                title: 'Deleting...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            fetch('{{ url_for("delete_attachment_route", payment_id=0) }}'.replace('0', paymentId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                Swal.close();
+                if (data.success) {
+                    Swal.fire('Success', data.message, 'success');
+                    location.reload();
+                } else {
+                    Swal.fire('Error', data.message || 'Failed to delete attachment.', 'error');
+                }
+            })
+            .catch(error => {
+                Swal.close();
+                console.error('Error:', error);
+                Swal.fire('Error', 'An error occurred while deleting the attachment.', 'error');
+            });
+        }
     });
 }
 </script>
+
+<style>
+/* Attachment column styling */
+.btn-info {
+    background-color: #0dcaf0;
+    border-color: #0dcaf0;
+}
+.btn-info:hover {
+    background-color: #0bb5d4;
+    border-color: #0aa8c4;
+}
+
+/* Payment row hover effect */
+.table tbody tr:hover {
+    background-color: #f0f4ff;
+}
+
+/* Attachment file name styling */
+.attachment-file-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+}
+</style>
 {% endblock %}
