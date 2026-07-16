@@ -22,15 +22,29 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-app4-secret-key-change-in-production'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-app4-secret-key-change-in-production')
 
 # ============ DATABASE CONFIGURATION ============
-base_dir = os.path.dirname(os.path.abspath(__file__))
-db_path = os.path.join(base_dir, 'app4.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ECHO'] = False  # Set to True for debugging
+# Check if we're on Render (production) or local
+if os.environ.get('DATABASE_URL_APP4'):
+    # Use PostgreSQL on Render
+    database_url = os.environ.get('DATABASE_URL_APP4')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(f"✅ Using PostgreSQL database on Render for App4")
+else:
+    # Use SQLite locally
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(base_dir, 'app4.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    print(f"✅ Using SQLite database at: {db_path}")
 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ECHO'] = False
+
+# ============ FOLDER CONFIGURATION ============
+base_dir = os.path.dirname(os.path.abspath(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(base_dir, 'static/uploads/logos')
 app.config['SIGNATURE_FOLDER'] = os.path.join(base_dir, 'static/uploads/signatures')
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif', 'svg'}
@@ -49,7 +63,7 @@ def init_db():
     """Initialize database - create tables and default data"""
     with app.app_context():
         db.create_all()
-        print(f"✅ Database tables created/verified at: {db_path}")
+        print(f"✅ Database tables created/verified")
 
         # Create default company if none exists
         if Company.query.count() == 0:
@@ -218,11 +232,12 @@ class LineItemForm(FlaskForm):
     withholding_tax_rate = FloatField('WHT Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)], default=0.0)
     vat_rate = FloatField('VAT Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)], default=0.0)
 
+
 class PaymentForm(FlaskForm):
     supplier_id = SelectField('Supplier', coerce=int, validators=[DataRequired()])
     invoice_number = StringField('Invoice Number', validators=[Optional(), Length(max=50)])
     currency = SelectField('Currency', choices=[
-        ('', '-- Select Currency --'),  # <-- ADD EMPTY OPTION FIRST
+        ('', '-- Select Currency --'),
         ('USD', 'USD - US Dollar'),
         ('EUR', 'EUR - Euro'),
         ('GBP', 'GBP - British Pound'),
@@ -241,21 +256,18 @@ class PaymentForm(FlaskForm):
         ('TZS', 'TZS - Tanzanian Shilling'),
         ('UGX', 'UGX - Ugandan Shilling'),
         ('ZMW', 'ZMW - Zambian Kwacha')
-    ], validators=[DataRequired()], default='')  # <-- Set default to empty
+    ], validators=[DataRequired()], default='')
     exchange_rate = FloatField('Exchange Rate (1 USD = ?)', validators=[Optional(), NumberRange(min=0.01)], default=1.0)
     payment_date = DateField('Payment Date', format='%Y-%m-%d', validators=[Optional()])
     description = TextAreaField('Payment Description', validators=[Optional()])
     reference = StringField('Reference Number', validators=[Optional()])
 
-    # Signature fields
     prepared_by_id = SelectField('Prepared By', coerce=int, validators=[Optional()])
     approved_by_id = SelectField('Approved By', coerce=int, validators=[Optional()])
     received_by_id = SelectField('Received By', coerce=int, validators=[Optional()])
 
-    # Source Bank field
     source_bank_id = SelectField('Source Bank', coerce=int, validators=[Optional()])
 
-    # Line items
     line_items = FieldList(FormField(LineItemForm), min_entries=1)
 
     def __init__(self, *args, **kwargs):
@@ -307,6 +319,7 @@ class PaymentForm(FlaskForm):
             self.approved_by_id.choices = [(0, '-- Select --')]
             self.received_by_id.choices = [(0, '-- Select --')]
             self.source_bank_id.choices = [(0, '-- Select Bank --')]
+
 
 class SupplierForm(FlaskForm):
     name = StringField('Supplier Name', validators=[DataRequired(), Length(max=100)])
@@ -377,15 +390,12 @@ class ReportForm(FlaskForm):
         super(ReportForm, self).__init__(*args, **kwargs)
         active_company = Company.query.filter_by(is_active=True).first()
         if active_company:
-            # Get suppliers and sort alphabetically by name (case-insensitive)
-            suppliers = Supplier.query.filter_by(
-                company_id=active_company.id
-            ).all()
-            # Sort suppliers alphabetically by name
+            suppliers = Supplier.query.filter_by(company_id=active_company.id).all()
             suppliers = sorted(suppliers, key=lambda s: s.name.lower())
             self.supplier_id.choices = [(0, '-- All Suppliers --')] + [(s.id, s.name) for s in suppliers]
         else:
             self.supplier_id.choices = [(0, '-- No Suppliers --')]
+
 
 class PaymentImportForm(FlaskForm):
     file = FileField('Excel File', validators=[
@@ -938,7 +948,7 @@ def generate_vat_report(company_id, date_from, date_to, supplier_id=None):
 
 
 def generate_supplier_transactions_report(company_id, date_from, date_to, supplier_id=None):
-    """Generate Supplier Transactions Report - Sorted by Supplier Name Only (Case-Insensitive)"""
+    """Generate Supplier Transactions Report - Sorted by Supplier Name (Case-Insensitive)"""
     query = Payment.query.filter(
         Payment.company_id == company_id,
         Payment.payment_date >= date_from,
@@ -951,7 +961,7 @@ def generate_supplier_transactions_report(company_id, date_from, date_to, suppli
     # Get all payments
     payments = query.all()
 
-    # Sort ONLY by supplier name (case-insensitive)
+    # Sort by supplier name alphabetically (case-insensitive)
     payments = sorted(payments, key=lambda p: p.supplier.name.lower())
 
     report_data = []
@@ -977,6 +987,7 @@ def generate_supplier_transactions_report(company_id, date_from, date_to, suppli
             total_net += item.net_amount
 
     return report_data, total_net
+
 
 def generate_report_excel(report_data, title, total_amount, currency):
     if not report_data:
@@ -1593,10 +1604,8 @@ def payments():
         flash('Please select a company first', 'warning')
         return redirect(url_for('companies'))
 
-    # Start with base query
     query = Payment.query.filter_by(company_id=active_company.id)
 
-    # Apply filters
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
     supplier_id = request.args.get('supplier_id')
@@ -1624,14 +1633,10 @@ def payments():
     if currency:
         query = query.filter(Payment.currency == currency)
 
-    # Order by payment date descending (newest first)
     payments = query.order_by(Payment.payment_date.desc()).all()
 
-    # Get all suppliers for filter dropdown - SORTED ALPHABETICALLY
     suppliers = Supplier.query.filter_by(company_id=active_company.id).all()
-    suppliers = sorted(suppliers, key=lambda s: s.name.lower())  # <-- ADD THIS LINE
-
-    # Get all currencies used in payments
+    suppliers = sorted(suppliers, key=lambda s: s.name.lower())
     currencies = db.session.query(Payment.currency).filter_by(company_id=active_company.id).distinct().all()
     currencies = [c[0] for c in currencies if c[0]]
 
@@ -1640,6 +1645,7 @@ def payments():
                            company=active_company,
                            suppliers=suppliers,
                            currencies=currencies)
+
 
 @app.route('/add_payment', methods=['GET', 'POST'])
 def add_payment():
@@ -1793,6 +1799,7 @@ def add_payment():
             flash(f'Error saving payment: {str(e)}', 'danger')
 
     return render_template('add_payment.html', form=form, active_company=active_company)
+
 
 @app.route('/bulk_delete_payments', methods=['POST'])
 def bulk_delete_payments():
@@ -2576,7 +2583,10 @@ if __name__ == '__main__':
     print("=" * 60)
     print("🚀 APP4 - Payment System Application")
     print("=" * 60)
-    print(f"📊 Database: {db_path}")
+    if os.environ.get('DATABASE_URL_APP4'):
+        print(f"📊 Database: PostgreSQL (Render)")
+    else:
+        print(f"📊 Database: SQLite at: {db_path}")
     print("🌐 Running at: http://localhost:5000/app4/")
     print("=" * 60)
     app.run(debug=True, host='0.0.0.0', port=5000)
