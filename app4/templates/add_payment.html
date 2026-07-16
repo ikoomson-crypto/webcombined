@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-3">Add New Payment</h2>
+
+<form method="POST" id="paymentForm">
+    {{ form.hidden_tag() }}
+
+    <div class="row g-2">
+        <div class="col-md-4">
+            <div class="mb-2">
+                {{ form.supplier_id.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.supplier_id(class="form-select form-select-sm") }}
+                {% for error in form.supplier_id.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="mb-2">
+                {{ form.invoice_number.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.invoice_number(class="form-control form-control-sm", placeholder="Optional") }}
+                <small class="text-muted" style="font-size: 0.7rem;">Optional</small>
+                {% for error in form.invoice_number.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-2">
+            <div class="mb-2">
+                {{ form.currency.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.currency(class="form-select form-select-sm", id="currency_select") }}
+                <small class="text-muted" style="font-size: 0.7rem;">Select payment currency</small>
+                {% for error in form.currency.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="mb-2">
+                {{ form.exchange_rate.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.exchange_rate(class="form-control form-control-sm", step="0.0001", placeholder="Enter rate") }}
+                <small class="text-muted" style="font-size: 0.7rem;">1 USD = ? (if applicable)</small>
+                {% for error in form.exchange_rate.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-2">
+        <div class="col-md-3">
+            <div class="mb-2">
+                {{ form.payment_date.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.payment_date(class="form-control form-control-sm", type="date") }}
+                {% for error in form.payment_date.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="mb-2">
+                {{ form.reference.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.reference(class="form-control form-control-sm") }}
+                {% for error in form.reference.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="mb-2">
+                {{ form.description.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.description(class="form-control form-control-sm", rows="1") }}
+                {% for error in form.description.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Source Bank Section -->
+    <div class="row g-2">
+        <div class="col-md-4">
+            <div class="mb-2">
+                {{ form.source_bank_id.label(class="form-label", style="font-size: 0.85rem;") }}
+                {{ form.source_bank_id(class="form-select form-select-sm") }}
+                <small class="text-muted" style="font-size: 0.7rem;">Select bank to pay from</small>
+                {% for error in form.source_bank_id.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Signature Section with Dropdowns -->
+    <div class="card mb-2">
+        <div class="card-header bg-secondary text-white py-1">
+            <h6 class="mb-0"><i class="bi bi-person-check"></i> Authorized Signatories</h6>
+        </div>
+        <div class="card-body p-2">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <div class="mb-2">
+                        {{ form.prepared_by_id.label(class="form-label", style="font-size: 0.85rem;") }}
+                        {{ form.prepared_by_id(class="form-select form-select-sm") }}
+                        <small class="text-muted" style="font-size: 0.7rem;">Who prepared this payment</small>
+                        {% for error in form.prepared_by_id.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-2">
+                        {{ form.approved_by_id.label(class="form-label", style="font-size: 0.85rem;") }}
+                        {{ form.approved_by_id(class="form-select form-select-sm") }}
+                        <small class="text-muted" style="font-size: 0.7rem;">Who approved this payment</small>
+                        {% for error in form.approved_by_id.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-2">
+                        {{ form.received_by_id.label(class="form-label", style="font-size: 0.85rem;") }}
+                        {{ form.received_by_id(class="form-select form-select-sm") }}
+                        <small class="text-muted" style="font-size: 0.7rem;">Who received this payment</small>
+                        {% for error in form.received_by_id.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-1">
+                <div class="col-md-12">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i>
+                        Select authorized signatories from the list.
+                        <a href="{{ url_for('signatures') }}" target="_blank">Manage Signatories</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items Section -->
+    <div class="card mb-2">
+        <div class="card-header bg-primary text-white py-1 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0"><i class="bi bi-list"></i> Line Items</h6>
+            <button type="button" class="btn btn-light btn-sm" id="addLineItem">
+                <i class="bi bi-plus-circle"></i> Add
+            </button>
+        </div>
+        <div class="card-body p-2">
+            <div id="lineItemsContainer">
+                {% for item in form.line_items %}
+                <div class="line-item row g-1 mb-2 p-2 border rounded" data-index="{{ loop.index0 }}">
+                    <div class="col-md-12">
+                        <div class="row g-1">
+                            <div class="col-md-4">
+                                <label class="form-label" style="font-size: 0.75rem;">Description</label>
+                                <input type="text"
+                                       class="form-control form-control-sm"
+                                       name="line_items-{{ loop.index0 }}-description"
+                                       placeholder="Item description"
+                                       value="{{ item.description.data or '' }}"
+                                       required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" style="font-size: 0.75rem;">Qty</label>
+                                <input type="number"
+                                       class="form-control form-control-sm quantity"
+                                       name="line_items-{{ loop.index0 }}-quantity"
+                                       step="0.01"
+                                       min="0.01"
+                                       value="{{ item.quantity.data or 1 }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" style="font-size: 0.75rem;">Unit Price</label>
+                                <input type="number"
+                                       class="form-control form-control-sm unit-price"
+                                       name="line_items-{{ loop.index0 }}-unit_price"
+                                       step="0.01"
+                                       min="0.01"
+                                       value="{{ item.unit_price.data or '' }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" style="font-size: 0.75rem;">WHT %</label>
+                                <input type="number"
+                                       class="form-control form-control-sm wht-rate"
+                                       name="line_items-{{ loop.index0 }}-withholding_tax_rate"
+                                       step="0.01"
+                                       placeholder="0"
+                                       value="{{ item.withholding_tax_rate.data or 0 }}">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" style="font-size: 0.75rem;">VAT %</label>
+                                <input type="number"
+                                       class="form-control form-control-sm vat-rate"
+                                       name="line_items-{{ loop.index0 }}-vat_rate"
+                                       step="0.01"
+                                       placeholder="0"
+                                       value="{{ item.vat_rate.data or 0 }}">
+                            </div>
+                        </div>
+                        <div class="row g-1 mt-1">
+                            <div class="col-md-12">
+                                <div class="alert alert-info py-1 mb-0" style="font-size: 0.75rem;">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <strong>Subtotal:</strong>
+                                            <span class="item-total">0.00</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>WHT:</strong>
+                                            <span class="item-wht">0.00</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>VAT:</strong>
+                                            <span class="item-vat">0.00</span>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong>Net:</strong>
+                                            <span class="item-net">0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-1">
+                            <div class="col-md-12 text-end">
+                                <button type="button" class="btn btn-danger btn-sm remove-line-item">
+                                    <i class="bi bi-trash"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Payment Totals -->
+            <div class="row mt-2">
+                <div class="col-md-12">
+                    <div class="alert alert-success py-1 mb-0" style="font-size: 0.8rem;">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>Total Gross:</strong>
+                                <span id="totalGross">0.00</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Total WHT:</strong>
+                                <span id="totalWHT">0.00</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Total VAT:</strong>
+                                <span id="totalVAT">0.00</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Total Net:</strong>
+                                <span id="totalNet">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Display base currency info -->
+    {% if active_company %}
+        <div class="alert alert-info py-1 mb-2" style="font-size: 0.8rem;">
+            <i class="bi bi-info-circle"></i>
+            <strong>Company Base Currency:</strong> {{ active_company.base_currency }}
+            <span class="text-muted">(Select the currency you are paying the supplier in)</span>
+        </div>
+    {% endif %}
+
+    <div class="mt-2">
+        <button type="submit" class="btn btn-primary btn-sm">Add Payment</button>
+        <a href="{{ url_for('payments') }}" class="btn btn-secondary btn-sm">Cancel</a>
+    </div>
+</form>
+
+<!-- Template for new line items -->
+<div id="lineItemTemplate" style="display:none;">
+    <div class="line-item row g-1 mb-2 p-2 border rounded" data-index="__index__">
+        <div class="col-md-12">
+            <div class="row g-1">
+                <div class="col-md-4">
+                    <label class="form-label" style="font-size: 0.75rem;">Description</label>
+                    <input type="text" class="form-control form-control-sm" name="line_items-__index__-description" placeholder="Item description" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-size: 0.75rem;">Qty</label>
+                    <input type="number" class="form-control form-control-sm quantity" name="line_items-__index__-quantity" step="0.01" min="0.01" value="1">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-size: 0.75rem;">Unit Price</label>
+                    <input type="number" class="form-control form-control-sm unit-price" name="line_items-__index__-unit_price" step="0.01" min="0.01">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-size: 0.75rem;">WHT %</label>
+                    <input type="number" class="form-control form-control-sm wht-rate" name="line_items-__index__-withholding_tax_rate" step="0.01" placeholder="0" value="0">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-size: 0.75rem;">VAT %</label>
+                    <input type="number" class="form-control form-control-sm vat-rate" name="line_items-__index__-vat_rate" step="0.01" placeholder="0" value="0">
+                </div>
+            </div>
+            <div class="row g-1 mt-1">
+                <div class="col-md-12">
+                    <div class="alert alert-info py-1 mb-0" style="font-size: 0.75rem;">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>Subtotal:</strong>
+                                <span class="item-total">0.00</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>WHT:</strong>
+                                <span class="item-wht">0.00</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>VAT:</strong>
+                                <span class="item-vat">0.00</span>
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Net:</strong>
+                                <span class="item-net">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-1">
+                <div class="col-md-12 text-end">
+                    <button type="button" class="btn btn-danger btn-sm remove-line-item">
+                        <i class="bi bi-trash"></i> Remove
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lineItemsContainer = document.getElementById('lineItemsContainer');
+    const addButton = document.getElementById('addLineItem');
+    const template = document.getElementById('lineItemTemplate');
+    let itemCount = {{ form.line_items|length }};
+
+    // Function to calculate a single line item
+    function calculateLineItem(element) {
+        const quantity = parseFloat(element.querySelector('.quantity').value) || 0;
+        const unitPrice = parseFloat(element.querySelector('.unit-price').value) || 0;
+        const whtRate = parseFloat(element.querySelector('.wht-rate').value) || 0;
+        const vatRate = parseFloat(element.querySelector('.vat-rate').value) || 0;
+
+        const total = quantity * unitPrice;
+        const whtAmount = (total * whtRate) / 100;
+        const vatAmount = (total * vatRate) / 100;
+        const netAmount = total - whtAmount + vatAmount;
+
+        element.querySelector('.item-total').textContent = total.toFixed(2);
+        element.querySelector('.item-wht').textContent = whtAmount.toFixed(2);
+        element.querySelector('.item-vat').textContent = vatAmount.toFixed(2);
+        element.querySelector('.item-net').textContent = netAmount.toFixed(2);
+
+        return { total, whtAmount, vatAmount, netAmount };
+    }
+
+    // Function to calculate all totals
+    function calculateAllTotals() {
+        const items = document.querySelectorAll('.line-item');
+        let totalGross = 0, totalWHT = 0, totalVAT = 0, totalNet = 0;
+
+        items.forEach(item => {
+            const result = calculateLineItem(item);
+            totalGross += result.total;
+            totalWHT += result.whtAmount;
+            totalVAT += result.vatAmount;
+            totalNet += result.netAmount;
+        });
+
+        document.getElementById('totalGross').textContent = totalGross.toFixed(2);
+        document.getElementById('totalWHT').textContent = totalWHT.toFixed(2);
+        document.getElementById('totalVAT').textContent = totalVAT.toFixed(2);
+        document.getElementById('totalNet').textContent = totalNet.toFixed(2);
+    }
+
+    // Add event listeners to a line item
+    function setupLineItemEvents(element) {
+        const inputs = element.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                calculateAllTotals();
+            });
+            input.addEventListener('change', function() {
+                calculateAllTotals();
+            });
+        });
+
+        // Remove button
+        const removeBtn = element.querySelector('.remove-line-item');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                if (document.querySelectorAll('.line-item').length > 1) {
+                    element.remove();
+                    calculateAllTotals();
+                } else {
+                    alert('You must have at least one line item.');
+                }
+            });
+        }
+    }
+
+    // Add new line item
+    addButton.addEventListener('click', function() {
+        const index = itemCount;
+        const html = template.innerHTML.replace(/__index__/g, index);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        const newItem = tempDiv.firstElementChild;
+
+        lineItemsContainer.appendChild(newItem);
+        setupLineItemEvents(newItem);
+        itemCount++;
+        calculateAllTotals();
+    });
+
+    // Setup existing line items
+    document.querySelectorAll('.line-item').forEach(item => {
+        setupLineItemEvents(item);
+    });
+
+    // Initial calculation
+    calculateAllTotals();
+
+    // NOTE: Exchange rate is now manual - no auto-fill
+    // User enters the exchange rate for the selected currency
+});
+</script>
+{% endblock %}

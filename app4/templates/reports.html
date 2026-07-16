@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Reports Dashboard</h2>
+</div>
+
+<!-- Report Cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-file-text"></i> WHT Report</h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">View all transactions with Withholding Tax (WHT) deductions.</p>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success"></i> Shows WHT rates and amounts</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Summarized by supplier</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Export to PDF or Excel</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('report_view', report_type='wht') }}" class="btn btn-primary w-100">
+                    <i class="bi bi-eye"></i> Open Report
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-file-text"></i> VAT Report</h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">View all transactions with Value Added Tax (VAT) applied.</p>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success"></i> Shows VAT rates and amounts</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Summarized by supplier</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Export to PDF or Excel</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('report_view', report_type='vat') }}" class="btn btn-success w-100">
+                    <i class="bi bi-eye"></i> Open Report
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-file-text"></i> Supplier Transactions</h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">View all transactions grouped by supplier with full details.</p>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success"></i> Complete transaction details</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Gross, WHT, VAT, and Net amounts</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Export to PDF or Excel</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('report_view', report_type='supplier') }}" class="btn btn-info w-100">
+                    <i class="bi bi-eye"></i> Open Report
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <h5><i class="bi bi-info-circle"></i> Report Information</h5>
+            <p class="mb-0">
+                Select a report type above to view and generate detailed reports.
+                You can filter by date range and supplier, and export to PDF or Excel format.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

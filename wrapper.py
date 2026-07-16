@@ -12,6 +12,7 @@ from extensions import db, migrate
 from app1.app import app as app1
 from app2.app import app as app2
 from app3.app import app as app3
+from app4.app import app as app4
 
 
 # ========== AUTH MODELS ==========
@@ -46,7 +47,7 @@ class User(db.Model):
     def get_accessible_apps(self):
         """Get list of apps user has access to"""
         if self.is_admin:
-            return ['app1', 'app2', 'app3']
+            return ['app1', 'app2', 'app3','app4',]
         return [access.app_name for access in self.app_access.filter_by(has_access=True).all()]
 
     def has_any_app_access(self):
@@ -202,7 +203,7 @@ def create_app():
             db.session.add(admin)
             db.session.flush()
 
-            for app_name in ['app1', 'app2', 'app3']:
+            for app_name in ['app1', 'app2', 'app3','app4']:
                 access = UserAppAccess(user_id=admin.id, app_name=app_name, has_access=True)
                 db.session.add(access)
 
@@ -373,7 +374,9 @@ def dashboard():
         'app2': {'name': 'Asset Register', 'icon': 'fa-boxes', 'color': 'success',
                  'description': 'Asset tracking and management'},
         'app3': {'name': 'Prepayment', 'icon': 'fa-cubes', 'color': 'info',
-                 'description': 'Prepayment schedule management'}
+                 'description': 'Prepayment schedule management'},
+        'app4': {'name': 'Payment Voucher', 'icon': 'fa-cubes', 'color': 'info',
+                 'description': 'Payment Voucher System'}
     }
 
     apps = []
@@ -452,6 +455,7 @@ def create_user():
         app1_access = request.form.get('app1_access') == 'on'
         app2_access = request.form.get('app2_access') == 'on'
         app3_access = request.form.get('app3_access') == 'on'
+        app4_access = request.form.get('app4_access') == 'on'
 
         if not any([app1_access, app2_access, app3_access]) and not is_admin:
             flash('Please assign at least one app access.', 'danger')
@@ -464,6 +468,8 @@ def create_user():
             db.session.add(UserAppAccess(user_id=user.id, app_name='app2', has_access=True))
         if app3_access:
             db.session.add(UserAppAccess(user_id=user.id, app_name='app3', has_access=True))
+        if app4_access:
+            db.session.add(UserAppAccess(user_id=user.id, app_name='app4', has_access=True))
 
         db.session.commit()
         flash(f'User {username} created successfully!', 'success')
@@ -494,6 +500,7 @@ def edit_user(user_id):
         app1_access = request.form.get('app1_access') == 'on'
         app2_access = request.form.get('app2_access') == 'on'
         app3_access = request.form.get('app3_access') == 'on'
+        app4_access = request.form.get('app4_access') == 'on'
 
         UserAppAccess.query.filter_by(user_id=user.id).delete()
 
@@ -505,6 +512,8 @@ def edit_user(user_id):
         if app2_access:
             db.session.add(UserAppAccess(user_id=user.id, app_name='app2', has_access=True))
         if app3_access:
+            db.session.add(UserAppAccess(user_id=user.id, app_name='app3', has_access=True))
+        if app4_access:
             db.session.add(UserAppAccess(user_id=user.id, app_name='app3', has_access=True))
 
         db.session.commit()
@@ -545,7 +554,8 @@ application = DispatcherMiddleware(
     {
         "/app1": app1,
         "/app2": app2,
-        "/app3": app3
+        "/app3": app3,
+        "/app4": app4,
     }
 )
 

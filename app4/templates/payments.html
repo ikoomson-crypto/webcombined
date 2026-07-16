@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Payments - {{ company.name }}</h2>
+    <div>
+        <a href="{{ url_for('add_payment') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Add Payment
+        </a>
+        <a href="{{ url_for('import_payments') }}" class="btn btn-success">
+            <i class="bi bi-upload"></i> Import Payments
+        </a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-funnel"></i> Filters</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('payments') }}" id="filterForm">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Date From</label>
+                    <input type="date" class="form-control" name="date_from" value="{{ request.args.get('date_from', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Date To</label>
+                    <input type="date" class="form-control" name="date_to" value="{{ request.args.get('date_to', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Supplier</label>
+                    <select class="form-select" name="supplier_id">
+                        <option value="">All Suppliers</option>
+                        {% for supplier in suppliers %}
+                            <option value="{{ supplier.id }}" {% if request.args.get('supplier_id')|int == supplier.id %}selected{% endif %}>
+                                {{ supplier.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Currency</label>
+                    <select class="form-select" name="currency">
+                        <option value="">All Currencies</option>
+                        {% for currency in currencies %}
+                            <option value="{{ currency }}" {% if request.args.get('currency') == currency %}selected{% endif %}>
+                                {{ currency }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="row g-3 mt-1">
+                <div class="col-md-12 d-flex">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-search"></i> Apply Filters
+                    </button>
+                    <a href="{{ url_for('payments') }}" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Clear Filters
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if payments %}
+<!-- Bulk Actions -->
+<div class="mb-3 d-flex justify-content-between align-items-center">
+    <div>
+        <button class="btn btn-sm btn-outline-primary me-2" onclick="selectAll()">
+            <i class="bi bi-check-all"></i> Select All
+        </button>
+        <button class="btn btn-sm btn-outline-secondary me-2" onclick="deselectAll()">
+            <i class="bi bi-x"></i> Deselect All
+        </button>
+        <span class="text-muted" id="selectedCount">0 selected</span>
+    </div>
+    <div>
+        <button class="btn btn-sm btn-danger" onclick="bulkDelete()" id="bulkDeleteBtn" disabled>
+            <i class="bi bi-trash"></i> Delete Selected
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover" id="paymentsTable">
+        <thead>
+            <tr>
+                <th width="30">
+                    <input type="checkbox" id="selectAllCheckbox" onclick="toggleAllCheckboxes()">
+                </th>
+                <th>Transaction #</th>
+                <th>Invoice #</th>
+                <th>Supplier</th>
+                <th>Source Bank</th>
+                <th>Items</th>
+                <th>Gross Amount</th>
+                <th>Currency</th>
+                <th>WHT Total</th>
+                <th>VAT Total</th>
+                <th>Net Amount</th>
+                <th>Payment Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for payment in payments %}
+            <tr>
+                <td>
+                    <input type="checkbox" class="payment-checkbox" value="{{ payment.id }}">
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-link text-decoration-none" type="button" data-bs-toggle="collapse" data-bs-target="#paymentItems{{ payment.id }}" aria-expanded="false">
+                        <i class="bi bi-chevron-right" id="chevron{{ payment.id }}"></i>
+                        {{ payment.transaction_number }}
+                    </button>
+                </td>
+                <td>{{ payment.invoice_number or 'N/A' }}</td>
+                <td>{{ payment.supplier.name }}</td>
+                <td>{{ payment.source_bank.name if payment.source_bank else 'N/A' }}</td>
+                <td>{{ payment.line_items|length }}</td>
+                <td>{{ "{:,.2f}".format(payment.total_gross_amount or 0) }}</td>
+                <td>{{ payment.currency }}</td>
+                <td>{{ "{:,.2f}".format(payment.total_wht_amount or 0) }}</td>
+                <td>{{ "{:,.2f}".format(payment.total_vat_amount or 0) }}</td>
+                <td><strong>{{ "{:,.2f}".format(payment.total_net_amount or 0) }}</strong></td>
+                <td>{{ payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else 'N/A' }}</td>
+                <td>
+                    <a href="{{ url_for('download_pdf_voucher', payment_id=payment.id) }}"
+                       class="btn btn-sm btn-success" title="Download PDF Voucher">
+                        <i class="bi bi-file-pdf"></i>
+                    </a>
+                    <a href="{{ url_for('edit_payment', payment_id=payment.id) }}"
+                       class="btn btn-sm btn-warning" title="Edit Payment">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{{ url_for('delete_payment', payment_id=payment.id) }}"
+                       class="btn btn-sm btn-danger" title="Delete Payment"
+                       onclick="return confirm('Are you sure you want to delete this payment?')">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            <!-- Collapsible row for line items -->
+            <tr>
+                <td colspan="13" class="p-0">
+                    <div class="collapse" id="paymentItems{{ payment.id }}">
+                        <div class="card card-body m-2">
+                            <h6 class="mb-3">Line Items for Transaction: {{ payment.transaction_number }}</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Description</th>
+                                            <th>Qty</th>
+                                            <th>Unit Price</th>
+                                            <th>Total</th>
+                                            <th>WHT Rate</th>
+                                            <th>WHT Amount</th>
+                                            <th>VAT Rate</th>
+                                            <th>VAT Amount</th>
+                                            <th>Net</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in payment.line_items %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ item.description }}</td>
+                                            <td>{{ "{:,.2f}".format(item.quantity) }}</td>
+                                            <td>{{ "{:,.2f}".format(item.unit_price) }}</td>
+                                            <td>{{ "{:,.2f}".format(item.total_amount) }}</td>
+                                            <td>{{ "{:,.2f}".format(item.withholding_tax_rate or 0) }}%</td>
+                                            <td>{{ "{:,.2f}".format(item.withholding_tax_amount or 0) }}</td>
+                                            <td>{{ "{:,.2f}".format(item.vat_rate or 0) }}%</td>
+                                            <td>{{ "{:,.2f}".format(item.vat_amount or 0) }}</td>
+                                            <td><strong>{{ "{:,.2f}".format(item.net_amount or 0) }}</strong></td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-success">
+                                        <tr>
+                                            <td colspan="4"><strong>TOTALS</strong></td>
+                                            <td><strong>{{ "{:,.2f}".format(payment.total_gross_amount or 0) }}</strong></td>
+                                            <td></td>
+                                            <td><strong>{{ "{:,.2f}".format(payment.total_wht_amount or 0) }}</strong></td>
+                                            <td></td>
+                                            <td><strong>{{ "{:,.2f}".format(payment.total_vat_amount or 0) }}</strong></td>
+                                            <td><strong>{{ "{:,.2f}".format(payment.total_net_amount or 0) }}</strong></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <strong>Reference:</strong> {{ payment.reference or 'N/A' }} |
+                                    <strong>Description:</strong> {{ payment.description or 'N/A' }} |
+                                    <strong>Source Bank:</strong> {{ payment.source_bank.name if payment.source_bank else 'N/A' }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Summary Row -->
+<div class="row mt-3">
+    <div class="col-md-12">
+        <div class="alert alert-info" style="font-size: 0.9rem;">
+            <div class="row">
+                <div class="col-md-3">
+                    <strong>Total Payments:</strong> {{ payments|length }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Total Net Amount:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_net_amount')) }} {{ company.base_currency }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Total WHT:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_wht_amount')) }} {{ company.base_currency }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Total VAT:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_vat_amount')) }} {{ company.base_currency }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-info-circle"></i> No payments found</h5>
+    <p>Click the "Add Payment" button to create your first payment.</p>
+    <a href="{{ url_for('add_payment') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Payment
+    </a>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle chevron rotation when collapse is toggled
+    document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-bs-target');
+            const chevron = document.querySelector('#chevron' + targetId.replace('#paymentItems', ''));
+            if (chevron) {
+                const isExpanded = this.getAttribute('aria-expanded') === 'true';
+                if (isExpanded) {
+                    chevron.classList.remove('bi-chevron-down');
+                    chevron.classList.add('bi-chevron-right');
+                } else {
+                    chevron.classList.remove('bi-chevron-right');
+                    chevron.classList.add('bi-chevron-down');
+                }
+            }
+        });
+    });
+
+    // Handle chevron rotation when collapse is shown/hidden via other means
+    document.querySelectorAll('.collapse').forEach(function(collapse) {
+        collapse.addEventListener('shown.bs.collapse', function() {
+            const id = this.id.replace('paymentItems', '');
+            const chevron = document.querySelector('#chevron' + id);
+            if (chevron) {
+                chevron.classList.remove('bi-chevron-right');
+                chevron.classList.add('bi-chevron-down');
+            }
+        });
+        collapse.addEventListener('hidden.bs.collapse', function() {
+            const id = this.id.replace('paymentItems', '');
+            const chevron = document.querySelector('#chevron' + id);
+            if (chevron) {
+                chevron.classList.remove('bi-chevron-down');
+                chevron.classList.add('bi-chevron-right');
+            }
+        });
+    });
+
+    // Update selected count
+    document.querySelectorAll('.payment-checkbox').forEach(function(checkbox) {
+        checkbox.addEventListener('change', updateSelectedCount);
+    });
+});
+
+function toggleAllCheckboxes() {
+    const selectAll = document.getElementById('selectAllCheckbox');
+    const checkboxes = document.querySelectorAll('.payment-checkbox');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = selectAll.checked;
+    });
+    updateSelectedCount();
+}
+
+function selectAll() {
+    const checkboxes = document.querySelectorAll('.payment-checkbox');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = true;
+    });
+    document.getElementById('selectAllCheckbox').checked = true;
+    updateSelectedCount();
+}
+
+function deselectAll() {
+    const checkboxes = document.querySelectorAll('.payment-checkbox');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = false;
+    });
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.payment-checkbox:checked');
+    const count = checkboxes.length;
+    document.getElementById('selectedCount').textContent = count + ' selected';
+    document.getElementById('bulkDeleteBtn').disabled = count === 0;
+}
+
+function bulkDelete() {
+    const checkboxes = document.querySelectorAll('.payment-checkbox:checked');
+    const count = checkboxes.length;
+
+    if (count === 0) {
+        alert('Please select at least one payment to delete.');
+        return;
+    }
+
+    if (!confirm('Are you sure you want to delete ' + count + ' payment(s)? This action cannot be undone.')) {
+        return;
+    }
+
+    const ids = [];
+    checkboxes.forEach(function(checkbox) {
+        ids.push(checkbox.value);
+    });
+
+    // Send AJAX request
+    fetch('{{ url_for("bulk_delete_payments") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ payment_ids: ids })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while deleting payments.');
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ report_title }}</h2>
+    <div>
+        <a href="{{ url_for('reports_dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Reports
+        </a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Report Filters</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" id="reportForm">
+            {{ form.hidden_tag() }}
+
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="mb-2">
+                        {{ form.date_from.label(class="form-label") }}
+                        {{ form.date_from(class="form-control", type="date") }}
+                        {% for error in form.date_from.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="mb-2">
+                        {{ form.date_to.label(class="form-label") }}
+                        {{ form.date_to(class="form-control", type="date") }}
+                        {% for error in form.date_to.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="mb-2">
+                        {{ form.supplier_id.label(class="form-label") }}
+                        {{ form.supplier_id(class="form-select") }}
+                        {% for error in form.supplier_id.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="mb-2">
+                        {{ form.format.label(class="form-label") }}
+                        {{ form.format(class="form-select") }}
+                        {% for error in form.format.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-12 d-flex">
+                    <button type="submit" name="action" value="preview" class="btn btn-primary me-2">
+                        <i class="bi bi-eye"></i> Run Report
+                    </button>
+                    <button type="submit" name="action" value="download" class="btn btn-success me-2" id="downloadBtn">
+                        <i class="bi bi-download"></i> Download
+                    </button>
+                    <button type="button" onclick="window.print()" class="btn btn-secondary">
+                        <i class="bi bi-printer"></i> Print
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Report Preview -->
+{% if report_data %}
+<div class="card">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-file-text"></i> {{ report_title }}
+        </h5>
+        <span>
+            <strong>Total:</strong> {{ "{:,.2f}".format(total_amount) }} {{ active_company.base_currency }} |
+            <strong>Records:</strong> {{ report_data|length }}
+        </span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+            <table class="table table-striped table-hover table-sm mb-0" id="reportTable">
+                <thead class="table-light" style="position: sticky; top: 0; z-index: 100;">
+                    <tr>
+                        {% if report_data %}
+                            {% for key in report_data[0].keys() %}
+                                <th>{{ key }}</th>
+                            {% endfor %}
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report_data %}
+                    <tr>
+                        {% for key, value in row.items() %}
+                            <td>
+                                {% if key == 'WHT Rate (%)' or key == 'VAT Rate (%)' %}
+                                    {{ value }}%
+                                {% elif value is number and value is not string %}
+                                    {{ "{:,.2f}".format(value) if value is not none else '' }}
+                                {% else %}
+                                    {{ value }}
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-success">
+                    <tr>
+                        <td colspan="{{ report_data[0]|length - 1 }}" class="text-end"><strong>Total Records:</strong></td>
+                        <td><strong>{{ report_data|length }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer text-muted">
+        <div class="row">
+            <div class="col-md-4">
+                <strong>Generated on:</strong> {{ now.strftime('%d-%m-%Y %H:%M') }}
+            </div>
+            <div class="col-md-4">
+                <strong>Period:</strong> {{ form.date_from.data.strftime('%d-%m-%Y') if form.date_from.data else '' }} to {{ form.date_to.data.strftime('%d-%m-%Y') if form.date_to.data else '' }}
+            </div>
+            <div class="col-md-4">
+                <strong>Supplier:</strong>
+                {% if form.supplier_id.data and form.supplier_id.data != 0 %}
+                    {% for supplier in form.supplier_id.choices %}
+                        {% if supplier[0] == form.supplier_id.data %}
+                            {{ supplier[1] }}
+                        {% endif %}
+                    {% endfor %}
+                {% else %}
+                    All Suppliers
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.table-sm th, .table-sm td {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+@media print {
+    .card .card-header.bg-primary,
+    .card .card-footer {
+        background-color: #f8f9fa !important;
+        color: #000 !important;
+    }
+    .btn, .no-print {
+        display: none !important;
+    }
+    .card {
+        border: 1px solid #ddd !important;
+    }
+}
+</style>
+{% endblock %}

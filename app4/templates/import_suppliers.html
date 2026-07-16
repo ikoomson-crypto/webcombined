@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2>Import Suppliers</h2>
+        <hr>
+        <div class="card">
+            <div class="card-body">
+                <h5>Instructions</h5>
+                <ol>
+                    <li>Download the template file using the button below</li>
+                    <li>Fill in the supplier information in the Excel file</li>
+                    <li>Upload the filled Excel file</li>
+                </ol>
+                <a href="{{ url_for('download_template') }}" class="btn btn-info mb-3">
+                    <i class="bi bi-download"></i> Download Template
+                </a>
+
+                <hr>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Choose Excel File</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".xlsx,.xls">
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-upload"></i> Import Suppliers
+                    </button>
+                    <a href="{{ url_for('suppliers') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

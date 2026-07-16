@@ -1,0 +1,81 @@
+/* Custom styles */
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.table th {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand img {
+    max-height: 40px;
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.5em 0.8em;
+}
+
+.alert {
+    border-radius: 8px;
+}
+
+.btn {
+    border-radius: 6px;
+}
+
+.form-control, .form-select {
+    border-radius: 6px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Dashboard stats */
+.stat-card {
+    text-align: center;
+    padding: 20px;
+    border-radius: 10px;
+    color: white;
+}
+
+.stat-card h3 {
+    margin: 0;
+    font-size: 2.5rem;
+}
+
+.stat-card p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+/* Responsive tables */
+.table-responsive {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Company logo in navbar */
+.navbar .company-logo {
+    max-height: 35px;
+    margin-right: 10px;
+}
+
+/* Flash messages animation */
+.alert {
+    animation: slideDown 0.5s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

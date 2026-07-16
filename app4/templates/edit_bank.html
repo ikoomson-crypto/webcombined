@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Edit Bank</h2>
+<hr>
+
+<form method="POST">
+    {{ form.hidden_tag() }}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                {{ form.name.label(class="form-label") }}
+                {{ form.name(class="form-control") }}
+                <small class="text-muted">Bank name (e.g., Standard Chartered Bank)</small>
+                {% for error in form.name.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.bank_code.label(class="form-label") }}
+                {{ form.bank_code(class="form-control") }}
+                <small class="text-muted">Bank code (e.g., SCBL)</small>
+                {% for error in form.bank_code.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.account_number.label(class="form-label") }}
+                {{ form.account_number(class="form-control") }}
+                <small class="text-muted">Bank account number</small>
+                {% for error in form.account_number.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.account_name.label(class="form-label") }}
+                {{ form.account_name(class="form-control") }}
+                <small class="text-muted">Account holder name</small>
+                {% for error in form.account_name.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="mb-3">
+                {{ form.branch.label(class="form-label") }}
+                {{ form.branch(class="form-control") }}
+                <small class="text-muted">Bank branch name</small>
+                {% for error in form.branch.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.address.label(class="form-label") }}
+                {{ form.address(class="form-control", rows="2") }}
+                <small class="text-muted">Bank address</small>
+                {% for error in form.address.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.swift_code.label(class="form-label") }}
+                {{ form.swift_code(class="form-control") }}
+                <small class="text-muted">SWIFT/BIC code</small>
+                {% for error in form.swift_code.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.is_active.label(class="form-label") }}
+                {{ form.is_active(class="form-select") }}
+                {% for error in form.is_active.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Update Bank</button>
+    <a href="{{ url_for('banks') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

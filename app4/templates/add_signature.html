@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Add Authorized Signature</h2>
+<hr>
+
+<form method="POST" enctype="multipart/form-data">
+    {{ form.hidden_tag() }}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                {{ form.name.label(class="form-label") }}
+                {{ form.name(class="form-control") }}
+                {% for error in form.name.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.title.label(class="form-label") }}
+                {{ form.title(class="form-control", placeholder="e.g., Finance Manager") }}
+                <small class="text-muted">Optional - Title/Position of the signatory</small>
+                {% for error in form.title.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.role.label(class="form-label") }}
+                {{ form.role(class="form-select") }}
+                <small class="text-muted">Select the role for this signatory</small>
+                {% for error in form.role.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="mb-3">
+                {{ form.signature_image.label(class="form-label") }}
+                {{ form.signature_image(class="form-control") }}
+                <small class="text-muted">Upload signature image (PNG, JPG, GIF) - Recommended size: 200x60px</small>
+                {% for error in form.signature_image.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.is_active.label(class="form-label") }}
+                {{ form.is_active(class="form-select") }}
+                <small class="text-muted">Active signatories will appear in payment dropdowns</small>
+                {% for error in form.is_active.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Add Signature</button>
+    <a href="{{ url_for('signatures') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

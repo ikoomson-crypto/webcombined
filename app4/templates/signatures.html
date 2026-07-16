@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Authorized Signatures - {{ company.name }}</h2>
+    <a href="{{ url_for('add_signature') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Signature
+    </a>
+</div>
+
+{% if signatures %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Signature</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sig in signatures %}
+            <tr>
+                <td>
+                    <strong>{{ sig.name }}</strong>
+                    {% if sig.title %}
+                        <br><small class="text-muted">{{ sig.title }}</small>
+                    {% endif %}
+                </td>
+                <td><span class="badge bg-info">{{ sig.role }}</span></td>
+                <td>
+                    {% if sig.signature_filename %}
+                        <img src="{{ url_for('static', filename='uploads/signatures/' + sig.signature_filename) }}"
+                             alt="Signature" height="40">
+                    {% else %}
+                        <span class="text-muted">No signature uploaded</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge bg-{{ 'success' if sig.is_active else 'secondary' }}">
+                        {{ 'Active' if sig.is_active else 'Inactive' }}
+                    </span>
+                </td>
+                <td>
+                    <a href="{{ url_for('edit_signature', signature_id=sig.id) }}"
+                       class="btn btn-sm btn-warning">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{{ url_for('delete_signature', signature_id=sig.id) }}"
+                       class="btn btn-sm btn-danger"
+                       onclick="return confirm('Are you sure you want to delete this signature?')">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <h5><i class="bi bi-info-circle"></i> No authorized signatures found</h5>
+    <p>Add authorized signatories who can approve payments.</p>
+    <a href="{{ url_for('add_signature') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Add Signature
+    </a>
+</div>
+{% endif %}
+{% endblock %}

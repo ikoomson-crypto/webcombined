@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2>Import Payments</h2>
+        <hr>
+        <div class="card">
+            <div class="card-body">
+                <h5>Instructions</h5>
+                <ol>
+                    <li>Download the template file using the button below</li>
+                    <li>Fill in the payment information in the Excel file</li>
+                    <li>Each row represents a line item (multiple rows per payment with same invoice number)</li>
+                    <li>Upload the filled Excel file</li>
+                </ol>
+
+                <div class="alert alert-info">
+                    <strong>Note:</strong>
+                    <ul class="mb-0">
+                        <li>Suppliers must already exist in the system</li>
+                        <li>Authorized signatories must already exist in the system</li>
+                        <li>Source Banks must already exist in the system</li>
+                        <li>Multiple line items for the same payment should have the same Invoice Number</li>
+                        <li>Required columns: Supplier Name, Currency, Line Item Description, Quantity, Unit Price</li>
+                    </ul>
+                </div>
+
+                <a href="{{ url_for('download_payment_template') }}" class="btn btn-info mb-3">
+                    <i class="bi bi-download"></i> Download Template
+                </a>
+
+                <hr>
+
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.file.label(class="form-label") }}
+                        {{ form.file(class="form-control") }}
+                        {% for error in form.file.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-upload"></i> Import Payments
+                    </button>
+                    <a href="{{ url_for('payments') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

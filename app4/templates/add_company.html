@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2>Add New Company</h2>
+        <hr>
+        <form method="POST" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+
+            <div class="mb-3">
+                {{ form.name.label(class="form-label") }}
+                {{ form.name(class="form-control") }}
+                {% for error in form.name.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.base_currency.label(class="form-label") }}
+                {{ form.base_currency(class="form-select") }}
+                {% for error in form.base_currency.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                {{ form.logo.label(class="form-label") }}
+                {{ form.logo(class="form-control") }}
+                {% for error in form.logo.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+                <small class="text-muted">Upload company logo (JPG, PNG, GIF, SVG)</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add Company</button>
+            <a href="{{ url_for('companies') }}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
