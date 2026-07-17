@@ -25,20 +25,20 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-app4-secret-key-change-in-production')
 
 # ============ DATABASE CONFIGURATION ============
-# Check if we're on Render (production) or local
+# Use the SAME database as app1, app2, app3
 if os.environ.get('DATABASE_URL'):
-    # Use PostgreSQL on Render
-    database_url = os.environ.get('DATABASE_URL_APP4')
+    # Use PostgreSQL on Render (shared database)
+    database_url = os.environ.get('DATABASE_URL')
     if database_url and database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print(f"✅ Using PostgreSQL database on Render for App4")
+    print(f"✅ App4 using shared PostgreSQL database")
 else:
-    # Use SQLite locally
+    # Use SQLite locally (for development)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(base_dir, 'app4.db')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-    print(f"✅ Using SQLite database at: {db_path}")
+    print(f"✅ App4 using SQLite database at: {db_path}")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = False
@@ -60,12 +60,69 @@ os.makedirs(app.config['ATTACHMENT_FOLDER'], exist_ok=True)
 db = SQLAlchemy(app)
 
 
+# ==================== DATABASE MIGRATION HELPER ====================
+def migrate_database():
+    """Add new columns to existing tables without losing data"""
+    try:
+        from sqlalchemy import inspect, text
+
+        inspector = inspect(db.engine)
+
+        # Get existing columns in payment table
+        if 'payment' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('payment')]
+
+            # List of columns that should exist
+            required_columns = {
+                'attachment_filename': 'VARCHAR(200)',
+                'attachment_original_name': 'VARCHAR(200)',
+                'attachment_size': 'INTEGER',
+                'attachment_uploaded_at': 'TIMESTAMP'
+            }
+
+            # Add missing columns
+            with db.engine.connect() as conn:
+                for col_name, col_type in required_columns.items():
+                    if col_name not in columns:
+                        print(f"🔧 Adding column: {col_name}")
+
+                        # PostgreSQL syntax (with IF NOT EXISTS)
+                        if os.environ.get('DATABASE_URL'):
+                            conn.execute(text(f"ALTER TABLE payment ADD COLUMN IF NOT EXISTS {col_name} {col_type}"))
+                        else:
+                            # SQLite syntax
+                            if db.engine.dialect.name == 'sqlite':
+                                cursor = conn.execute(text("PRAGMA table_info(payment)"))
+                                sqlite_columns = [row[1] for row in cursor]
+                                if col_name not in sqlite_columns:
+                                    conn.execute(text(f"ALTER TABLE payment ADD COLUMN {col_name} {col_type}"))
+                            else:
+                                conn.execute(text(f"ALTER TABLE payment ADD COLUMN {col_name} {col_type}"))
+
+                        conn.commit()
+                        print(f"✅ Added column: {col_name}")
+
+            # Update attachment_uploaded_at default for existing rows
+            if 'attachment_uploaded_at' in required_columns and 'attachment_uploaded_at' not in columns:
+                with db.engine.connect() as conn:
+                    conn.execute(text(
+                        "UPDATE payment SET attachment_uploaded_at = CURRENT_TIMESTAMP WHERE attachment_uploaded_at IS NULL"))
+                    conn.commit()
+
+        print("✅ Database migration completed successfully")
+    except Exception as e:
+        print(f"⚠️ Migration warning: {e}")
+
+
 # ==================== DATABASE INITIALIZATION FUNCTION ====================
 def init_db():
     """Initialize database - create tables and default data"""
     with app.app_context():
         db.create_all()
         print(f"✅ Database tables created/verified")
+
+        # Run migration for new columns
+        migrate_database()
 
         # Create default company if none exists
         if Company.query.count() == 0:
@@ -2730,8 +2787,8 @@ if __name__ == '__main__':
     print("=" * 60)
     print("🚀 APP4 - Payment System Application")
     print("=" * 60)
-    if os.environ.get('DATABASE_URL_APP4'):
-        print(f"📊 Database: PostgreSQL (Render)")
+    if os.environ.get('DATABASE_URL'):
+        print(f"📊 Database: PostgreSQL (shared with app1, app2, app3)")
     else:
         print(f"📊 Database: SQLite at: {db_path}")
     print("🌐 Running at: http://localhost:5000/app4/")
