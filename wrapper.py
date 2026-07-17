@@ -160,7 +160,6 @@ def login_required(f):
             flash('User not found. Please log in again.', 'warning')
             return redirect(url_for('login'))
 
-        # Check if user has any app access (skip for admin)
         if not user.is_admin and not user.has_any_app_access():
             pass
 
@@ -216,10 +215,8 @@ def app_access_required(app_name):
 def create_app():
     flask_app = Flask(__name__)
 
-    flask_app.config.from_object("config.Config")
-
     # ===== DATABASE CONFIGURATION FOR AUTH =====
-    # Check if we're on Render (production) or local
+    # MUST BE SET BEFORE db.init_app()
     if os.environ.get('DATABASE_URL_AUTH'):
         # Use PostgreSQL on Render
         database_url = os.environ.get('DATABASE_URL_AUTH')
@@ -235,7 +232,7 @@ def create_app():
     flask_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     flask_app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
 
-    # Initialize extensions
+    # Initialize extensions AFTER database URI is set
     db.init_app(flask_app)
     migrate.init_app(flask_app, db)
 
@@ -255,7 +252,6 @@ def create_app():
             db.session.add(admin)
             db.session.flush()
 
-            # Give admin access to all apps dynamically
             for app_name in APP_NAMES:
                 access = UserAppAccess(user_id=admin.id, app_name=app_name, has_access=True)
                 db.session.add(access)
@@ -270,6 +266,7 @@ def create_app():
     return flask_app
 
 
+# ========== Create main app ==========
 main_app = create_app()
 
 
@@ -496,7 +493,6 @@ def create_user():
         db.session.add(user)
         db.session.flush()
 
-        # Dynamically check all apps
         app_access = {}
         for app_name in APP_NAMES:
             app_access[app_name] = request.form.get(f'{app_name}_access') == 'on'
@@ -539,7 +535,6 @@ def edit_user(user_id):
                 return render_template('edit_user.html', user=user, access_apps=[], apps=AVAILABLE_APPS)
             user.set_password(new_password)
 
-        # Dynamically check all apps
         app_access = {}
         for app_name in APP_NAMES:
             app_access[app_name] = request.form.get(f'{app_name}_access') == 'on'
