@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from datetime import datetime, timezone  # <-- ADD timezone here
+from datetime import datetime, timezone
 import os
 import re
 import sqlite3
@@ -13,7 +13,6 @@ from app1.app import app as app1
 from app2.app import app as app2
 from app3.app import app as app3
 from app4.app import app as app4
-
 
 # ========== APP CONFIGURATION ==========
 # Define all available apps in one place - Add new apps here!
@@ -84,7 +83,7 @@ class User(db.Model):
     def get_accessible_apps(self):
         """Get list of apps user has access to - Dynamic"""
         if self.is_admin:
-            return APP_NAMES  # Use the dynamic list
+            return APP_NAMES
         return [access.app_name for access in self.app_access.filter_by(has_access=True).all()]
 
     def has_any_app_access(self):
@@ -163,7 +162,6 @@ def login_required(f):
 
         # Check if user has any app access (skip for admin)
         if not user.is_admin and not user.has_any_app_access():
-            # Allow access to dashboard but show no apps message
             pass
 
         return f(*args, **kwargs)
@@ -219,8 +217,25 @@ def create_app():
     flask_app = Flask(__name__)
 
     flask_app.config.from_object("config.Config")
+
+    # ===== DATABASE CONFIGURATION FOR AUTH =====
+    # Check if we're on Render (production) or local
+    if os.environ.get('DATABASE_URL_AUTH'):
+        # Use PostgreSQL on Render
+        database_url = os.environ.get('DATABASE_URL_AUTH')
+        if database_url and database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        flask_app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        print(f"✅ Auth using PostgreSQL on Render")
+    else:
+        # Use SQLite locally
+        flask_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///auth.db'
+        print(f"✅ Auth using SQLite locally")
+
+    flask_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     flask_app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
 
+    # Initialize extensions
     db.init_app(flask_app)
     migrate.init_app(flask_app, db)
 
@@ -328,7 +343,6 @@ def register():
                                    email=email,
                                    full_name=full_name)
 
-        # Create new user with NO app access by default
         user = User(
             username=username,
             email=email,
@@ -339,7 +353,6 @@ def register():
         user.set_password(password)
         db.session.add(user)
 
-        # NO app access assigned by default - admin must assign
         db.session.commit()
 
         flash('Registration successful! You can now log in. Contact your administrator to get access to applications.',
@@ -371,7 +384,6 @@ def login():
             session['full_name'] = user.full_name
             session['is_admin'] = user.is_admin
 
-            # Update last login - FIXED: using datetime.utcnow()
             user.last_login = datetime.utcnow()
             db.session.commit()
 
@@ -446,7 +458,6 @@ def manage_users():
 @main_app.route('/admin/users/no-apps')
 @admin_required
 def users_without_apps():
-    """View users who have no app access"""
     users_no_apps = User.query.filter_by(is_admin=False).all()
     users_no_apps = [u for u in users_no_apps if not u.has_any_app_access()]
     return render_template('no_apps_users.html', users=users_no_apps)
@@ -490,13 +501,11 @@ def create_user():
         for app_name in APP_NAMES:
             app_access[app_name] = request.form.get(f'{app_name}_access') == 'on'
 
-        # Check if at least one app is selected (unless admin)
         if not any(app_access.values()) and not is_admin:
             flash('Please assign at least one app access.', 'danger')
             db.session.rollback()
             return render_template('create_user.html')
 
-        # Assign app access dynamically
         for app_name in APP_NAMES:
             if app_access.get(app_name, False):
                 db.session.add(UserAppAccess(user_id=user.id, app_name=app_name, has_access=True))
@@ -535,16 +544,12 @@ def edit_user(user_id):
         for app_name in APP_NAMES:
             app_access[app_name] = request.form.get(f'{app_name}_access') == 'on'
 
-        # Remove existing access
         UserAppAccess.query.filter_by(user_id=user.id).delete()
 
-        # Add new access dynamically
         if user.is_admin:
-            # Admin gets all apps
             for app_name in APP_NAMES:
                 db.session.add(UserAppAccess(user_id=user.id, app_name=app_name, has_access=True))
         else:
-            # Regular user gets selected apps
             for app_name in APP_NAMES:
                 if app_access.get(app_name, False):
                     db.session.add(UserAppAccess(user_id=user.id, app_name=app_name, has_access=True))
@@ -553,9 +558,7 @@ def edit_user(user_id):
         flash(f'User {user.username} updated successfully!', 'success')
         return redirect(url_for('manage_users'))
 
-    # Get current app access
     access_apps = [a.app_name for a in user.app_access.filter_by(has_access=True).all()]
-
     return render_template('edit_user.html', user=user, access_apps=access_apps, apps=AVAILABLE_APPS)
 
 
@@ -586,7 +589,7 @@ def home():
     return redirect(url_for('login'))
 
 
-# ========== Combine multiple Flask applications ==========
+# ========== COMBINE APPS ==========
 
 application = DispatcherMiddleware(
     main_app,
@@ -599,7 +602,6 @@ application = DispatcherMiddleware(
 )
 
 app = application
-
 
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
