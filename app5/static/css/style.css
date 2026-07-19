@@ -1,0 +1,358 @@
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f2f5;
+}
+
+/* Currency Display Styles */
+.currency-selector {
+    max-width: 200px;
+    margin-bottom: 15px;
+}
+
+.currency-symbol {
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 14px;
+}
+
+.currency-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    background-color: #e8f5e9;
+    color: #1e3c72;
+    margin-left: 8px;
+}
+
+.currency-badge-large {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+    background: linear-gradient(135deg, #27ae60, #2ecc71);
+    color: white;
+}
+
+/* Currency Row Styles */
+.global-currency-row {
+    background: white;
+    padding: 15px 25px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.currency-controls {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.currency-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #e8f5e9;
+    padding: 8px 16px;
+    border-radius: 30px;
+}
+
+.currency-item label {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 13px;
+    margin: 0;
+}
+
+.currency-item select,
+.currency-item input {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 20px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.currency-item select {
+    width: 100px;
+}
+
+.currency-item input {
+    width: 100px;
+}
+
+.global-currency-badge {
+    background: #27ae60;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.btn-currency-reset {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-currency-reset:hover {
+    background: #7f8c8d;
+    transform: translateY(-2px);
+}
+
+.btn-convert {
+    background: #f39c12;
+    color: white;
+    border: none;
+    padding: 6px 20px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-convert:hover {
+    background: #e67e22;
+    transform: translateY(-2px);
+}
+
+/* Currency Display in Tables */
+.currency-display {
+    font-size: 11px;
+    color: #27ae60;
+    margin-left: 5px;
+}
+
+td.numeric-cell .currency-amount {
+    font-weight: 500;
+    font-family: monospace;
+}
+
+/* Exchange Rates Table Styles */
+.rates-table-container {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.rates-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.rates-table th {
+    background: #1e3c72;
+    color: white;
+    padding: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.rates-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.rates-table tr:hover {
+    background: #f8f9fa;
+}
+
+.rate-input {
+    width: 120px;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: right;
+    font-weight: bold;
+}
+
+.rate-input.custom-rate {
+    background-color: #fff3cd;
+    border-color: #ffc107;
+}
+
+.rate-status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.rate-status-custom {
+    background: #f39c12;
+    color: white;
+}
+
+.rate-status-default {
+    background: #95a5a6;
+    color: white;
+}
+
+/* Conversion Button Styles */
+.btn-convert-sm {
+    background: #f39c12;
+    color: white;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-convert-sm:hover {
+    background: #e67e22;
+}
+
+/* Currency Stats Card */
+.currency-stats {
+    background: white;
+    border-radius: 16px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.currency-stats h4 {
+    color: #1e3c72;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.currency-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.currency-stat-item {
+    text-align: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.currency-stat-code {
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 14px;
+}
+
+.currency-stat-count {
+    font-size: 20px;
+    font-weight: bold;
+    color: #27ae60;
+}
+
+/* Responsive Currency Styles */
+@media (max-width: 768px) {
+    .global-currency-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .currency-controls {
+        justify-content: center;
+    }
+
+    .currency-item {
+        justify-content: space-between;
+        flex: 1;
+    }
+
+    .currency-item select,
+    .currency-item input {
+        width: 120px;
+    }
+}
+
+/* Animation for currency updates */
+@keyframes currencyFlash {
+    0% { background-color: #fff3cd; }
+    100% { background-color: transparent; }
+}
+
+.currency-updated {
+    animation: currencyFlash 0.5s ease-in-out;
+}
+
+/* Tooltip for currency info */
+.currency-info-tooltip {
+    cursor: help;
+    border-bottom: 1px dashed #999;
+}
+
+/* Conversion Modal Styles */
+.conversion-preview {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 12px;
+    margin: 15px 0;
+}
+
+.conversion-preview .original {
+    color: #666;
+    text-decoration: line-through;
+    font-size: 12px;
+}
+
+.conversion-preview .converted {
+    color: #27ae60;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.conversion-rate-info {
+    background: #e8f5e9;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* Exchange Rate Import/Export */
+.rate-action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+.rate-action-btn {
+    padding: 8px 16px;
+    border-radius: 25px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.rate-action-btn:hover {
+    transform: translateY(-2px);
+}

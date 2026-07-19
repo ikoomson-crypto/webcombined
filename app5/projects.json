@@ -1,0 +1,245 @@
+[
+  {
+    "id": "20260529184812",
+    "project_name": "MIIF",
+    "implementation_items": [
+      {
+        "allocation": 80,
+        "days": 22,
+        "location": "nan",
+        "months": 12,
+        "no_of_resource": 1,
+        "rate": 150,
+        "role": "Project Manager",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 80,
+        "days": 22,
+        "location": "nan",
+        "months": 6,
+        "no_of_resource": 1,
+        "rate": 110,
+        "role": "Solution Architect",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 90,
+        "days": 22,
+        "location": "nan",
+        "months": 10,
+        "no_of_resource": 1,
+        "rate": 110,
+        "role": "Finance Functional Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 90,
+        "days": 22,
+        "location": "nan",
+        "months": 10,
+        "no_of_resource": 1,
+        "rate": 110,
+        "role": "Finance Functional Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 90,
+        "days": 22,
+        "location": "nan",
+        "months": 10,
+        "no_of_resource": 1,
+        "rate": 75,
+        "role": "SCM Functional Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 90,
+        "days": 22,
+        "location": "nan",
+        "months": 10,
+        "no_of_resource": 1,
+        "rate": 75,
+        "role": "SCM Functional Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 90,
+        "days": 22,
+        "location": "nan",
+        "months": 10,
+        "no_of_resource": 1,
+        "rate": 75,
+        "role": "HR Functional Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 90,
+        "days": 22,
+        "location": "nan",
+        "months": 10,
+        "no_of_resource": 1,
+        "rate": 75,
+        "role": "Investment & Risk Functional Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 80,
+        "days": 22,
+        "location": "nan",
+        "months": 6,
+        "no_of_resource": 1,
+        "rate": 110,
+        "role": "Technical Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 80,
+        "days": 22,
+        "location": "nan",
+        "months": 6,
+        "no_of_resource": 1,
+        "rate": 110,
+        "role": "Technical Consultant",
+        "workplace_type": "Onsite"
+      },
+      {
+        "allocation": 80,
+        "days": 22,
+        "location": "nan",
+        "months": 6,
+        "no_of_resource": 1,
+        "rate": 110,
+        "role": "Senior Developer",
+        "workplace_type": "Onsite"
+      }
+    ],
+    "software_items": [
+      {
+        "description": "Finance",
+        "qty": 20,
+        "unit_price": 210,
+        "years": 12
+      },
+      {
+        "description": "Supply Chain/Operations(New Users)",
+        "qty": 20,
+        "unit_price": 210,
+        "years": 12
+      },
+      {
+        "description": "Supply Chain/Operations(Attached Users)",
+        "qty": 0,
+        "unit_price": 30,
+        "years": 12
+      },
+      {
+        "description": "Dyn365 Activity User",
+        "qty": 20,
+        "unit_price": 50,
+        "years": 12
+      },
+      {
+        "description": "Portfolio",
+        "qty": 15,
+        "unit_price": 50,
+        "years": 12
+      },
+      {
+        "description": "Risk Mgt",
+        "qty": 15,
+        "unit_price": 50,
+        "years": 12
+      }
+    ],
+    "logistics_items": [
+      {
+        "accommodation": 25,
+        "consultant_name": "nan",
+        "days_onsite": 30,
+        "flight_cost": 1100,
+        "location_base": "nan",
+        "no_of_resources": 1,
+        "per_diem": 50,
+        "role": "Solution Architect",
+        "round_trips": 1,
+        "transport_per_day": 10
+      },
+      {
+        "accommodation": 25,
+        "consultant_name": "nan",
+        "days_onsite": 45,
+        "flight_cost": 1100,
+        "location_base": "nan",
+        "no_of_resources": 1,
+        "per_diem": 50,
+        "role": "SCM Functional Consultant",
+        "round_trips": 1,
+        "transport_per_day": 10
+      },
+      {
+        "accommodation": 25,
+        "consultant_name": "nan",
+        "days_onsite": 45,
+        "flight_cost": 1100,
+        "location_base": "nan",
+        "no_of_resources": 1,
+        "per_diem": 50,
+        "role": "HR Functional Consultant",
+        "round_trips": 1,
+        "transport_per_day": 10
+      },
+      {
+        "accommodation": 25,
+        "consultant_name": "nan",
+        "days_onsite": 45,
+        "flight_cost": 1100,
+        "location_base": "nan",
+        "no_of_resources": 1,
+        "per_diem": 50,
+        "role": "Investment & Risk Functional Consultant",
+        "round_trips": 1,
+        "transport_per_day": 10
+      },
+      {
+        "accommodation": 25,
+        "consultant_name": "nan",
+        "days_onsite": 45,
+        "flight_cost": 1100,
+        "location_base": "nan",
+        "no_of_resources": 1,
+        "per_diem": 50,
+        "role": "Technical Consultant",
+        "round_trips": 1,
+        "transport_per_day": 10
+      },
+      {
+        "accommodation": 25,
+        "consultant_name": "nan",
+        "days_onsite": 30,
+        "flight_cost": 1180,
+        "location_base": "nan",
+        "no_of_resources": 1,
+        "per_diem": 50,
+        "role": "Technical Consultant",
+        "round_trips": 1,
+        "transport_per_day": 10
+      }
+    ],
+    "annual_maintenance_cost": 0,
+    "expected_annual_benefit": 0,
+    "project_lifetime_years": 1,
+    "discount_rate": 10,
+    "markup_percentages": {
+      "implementation": 30,
+      "software": 0,
+      "logistics": 0,
+      "maintenance": 0
+    },
+    "currency_code": "GHS",
+    "currency_symbol": "\u20b5",
+    "exchange_rate": 10,
+    "modified_date": "2026-05-30T18:31:26.952393",
+    "user_id": "d546d316-c6dd-4ddf-ac99-9959b09477a6"
+  }
+]

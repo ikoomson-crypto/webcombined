@@ -1,0 +1,464 @@
+<!-- templates/admin_settings.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Settings - Project Costing System</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; }
+
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        h1 { color: #1e3c72; margin: 0; }
+        .btn-back { background: #3498db; color: white; padding: 8px 20px; border-radius: 30px; text-decoration: none; display: inline-block; }
+        .btn-back:hover { background: #2980b9; }
+        .btn-logout { background: #e74c3c; color: white; padding: 8px 20px; border-radius: 30px; text-decoration: none; display: inline-block; }
+        .btn-logout:hover { background: #c0392b; }
+
+        .settings-container {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .form-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .form-section h2 {
+            color: #1e3c72;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            max-width: 500px;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            max-width: 600px;
+            rows: 3;
+        }
+
+        .logo-preview {
+            margin-top: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .logo-preview img {
+            max-height: 80px;
+            max-width: 200px;
+            border-radius: 8px;
+        }
+
+        .btn-save {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-save:hover {
+            background: #219653;
+        }
+
+        .btn-test {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .btn-test:hover {
+            background: #e67e22;
+        }
+
+        .current-logo {
+            margin-bottom: 15px;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+
+        .flash {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .flash.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .flash.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .flash.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .row {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .currency-info {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+
+        .currency-info p {
+            margin: 5px 0;
+            font-size: 13px;
+        }
+
+        .exchange-rate-note {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .rate-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .rate-custom { background: #f39c12; color: white; }
+        .rate-default { background: #95a5a6; color: white; }
+
+        .company-header {
+            background: linear-gradient(135deg, #1e3c72, #2c3e50);
+            border-radius: 16px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .company-logo {
+            background: rgba(255,255,255,0.2);
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .company-name {
+            margin: 0;
+            font-size: 18px;
+        }
+        .company-system {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        .company-address {
+            text-align: right;
+            font-size: 11px;
+            margin: 0;
+        }
+        .company-contact {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="company-header">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="company-logo">🏢</div>
+            <div>
+                <h2 class="company-name">{{ settings.company_name if settings else 'Your Company Name' }}</h2>
+                <p class="company-system">{{ settings.system_name if settings else 'Project Costing System' }}</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <p class="company-address">{{ settings.company_address if settings else '123 Business Street, City, State 12345' }}</p>
+            <p class="company-contact">📞 {{ settings.company_phone if settings else '+1 (555) 123-4567' }} | ✉️ {{ settings.company_email if settings else 'info@yourcompany.com' }}</p>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1>⚙️ Admin Settings</h1>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ base_path }}/admin" class="btn-back">← Back to Admin Panel</a>
+            <a href="{{ base_path }}/admin/currencies" class="btn-back" style="background: #27ae60;">💱 Manage Currencies</a>
+            <a href="{{ base_path }}/dashboard" class="btn-back">📊 Dashboard</a>
+            <a href="{{ base_path }}/logout" class="btn-logout">🚪 Logout</a>
+        </div>
+    </div>
+
+    <div class="settings-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-section">
+                <h2>🏢 Company Information</h2>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label>Company Name</label>
+                            <input type="text" name="company_name" value="{{ settings.company_name }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Company Address</label>
+                            <input type="text" name="company_address" value="{{ settings.company_address }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number</label>
+                            <input type="text" name="company_phone" value="{{ settings.company_phone }}" required>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" name="company_email" value="{{ settings.company_email }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Website</label>
+                            <input type="text" name="company_website" value="{{ settings.company_website }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label>System Name</label>
+                            <input type="text" name="system_name" value="{{ settings.system_name }}" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>💰 Currency Settings</h2>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label>Default Currency for New Projects</label>
+                            <select name="default_currency" id="defaultCurrency">
+                                <option value="USD" {% if settings.default_currency == 'USD' %}selected{% endif %}>USD - US Dollar ($)</option>
+                                <option value="EUR" {% if settings.default_currency == 'EUR' %}selected{% endif %}>EUR - Euro (€)</option>
+                                <option value="GBP" {% if settings.default_currency == 'GBP' %}selected{% endif %}>GBP - British Pound (£)</option>
+                                <option value="JPY" {% if settings.default_currency == 'JPY' %}selected{% endif %}>JPY - Japanese Yen (¥)</option>
+                                <option value="CNY" {% if settings.default_currency == 'CNY' %}selected{% endif %}>CNY - Chinese Yuan (¥)</option>
+                                <option value="INR" {% if settings.default_currency == 'INR' %}selected{% endif %}>INR - Indian Rupee (₹)</option>
+                                <option value="GHS" {% if settings.default_currency == 'GHS' %}selected{% endif %}>GHS - Ghanaian Cedi (₵)</option>
+                                <option value="NGN" {% if settings.default_currency == 'NGN' %}selected{% endif %}>NGN - Nigerian Naira (₦)</option>
+                                <option value="ZAR" {% if settings.default_currency == 'ZAR' %}selected{% endif %}>ZAR - South African Rand (R)</option>
+                                <option value="CAD" {% if settings.default_currency == 'CAD' %}selected{% endif %}>CAD - Canadian Dollar ($)</option>
+                                <option value="AUD" {% if settings.default_currency == 'AUD' %}selected{% endif %}>AUD - Australian Dollar ($)</option>
+                                <option value="CHF" {% if settings.default_currency == 'CHF' %}selected{% endif %}>CHF - Swiss Franc (Fr)</option>
+                                <option value="SGD" {% if settings.default_currency == 'SGD' %}selected{% endif %}>SGD - Singapore Dollar (S$)</option>
+                                <option value="HKD" {% if settings.default_currency == 'HKD' %}selected{% endif %}>HKD - Hong Kong Dollar (HK$)</option>
+                                <option value="NZD" {% if settings.default_currency == 'NZD' %}selected{% endif %}>NZD - New Zealand Dollar (NZ$)</option>
+                                <option value="KRW" {% if settings.default_currency == 'KRW' %}selected{% endif %}>KRW - South Korean Won (₩)</option>
+                                <option value="RUB" {% if settings.default_currency == 'RUB' %}selected{% endif %}>RUB - Russian Ruble (₽)</option>
+                                <option value="BRL" {% if settings.default_currency == 'BRL' %}selected{% endif %}>BRL - Brazilian Real (R$)</option>
+                                <option value="MYR" {% if settings.default_currency == 'MYR' %}selected{% endif %}>MYR - Malaysian Ringgit (RM)</option>
+                                <option value="THB" {% if settings.default_currency == 'THB' %}selected{% endif %}>THB - Thai Baht (฿)</option>
+                                <option value="VND" {% if settings.default_currency == 'VND' %}selected{% endif %}>VND - Vietnamese Dong (₫)</option>
+                                <option value="IDR" {% if settings.default_currency == 'IDR' %}selected{% endif %}>IDR - Indonesian Rupiah (Rp)</option>
+                                <option value="PHP" {% if settings.default_currency == 'PHP' %}selected{% endif %}>PHP - Philippine Peso (₱)</option>
+                                <option value="PKR" {% if settings.default_currency == 'PKR' %}selected{% endif %}>PKR - Pakistani Rupee (₨)</option>
+                                <option value="BDT" {% if settings.default_currency == 'BDT' %}selected{% endif %}>BDT - Bangladeshi Taka (৳)</option>
+                                <option value="EGP" {% if settings.default_currency == 'EGP' %}selected{% endif %}>EGP - Egyptian Pound (£)</option>
+                                <option value="TRY" {% if settings.default_currency == 'TRY' %}selected{% endif %}>TRY - Turkish Lira (₺)</option>
+                                <option value="MXN" {% if settings.default_currency == 'MXN' %}selected{% endif %}>MXN - Mexican Peso ($)</option>
+                                <option value="SEK" {% if settings.default_currency == 'SEK' %}selected{% endif %}>SEK - Swedish Krona (kr)</option>
+                                <option value="NOK" {% if settings.default_currency == 'NOK' %}selected{% endif %}>NOK - Norwegian Krone (kr)</option>
+                                <option value="DKK" {% if settings.default_currency == 'DKK' %}selected{% endif %}>DKK - Danish Krone (kr)</option>
+                                <option value="PLN" {% if settings.default_currency == 'PLN' %}selected{% endif %}>PLN - Polish Zloty (zł)</option>
+                                <option value="CZK" {% if settings.default_currency == 'CZK' %}selected{% endif %}>CZK - Czech Koruna (Kč)</option>
+                                <option value="HUF" {% if settings.default_currency == 'HUF' %}selected{% endif %}>HUF - Hungarian Forint (Ft)</option>
+                                <option value="ILS" {% if settings.default_currency == 'ILS' %}selected{% endif %}>ILS - Israeli Shekel (₪)</option>
+                                <option value="CLP" {% if settings.default_currency == 'CLP' %}selected{% endif %}>CLP - Chilean Peso ($)</option>
+                                <option value="PEN" {% if settings.default_currency == 'PEN' %}selected{% endif %}>PEN - Peruvian Sol (S/)</option>
+                                <option value="COP" {% if settings.default_currency == 'COP' %}selected{% endif %}>COP - Colombian Peso ($)</option>
+                                <option value="AED" {% if settings.default_currency == 'AED' %}selected{% endif %}>AED - UAE Dirham (د.إ)</option>
+                                <option value="SAR" {% if settings.default_currency == 'SAR' %}selected{% endif %}>SAR - Saudi Riyal (﷼)</option>
+                            </select>
+                            <small class="exchange-rate-note">This currency will be preselected when creating new projects</small>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="currency-info">
+                            <p><strong>💡 About Currencies:</strong></p>
+                            <p>• Exchange rates can be managed in the <a href="{{ base_path }}/admin/currencies" style="color:#27ae60;">Currency Manager</a></p>
+                            <p>• All costs are stored in USD in the database</p>
+                            <p>• Projects can be converted to any currency at any time</p>
+                            <p>• Exchange rates are updated daily via the admin panel</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>📄 Report Settings</h2>
+                <div class="form-group">
+                    <label>Report Footer Text</label>
+                    <textarea name="report_footer" rows="3" style="width:100%; max-width:100%;">{{ settings.report_footer }}</textarea>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>🖼️ Company Logo</h2>
+                <div class="current-logo">
+                    <label>Current Logo:</label>
+                    <div class="logo-preview">
+                        {% if settings.logo_filename and settings.logo_filename != 'default_logo.png' %}
+                            <img src="{{ base_path }}/static/{{ settings.logo_filename }}" alt="Company Logo">
+                        {% else %}
+                            <div style="background: #e9ecef; padding: 20px; text-align: center; border-radius: 8px;">
+                                <span style="font-size: 40px;">🏢</span>
+                                <p style="margin-top: 10px; color: #666;">No logo uploaded</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Upload New Logo</label>
+                    <input type="file" name="logo" accept="image/png, image/jpeg, image/jpg, image/gif, image/svg">
+                    <small style="color: #888; display: block; margin-top: 5px;">Supported formats: PNG, JPG, JPEG, GIF, SVG. Recommended size: 200x80px</small>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+                <button type="submit" class="btn-save">💾 Save All Settings</button>
+                <button type="button" class="btn-test" onclick="testCurrencySettings()">🔍 Test Currency Settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ============ CRITICAL: Get BASE_PATH from server ============
+    const BASE_PATH = '{{ base_path }}' || '';
+    console.log('BASE_PATH:', BASE_PATH);
+    // ============================================================
+
+    async function testCurrencySettings() {
+        const defaultCurrency = document.getElementById('defaultCurrency').value;
+
+        try {
+            const response = await fetch(`${BASE_PATH}/api/currencies`);
+            const currencies = await response.json();
+            const selectedCurrency = currencies.find(c => c.code === defaultCurrency);
+
+            if (selectedCurrency) {
+                alert(`✅ Currency settings are working!\n\nDefault Currency: ${selectedCurrency.code} (${selectedCurrency.symbol})\nExchange Rate to USD: ${selectedCurrency.rate_to_usd}\nDecimal Places: ${selectedCurrency.decimal_places}\n\nNew projects will use ${selectedCurrency.code} as their base currency.`);
+            } else {
+                alert(`⚠️ Currency ${defaultCurrency} is valid but not found in exchange rates. Please check the Currency Manager.`);
+            }
+        } catch (error) {
+            console.error('Error testing currency:', error);
+            alert('❌ Error testing currency settings. Make sure the server is running.');
+        }
+    }
+
+    async function loadExchangeRateInfo() {
+        try {
+            const response = await fetch(`${BASE_PATH}/api/currencies/rates`);
+            const rates = await response.json();
+            const defaultCurrency = document.getElementById('defaultCurrency').value;
+            const rate = rates[defaultCurrency] || 1;
+
+            // Remove existing rate info if present
+            const parent = document.querySelector('.form-group select[name="default_currency"]').parentNode;
+            const existing = parent.querySelector('.exchange-rate-note:last-child');
+            if (existing) {
+                existing.remove();
+            }
+
+            // Add new rate info
+            const rateInfo = document.createElement('div');
+            rateInfo.className = 'exchange-rate-note';
+            rateInfo.style.marginTop = '5px';
+            rateInfo.style.color = '#27ae60';
+            rateInfo.innerHTML = `Current exchange rate: 1 USD = ${rate} ${defaultCurrency}`;
+            parent.appendChild(rateInfo);
+        } catch (error) {
+            console.error('Error loading exchange rate:', error);
+        }
+    }
+
+    document.getElementById('defaultCurrency').addEventListener('change', loadExchangeRateInfo);
+
+    // Load exchange rate info on page load
+    loadExchangeRateInfo();
+</script>
+</body>
+</html>

@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Currencies - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-exchange-alt"></i> Currency Exchange Rates</h3>
+                    <p class="text-muted mb-0">Manage exchange rates (base currency: USD) - All currencies are converted from USD</p>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>How it works:</strong> All project costs are stored in USD in the database.
+                        When viewing or converting projects, the system uses these exchange rates to convert to the target currency.
+                        Update these rates regularly to ensure accurate currency conversions.
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <input type="text" id="currencySearch" class="form-control" placeholder="🔍 Search currency...">
+                        </div>
+                        <div class="col-md-4">
+                            <select id="rateFilter" class="form-control">
+                                <option value="all">All Currencies</option>
+                                <option value="custom">Custom Rates Only</option>
+                                <option value="default">Default Rates Only</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-success" id="applyToAllBtn">
+                                <i class="fas fa-chart-line"></i> Apply Rate to All
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover" id="currenciesTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Currency Code</th>
+                                    <th>Symbol</th>
+                                    <th>Currency Name</th>
+                                    <th>Exchange Rate (1 USD = )</th>
+                                    <th>Decimal Places</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for currency in currencies %}
+                                <tr data-code="{{ currency.code }}" data-name="{{ currency.name|lower }}"
+                                    data-rate-status="{% if currency.rate != currency.default_rate %}custom{% else %}default{% endif %}">
+                                    <td><strong>{{ currency.code }}</strong></td>
+                                    <td><span style="font-size: 18px;">{{ currency.symbol }}</span></td>
+                                    <td>{{ currency.name }}</td>
+                                    <td>
+                                        <input type="number"
+                                               class="form-control rate-input"
+                                               value="{{ currency.rate }}"
+                                               step="0.0001"
+                                               data-code="{{ currency.code }}"
+                                               data-default="{{ currency.default_rate }}"
+                                               style="width: 140px; text-align: right;">
+                                    </td>
+                                    <td class="text-center">{{ currency.decimal_places }}</td>
+                                    <td class="text-center">
+                                        <span class="badge {% if currency.rate != currency.default_rate %}bg-warning{% else %}bg-secondary{% endif %} rate-status">
+                                            {% if currency.rate != currency.default_rate %}
+                                                <i class="fas fa-edit"></i> Custom
+                                            {% else %}
+                                                <i class="fas fa-check"></i> Default
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-secondary reset-single"
+                                                data-code="{{ currency.code }}"
+                                                data-default="{{ currency.default_rate }}">
+                                            <i class="fas fa-undo"></i> Reset
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-3">
+                        <button class="btn btn-primary" id="saveRatesBtn">
+                            <i class="fas fa-save"></i> Save All Rates
+                        </button>
+                        <button class="btn btn-secondary" id="resetRatesBtn">
+                            <i class="fas fa-undo"></i> Reset All to Defaults
+                        </button>
+                        <button class="btn btn-info" id="exportRatesBtn">
+                            <i class="fas fa-download"></i> Export Rates
+                        </button>
+                        <button class="btn btn-warning" id="importRatesBtn">
+                            <i class="fas fa-upload"></i> Import Rates
+                        </button>
+                        <input type="file" id="importFile" accept=".json" style="display: none;">
+                    </div>
+
+                    <div class="mt-3 alert alert-secondary">
+                        <small>
+                            <i class="fas fa-clock"></i> Last updated: <span id="lastUpdated">
+                                {% if rates.last_updated %}{{ rates.last_updated }}{% else %}Never{% endif %}
+                            </span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .rate-input {
+        font-weight: bold;
+        background-color: #fff;
+    }
+    .rate-input.custom-rate {
+        background-color: #fff3cd;
+        border-color: #ffc107;
+    }
+    .rate-status {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
+    .table tbody tr:hover {
+        background-color: #f8f9fa;
+        cursor: pointer;
+    }
+    #applyToAllBtn {
+        background-color: #27ae60;
+        border-color: #27ae60;
+    }
+    #applyToAllBtn:hover {
+        background-color: #219653;
+    }
+</style>
+
+<script>
+    // ============ CRITICAL: Get BASE_PATH from server ============
+    const BASE_PATH = '{{ base_path }}' || '';
+    console.log('BASE_PATH:', BASE_PATH);
+    // ============================================================
+
+    // Store default rates from server
+    const defaultRates = {{ default_rates|tojson }};
+
+    // Initialize rate inputs with custom rate styling
+    document.querySelectorAll('.rate-input').forEach(input => {
+        const currentValue = parseFloat(input.value);
+        const defaultValue = parseFloat(input.getAttribute('data-default'));
+
+        if (Math.abs(currentValue - defaultValue) > 0.0001) {
+            input.classList.add('custom-rate');
+        }
+
+        input.addEventListener('change', function() {
+            const newValue = parseFloat(this.value);
+            const defaultValue = parseFloat(this.getAttribute('data-default'));
+            const statusSpan = this.closest('tr').querySelector('.rate-status');
+
+            if (Math.abs(newValue - defaultValue) > 0.0001) {
+                statusSpan.innerHTML = '<i class="fas fa-edit"></i> Custom';
+                statusSpan.className = 'badge bg-warning rate-status';
+                this.classList.add('custom-rate');
+                this.closest('tr').setAttribute('data-rate-status', 'custom');
+            } else {
+                statusSpan.innerHTML = '<i class="fas fa-check"></i> Default';
+                statusSpan.className = 'badge bg-secondary rate-status';
+                this.classList.remove('custom-rate');
+                this.closest('tr').setAttribute('data-rate-status', 'default');
+            }
+        });
+    });
+
+    // Save all rates
+    document.getElementById('saveRatesBtn').addEventListener('click', function() {
+        const rates = {};
+        document.querySelectorAll('.rate-input').forEach(input => {
+            const code = input.getAttribute('data-code');
+            rates[code] = parseFloat(input.value);
+        });
+
+        // Add timestamp
+        rates.last_updated = new Date().toISOString();
+
+        const saveBtn = this;
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        saveBtn.disabled = true;
+
+        fetch(`${BASE_PATH}/api/currencies/rates`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(rates)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('✅ Exchange rates saved successfully!', 'success');
+                document.getElementById('lastUpdated').innerHTML = new Date().toLocaleString();
+            } else {
+                showToast('❌ Error saving rates: ' + (data.message || 'Unknown error'), 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('❌ Error saving rates. Please try again.', 'error');
+        })
+        .finally(() => {
+            saveBtn.innerHTML = originalText;
+            saveBtn.disabled = false;
+        });
+    });
+
+    // Reset all rates to defaults
+    document.getElementById('resetRatesBtn').addEventListener('click', function() {
+        if (confirm('⚠️ Reset all exchange rates to default values? This cannot be undone.')) {
+            document.querySelectorAll('.rate-input').forEach(input => {
+                const defaultVal = input.getAttribute('data-default');
+                input.value = defaultVal;
+                const event = new Event('change');
+                input.dispatchEvent(event);
+            });
+            showToast('All rates have been reset to defaults. Click "Save All Rates" to persist changes.', 'info');
+        }
+    });
+
+    // Reset single rate
+    document.querySelectorAll('.reset-single').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const code = this.getAttribute('data-code');
+            const defaultVal = parseFloat(this.getAttribute('data-default'));
+            const input = document.querySelector(`.rate-input[data-code="${code}"]`);
+            if (input) {
+                input.value = defaultVal;
+                const event = new Event('change');
+                input.dispatchEvent(event);
+                showToast(`${code} reset to default rate (${defaultVal})`, 'info');
+            }
+        });
+    });
+
+    // Apply same rate to all currencies
+    document.getElementById('applyToAllBtn').addEventListener('click', function() {
+        const value = prompt('Enter the exchange rate to apply to ALL currencies (1 USD = ?):', '1.0');
+        if (value !== null && !isNaN(parseFloat(value))) {
+            const rate = parseFloat(value);
+            document.querySelectorAll('.rate-input').forEach(input => {
+                input.value = rate;
+                const event = new Event('change');
+                input.dispatchEvent(event);
+            });
+            showToast(`Applied rate ${rate} to all currencies. Click "Save All Rates" to persist.`, 'info');
+        }
+    });
+
+    // Search functionality
+    document.getElementById('currencySearch').addEventListener('keyup', function() {
+        const searchTerm = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#currenciesTable tbody tr');
+
+        rows.forEach(row => {
+            const code = row.getAttribute('data-code').toLowerCase();
+            const name = row.getAttribute('data-name');
+
+            if (code.includes(searchTerm) || name.includes(searchTerm)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    // Filter by rate status
+    document.getElementById('rateFilter').addEventListener('change', function() {
+        const filter = this.value;
+        const rows = document.querySelectorAll('#currenciesTable tbody tr');
+
+        rows.forEach(row => {
+            const status = row.getAttribute('data-rate-status');
+            if (filter === 'all') {
+                row.style.display = '';
+            } else if (filter === 'custom' && status === 'custom') {
+                row.style.display = '';
+            } else if (filter === 'default' && status === 'default') {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+
+    // Export rates to JSON file
+    document.getElementById('exportRatesBtn').addEventListener('click', function() {
+        const rates = {};
+        document.querySelectorAll('.rate-input').forEach(input => {
+            const code = input.getAttribute('data-code');
+            rates[code] = parseFloat(input.value);
+        });
+        rates.last_updated = new Date().toISOString();
+
+        const dataStr = JSON.stringify(rates, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(dataBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `exchange_rates_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast('✅ Exchange rates exported successfully!', 'success');
+    });
+
+    // Import rates from JSON file
+    document.getElementById('importRatesBtn').addEventListener('click', function() {
+        document.getElementById('importFile').click();
+    });
+
+    document.getElementById('importFile').addEventListener('change', function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const rates = JSON.parse(e.target.result);
+                let importedCount = 0;
+
+                document.querySelectorAll('.rate-input').forEach(input => {
+                    const code = input.getAttribute('data-code');
+                    if (rates[code] !== undefined && !isNaN(parseFloat(rates[code]))) {
+                        input.value = parseFloat(rates[code]);
+                        const changeEvent = new Event('change');
+                        input.dispatchEvent(changeEvent);
+                        importedCount++;
+                    }
+                });
+
+                showToast(`✅ Imported ${importedCount} exchange rates successfully! Click "Save All Rates" to persist.`, 'success');
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                showToast('❌ Error importing file. Please ensure it is a valid JSON file.', 'error');
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    });
+
+    // Toast notification function
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        if (!container) {
+            alert(message);
+            return;
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'custom-toast fade-in';
+        const icon = type === 'success' ? 'check-circle' :
+                    type === 'error' ? 'exclamation-circle' : 'info-circle';
+        const color = type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db';
+
+        toast.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas fa-${icon} me-2" style="color: ${color}"></i>
+                <div class="flex-grow-1">${message}</div>
+                <button class="btn-close btn-sm" onclick="this.parentElement.parentElement.remove()"></button>
+            </div>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+
+    window.showToast = showToast;
+</script>
+{% endblock %}

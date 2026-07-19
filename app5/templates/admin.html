@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Project Costing System</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; }
+
+        .header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        h1 { color: #1e3c72; margin: 0; font-size: 24px; }
+        .user-info {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .user-name {
+            font-weight: bold;
+            color: #1e3c72;
+            background: #eef2fa;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+        .btn-dashboard {
+            background: #667eea;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-dashboard:hover {
+            background: #5a67d8;
+        }
+        .btn-settings {
+            background: #f39c12;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-settings:hover {
+            background: #e67e22;
+        }
+        .btn-back {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-back:hover {
+            background: #2980b9;
+        }
+        .btn-logout {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-logout:hover {
+            background: #c0392b;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            background: #e9ecef;
+            padding: 10px 10px 0 10px;
+            border-radius: 12px 12px 0 0;
+        }
+        .tab-btn {
+            background: #dee2e6;
+            border: none;
+            padding: 12px 28px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: white;
+            color: #1e3c72;
+            border-bottom: 3px solid #3498db;
+        }
+        .tab-content {
+            background: white;
+            border-radius: 0 0 12px 12px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-height: 500px;
+        }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #e9ecef; font-weight: 600; }
+        .btn { padding: 6px 12px; border: none; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: bold; }
+        .btn-edit { background: #3498db; color: white; }
+        .btn-edit:hover { background: #2980b9; }
+        .btn-delete { background: #e74c3c; color: white; }
+        .btn-delete:hover { background: #c0392b; }
+        .btn-add { background: #27ae60; color: white; }
+        .btn-add:hover { background: #219653; }
+        .btn-share { background: #f39c12; color: white; }
+        .btn-share:hover { background: #e67e22; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .form-group input, .form-group select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; }
+        .close { cursor: pointer; font-size: 24px; color: #999; }
+        .close:hover { color: #333; }
+
+        .search-bar { margin-bottom: 20px; }
+        .search-bar input { width: 100%; max-width: 300px; padding: 10px 15px; border: 1px solid #ddd; border-radius: 30px; }
+
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .role-admin { background: #e74c3c; color: white; }
+        .role-ceo { background: #8e44ad; color: white; }
+        .role-procurement { background: #27ae60; color: white; }
+        .role-technical_lead { background: #2980b9; color: white; }
+        .role-viewer { background: #f39c12; color: white; }
+        .role-user { background: #3498db; color: white; }
+
+        .status-active { color: #27ae60; font-weight: bold; }
+        .status-inactive { color: #e74c3c; font-weight: bold; }
+
+        .shared-list { font-size: 12px; color: #666; max-width: 200px; }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .approval-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .approval-approved { background: #27ae60; color: white; }
+        .approval-pending { background: #f39c12; color: white; }
+        .approval-rejected { background: #e74c3c; color: white; }
+
+        .company-header {
+            background: linear-gradient(135deg, #1e3c72, #2c3e50);
+            border-radius: 16px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .company-logo {
+            background: rgba(255,255,255,0.2);
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .company-name {
+            margin: 0;
+            font-size: 18px;
+        }
+        .company-system {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        .company-address {
+            text-align: right;
+            font-size: 11px;
+            margin: 0;
+        }
+        .company-contact {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .flash.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .flash.danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .flash.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="company-header">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="company-logo">🏢</div>
+            <div>
+                <h2 class="company-name">{{ settings.company_name if settings else 'Your Company Name' }}</h2>
+                <p class="company-system">{{ settings.system_name if settings else 'Project Costing System' }}</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <p class="company-address">{{ settings.company_address if settings else '123 Business Street, City, State 12345' }}</p>
+            <p class="company-contact">📞 {{ settings.company_phone if settings else '+1 (555) 123-4567' }} | ✉️ {{ settings.company_email if settings else 'info@yourcompany.com' }}</p>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="header">
+        <h1>⚙️ Admin Panel</h1>
+        <div class="user-info">
+            <span class="user-name">👤 {{ user }}</span>
+            <a href="{{ base_path }}/dashboard" class="btn-dashboard">📊 Dashboard</a>
+            <a href="{{ base_path }}/admin/settings" class="btn-settings">⚙️ Settings</a>
+            <a href="{{ base_path }}/" class="btn-back">✏️ Data Entry</a>
+            <a href="{{ base_path }}/logout" class="btn-logout">🚪 Logout</a>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="users">👥 User Management</button>
+        <button class="tab-btn" data-tab="projects">📁 Project Management</button>
+    </div>
+
+    <div class="tab-content">
+        <div id="users" class="tab-pane active">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                <h2>System Users</h2>
+                <button class="btn btn-add" onclick="openAddUserModal()">+ Add New User</button>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="userSearch" placeholder="🔍 Search users..." onkeyup="filterUsers()">
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="usersTable">
+                    <thead>
+                        <tr><th>Username</th><th>Full Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="usersBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="projects" class="tab-pane">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <h2>All Projects</h2>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="projectSearch" placeholder="🔍 Search projects..." onkeyup="filterProjects()">
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="projectsTable">
+                    <thead>
+                        <tr><th>Project Name</th><th>Owner</th><th>Approval Status</th><th>Shared With</th><th>Last Modified</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="projectsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Add New User</h3>
+            <span class="close" onclick="closeUserModal()">&times;</span>
+        </div>
+        <form id="userForm">
+            <input type="hidden" id="userId">
+            <div class="form-group">
+                <label>Username *</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="fullName">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="email">
+            </div>
+            <div class="form-group" id="passwordGroup">
+                <label>Password *</label>
+                <input type="password" id="password">
+                <small>Minimum 6 characters</small>
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select id="role">
+                    <option value="user">User (Own projects only, can edit own)</option>
+                    <option value="viewer">Viewer (View all projects, no edit)</option>
+                    <option value="technical_lead">Technical Lead (View all, exec reports, download templates)</option>
+                    <option value="procurement">Procurement (View all, edit all, no user mgmt)</option>
+                    <option value="ceo">CEO (View all, approve/reject costs)</option>
+                    <option value="admin">Admin (Full access)</option>
+                </select>
+            </div>
+            <div class="form-group" id="statusGroup" style="display:none;">
+                <label>Status</label>
+                <select id="status">
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-add" style="width:100%">Save</button>
+        </form>
+    </div>
+</div>
+
+<div id="shareModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Share Project</h3>
+            <span class="close" onclick="closeShareModal()">&times;</span>
+        </div>
+        <form id="shareForm">
+            <input type="hidden" id="shareProjectId">
+            <div class="form-group">
+                <label>Select users to share with:</label>
+                <div id="userChecklist" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;"></div>
+            </div>
+            <button type="submit" class="btn btn-add" style="width:100%; margin-top:15px;">Save Sharing</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // ============ CRITICAL: Get BASE_PATH from server ============
+    const BASE_PATH = '{{ base_path }}' || '';
+    console.log('BASE_PATH:', BASE_PATH);
+    // ============================================================
+
+    let users = [];
+    let projects = [];
+    let allUsers = [];
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            document.getElementById(btn.getAttribute('data-tab')).classList.add('active');
+        });
+    });
+
+    async function loadUsers() {
+        try {
+            const response = await fetch(`${BASE_PATH}/admin/users`);
+            users = await response.json();
+            allUsers = [...users];
+            renderUsers();
+        } catch (err) {
+            console.error("Error loading users:", err);
+        }
+    }
+
+    async function loadProjects() {
+        try {
+            const response = await fetch(`${BASE_PATH}/admin/projects`);
+            projects = await response.json();
+            renderProjects();
+        } catch (err) {
+            console.error("Error loading projects:", err);
+        }
+    }
+
+    function getRoleBadgeClass(role) {
+        switch(role) {
+            case 'admin': return 'role-admin';
+            case 'ceo': return 'role-ceo';
+            case 'procurement': return 'role-procurement';
+            case 'technical_lead': return 'role-technical_lead';
+            case 'viewer': return 'role-viewer';
+            default: return 'role-user';
+        }
+    }
+
+    function getRoleDisplayName(role) {
+        switch(role) {
+            case 'admin': return 'Admin';
+            case 'ceo': return 'CEO';
+            case 'procurement': return 'Procurement';
+            case 'technical_lead': return 'Technical Lead';
+            case 'viewer': return 'Viewer';
+            default: return 'User';
+        }
+    }
+
+    function getApprovalBadgeClass(status) {
+        switch(status) {
+            case 'approved': return 'approval-approved';
+            case 'rejected': return 'approval-rejected';
+            default: return 'approval-pending';
+        }
+    }
+
+    function renderUsers() {
+        const tbody = document.getElementById('usersBody');
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999; padding:40px;">No users found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = users.map(user => `
+            <tr>
+                <td>${escapeHtml(user.username)}</td>
+                <td>${escapeHtml(user.full_name || '-')}</td>
+                <td>${escapeHtml(user.email || '-')}</td>
+                <td><span class="role-badge ${getRoleBadgeClass(user.role)}">${getRoleDisplayName(user.role)}</span></td>
+                <td class="${user.is_active !== false ? 'status-active' : 'status-inactive'}">${user.is_active !== false ? 'Active' : 'Inactive'}</td>
+                <td>${user.created_date ? new Date(user.created_date).toLocaleDateString() : '-'}</td>
+                <td class="action-buttons">
+                    <button class="btn btn-edit" onclick="editUser('${user.id}')">Edit</button>
+                    <button class="btn btn-delete" onclick="deleteUser('${user.id}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function renderProjects() {
+        const tbody = document.getElementById('projectsBody');
+        if (projects.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#999; padding:40px;">No projects found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = projects.map(project => `
+            <tr>
+                <td>${escapeHtml(project.project_name)}</td>
+                <td>${escapeHtml(project.owner_name || project.user_id)}</td>
+                <td><span class="approval-badge ${getApprovalBadgeClass(project.approval_status)}">${(project.approval_status || 'pending').toUpperCase()}</span></td>
+                <td class="shared-list">${getSharedNames(project.shared_with || [])}</td>
+                <td>${project.modified_date ? new Date(project.modified_date).toLocaleDateString() : '-'}</td>
+                <td class="action-buttons">
+                    <button class="btn btn-share" onclick="openShareModal('${project.id}')">Share</button>
+                    <button class="btn btn-delete" onclick="deleteProject('${project.id}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function getSharedNames(userIds) {
+        if (!userIds || userIds.length === 0) return 'None';
+        const names = userIds.map(id => {
+            const user = allUsers.find(u => u.id === id);
+            return user ? (user.full_name || user.username) : id;
+        });
+        return names.join(', ');
+    }
+
+    function filterUsers() {
+        const search = document.getElementById('userSearch').value.toLowerCase();
+        const filtered = allUsers.filter(u => u.username.toLowerCase().includes(search) || (u.full_name && u.full_name.toLowerCase().includes(search)));
+        users = filtered;
+        renderUsers();
+    }
+
+    function filterProjects() {
+        const search = document.getElementById('projectSearch').value.toLowerCase();
+        const filtered = projects.filter(p => p.project_name.toLowerCase().includes(search));
+        const tbody = document.getElementById('projectsBody');
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#999; padding:40px;">No projects match your search</td></tr>';
+            return;
+        }
+        tbody.innerHTML = filtered.map(project => `
+            <tr>
+                <td>${escapeHtml(project.project_name)}</td>
+                <td>${escapeHtml(project.owner_name || project.user_id)}</td>
+                <td><span class="approval-badge ${getApprovalBadgeClass(project.approval_status)}">${(project.approval_status || 'pending').toUpperCase()}</span></td>
+                <td class="shared-list">${getSharedNames(project.shared_with || [])}</td>
+                <td>${project.modified_date ? new Date(project.modified_date).toLocaleDateString() : '-'}</td>
+                <td class="action-buttons">
+                    <button class="btn btn-share" onclick="openShareModal('${project.id}')">Share</button>
+                    <button class="btn btn-delete" onclick="deleteProject('${project.id}')">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function openAddUserModal() {
+        document.getElementById('modalTitle').innerText = 'Add New User';
+        document.getElementById('userId').value = '';
+        document.getElementById('username').value = '';
+        document.getElementById('fullName').value = '';
+        document.getElementById('email').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('role').value = 'user';
+        document.getElementById('passwordGroup').style.display = 'block';
+        document.getElementById('statusGroup').style.display = 'none';
+        document.getElementById('userModal').style.display = 'flex';
+    }
+
+    async function editUser(userId) {
+        const user = allUsers.find(u => u.id === userId);
+        if (!user) return;
+
+        document.getElementById('modalTitle').innerText = 'Edit User';
+        document.getElementById('userId').value = user.id;
+        document.getElementById('username').value = user.username;
+        document.getElementById('fullName').value = user.full_name || '';
+        document.getElementById('email').value = user.email || '';
+        document.getElementById('password').value = '';
+        document.getElementById('role').value = user.role;
+        document.getElementById('status').value = user.is_active !== false ? 'true' : 'false';
+        document.getElementById('passwordGroup').style.display = 'block';
+        document.getElementById('statusGroup').style.display = 'block';
+        document.getElementById('userModal').style.display = 'flex';
+    }
+
+    document.getElementById('userForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const userId = document.getElementById('userId').value;
+        const data = {
+            username: document.getElementById('username').value,
+            full_name: document.getElementById('fullName').value,
+            email: document.getElementById('email').value,
+            role: document.getElementById('role').value
+        };
+
+        if (userId) {
+            const password = document.getElementById('password').value;
+            if (password) data.password = password;
+            data.is_active = document.getElementById('status').value === 'true';
+
+            const response = await fetch(`${BASE_PATH}/admin/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                closeUserModal();
+                loadUsers();
+                loadProjects();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Error updating user');
+            }
+        } else {
+            data.password = document.getElementById('password').value;
+            if (!data.password) {
+                alert('Password is required');
+                return;
+            }
+            if (data.password.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            const response = await fetch(`${BASE_PATH}/admin/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                closeUserModal();
+                loadUsers();
+                loadProjects();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Error creating user');
+            }
+        }
+    });
+
+    async function deleteUser(userId) {
+        if (confirm('Are you sure? This will also delete all projects owned by this user.')) {
+            const response = await fetch(`${BASE_PATH}/admin/users/${userId}`, { method: 'DELETE' });
+            if (response.ok) {
+                loadUsers();
+                loadProjects();
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Error deleting user');
+            }
+        }
+    }
+
+    async function deleteProject(projectId) {
+        if (confirm('Are you sure you want to delete this project?')) {
+            const response = await fetch(`${BASE_PATH}/admin/projects/${projectId}`, { method: 'DELETE' });
+            if (response.ok) {
+                loadProjects();
+            } else {
+                alert('Error deleting project');
+            }
+        }
+    }
+
+    async function openShareModal(projectId) {
+        document.getElementById('shareProjectId').value = projectId;
+
+        const usersResponse = await fetch(`${BASE_PATH}/admin/users`);
+        const allUsersList = await usersResponse.json();
+
+        const project = projects.find(p => p.id === projectId);
+        const currentShares = project?.shared_with || [];
+
+        const checklist = document.getElementById('userChecklist');
+        checklist.innerHTML = allUsersList
+            .filter(u => u.id !== project?.user_id)
+            .map(user => `
+                <label style="display: block; padding: 8px; border-bottom: 1px solid #eee; cursor: pointer;">
+                    <input type="checkbox" value="${user.id}" ${currentShares.includes(user.id) ? 'checked' : ''}>
+                    ${escapeHtml(user.full_name || user.username)}
+                    <span style="color: #888; font-size: 11px;">(${getRoleDisplayName(user.role)})</span>
+                </label>
+            `).join('');
+
+        document.getElementById('shareModal').style.display = 'flex';
+    }
+
+    document.getElementById('shareForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const projectId = document.getElementById('shareProjectId').value;
+        const checkboxes = document.querySelectorAll('#userChecklist input[type="checkbox"]');
+        const user_ids = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+
+        const response = await fetch(`${BASE_PATH}/admin/projects/${projectId}/share`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_ids })
+        });
+
+        if (response.ok) {
+            closeShareModal();
+            loadProjects();
+            alert('Project sharing updated successfully!');
+        } else {
+            alert('Error sharing project');
+        }
+    });
+
+    function closeUserModal() { document.getElementById('userModal').style.display = 'none'; }
+    function closeShareModal() { document.getElementById('shareModal').style.display = 'none'; }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Load data on page load
+    loadUsers();
+    loadProjects();
+</script>
+</body>
+</html>

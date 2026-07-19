@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Costing Model - Data Entry</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1600px; margin: auto; }
+
+        .company-header {
+            background: linear-gradient(135deg, #1e3c72, #2c3e50);
+            border-radius: 16px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .company-logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .company-logo {
+            background: rgba(255,255,255,0.2);
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .company-name {
+            margin: 0;
+            font-size: 18px;
+        }
+        .company-system {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        .company-address {
+            text-align: right;
+            font-size: 11px;
+            margin: 0;
+        }
+        .company-contact {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+        }
+
+        .user-bar {
+            background: white;
+            border-radius: 16px;
+            padding: 12px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .welcome-text {
+            font-size: 14px;
+            color: #666;
+        }
+        .username {
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        .btn-dashboard {
+            background: #667eea;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-dashboard:hover {
+            background: #5a67d8;
+        }
+        .btn-admin {
+            background: #f39c12;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-admin:hover {
+            background: #e67e22;
+        }
+        .btn-logout {
+            background: #e74c3c;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-logout:hover {
+            background: #c0392b;
+        }
+        .btn-view {
+            background: #27ae60;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-view:hover {
+            background: #219653;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .role-admin { background: #e74c3c; color: white; }
+        .role-ceo { background: #8e44ad; color: white; }
+        .role-procurement { background: #27ae60; color: white; }
+        .role-technical_lead { background: #2980b9; color: white; }
+        .role-viewer { background: #f39c12; color: white; }
+        .role-user { background: #3498db; color: white; }
+
+        .project-header {
+            background: white;
+            padding: 20px 25px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .project-name-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 0;
+        }
+        .project-name-row label {
+            font-weight: 700;
+            color: #1e3c72;
+            font-size: 18px;
+        }
+        #projectName {
+            flex: 2;
+            padding: 12px 16px;
+            font-size: 16px;
+            border-radius: 30px;
+            border: 1px solid #ccc;
+            background: #f8f9fa;
+        }
+
+        /* Three Column Layout */
+        .three-column-layout {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .config-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1e3c72;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .config-title i {
+            font-size: 20px;
+            color: #3498db;
+        }
+
+        /* Currency Section */
+        .currency-item {
+            margin-bottom: 15px;
+        }
+        .currency-item label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+        .currency-item select, .currency-item input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        .btn-currency-reset {
+            width: 100%;
+            background: #95a5a6;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .btn-currency-reset:hover {
+            background: #7f8c8d;
+        }
+
+        /* Markup Grid */
+        .markup-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .markup-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 10px;
+        }
+        .markup-item label {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 13px;
+        }
+        .markup-item input {
+            width: 80px;
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .markup-percent {
+            font-size: 13px;
+            font-weight: bold;
+            color: #666;
+            margin-left: 5px;
+        }
+
+        /* ROI Grid */
+        .roi-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .roi-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .roi-item label {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 13px;
+        }
+        .roi-item input {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        .roi-item small {
+            color: #888;
+            font-size: 10px;
+        }
+
+        /* Cost Summary Section - Horizontal */
+        .cost-summary {
+            background: linear-gradient(135deg, #1e3c72, #2c3e50);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            color: white;
+        }
+        .cost-summary-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .cost-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            align-items: center;
+        }
+        .cost-summary-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+        }
+        .cost-summary-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        .cost-summary-amount {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .cost-summary-grand {
+            background: #f39c12;
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+        .cost-summary-grand .cost-summary-label {
+            color: #1e3c72;
+            font-weight: bold;
+        }
+        .cost-summary-grand .cost-summary-amount {
+            color: #1e3c72;
+            font-size: 20px;
+        }
+
+        /* ROI Results */
+        .roi-results {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            border-radius: 16px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            color: white;
+            display: none;
+        }
+        .roi-results-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            text-align: center;
+        }
+        .roi-result-label {
+            font-size: 11px;
+            opacity: 0.9;
+        }
+        .roi-result-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .roi-note {
+            font-size: 11px;
+            text-align: center;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            background: #e9ecef;
+            padding: 10px 10px 0 10px;
+            border-radius: 12px 12px 0 0;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: #dee2e6;
+            border: none;
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 10px 10px 0 0;
+            transition: all 0.2s;
+            color: #495057;
+        }
+        .tab-btn:hover { background: #cbd3da; }
+        .tab-btn.active {
+            background: white;
+            color: #1e3c72;
+            border-bottom: 3px solid #3498db;
+        }
+        .tab-content {
+            background: white;
+            border-radius: 0 0 12px 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-height: 450px;
+            overflow-x: auto;
+        }
+        .tab-pane { display: none; }
+        .tab-pane.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .table-container {
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
+        th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #e9ecef; font-weight: 600; white-space: nowrap; }
+        input, select { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; }
+        .btn-add {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            margin-top: 5px;
+            display: inline-block;
+        }
+        .btn-add:hover { background: #2980b9; }
+        .btn-remove {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 4px 12px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .btn-remove:hover { background: #c0392b; }
+
+        .excel-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            padding-top: 10px;
+            border-top: 1px solid #e9ecef;
+        }
+        .btn-excel {
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .btn-excel-template { background: #f39c12; }
+        .btn-excel-export { background: #27ae60; }
+        .btn-excel-import { background: #3498db; }
+        .btn-excel:hover { opacity: 0.9; }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-save, .btn-new, .btn-view-projects, .btn-pdf {
+            padding: 10px 28px;
+            border: none;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-save { background: #27ae60; color: white; }
+        .btn-save:hover { background: #219653; }
+        .btn-new { background: #3498db; color: white; }
+        .btn-new:hover { background: #2980b9; }
+        .btn-view-projects { background: #9b59b6; color: white; }
+        .btn-view-projects:hover { background: #8e44ad; }
+        .btn-pdf { background: #e74c3c; color: white; }
+        .btn-pdf:hover { background: #c0392b; }
+
+        .inline-note {
+            font-size: 12px;
+            color: #888;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .empty-state-message {
+            text-align: center;
+            padding: 40px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+
+        .currency-header {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: normal;
+            margin-left: 5px;
+            color: #27ae60;
+        }
+
+        @media (max-width: 1000px) {
+            .three-column-layout {
+                grid-template-columns: 1fr;
+            }
+            .cost-summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .roi-results-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="company-header">
+        <div class="company-logo-area">
+            {% if settings and settings.logo_filename and settings.logo_filename != '' %}
+            <img src="{{ base_path }}/static/{{ settings.logo_filename }}" alt="Logo" style="height: 50px; width: auto; border-radius: 10px;">
+            {% else %}
+            <div class="company-logo">🏢</div>
+            {% endif %}
+            <div>
+                <h2 class="company-name">{{ settings.company_name if settings else 'Your Company Name' }}</h2>
+                <p class="company-system">{{ settings.system_name if settings else 'Project Costing System' }}</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <p class="company-address">{{ settings.company_address if settings else '123 Business Street, City, State 12345' }}</p>
+            <p class="company-contact">📞 {{ settings.company_phone if settings else '+1 (555) 123-4567' }} | ✉️ {{ settings.company_email if settings else 'info@yourcompany.com' }}</p>
+        </div>
+    </div>
+
+    <div class="user-bar">
+        <div class="user-info">
+            <span class="welcome-text">Welcome,</span>
+            <span class="username">{{ user }}</span>
+            <span class="role-badge role-{{ role }}">{{ role|replace('_', ' ') }}</span>
+            <a href="{{ base_path }}/dashboard" class="btn-dashboard">📊 Dashboard</a>
+            <a href="{{ base_path }}/projects" class="btn-view">📋 View Projects</a>
+            {% if role == 'admin' %}
+                <a href="{{ base_path }}/admin" class="btn-admin">⚙️ Admin Panel</a>
+            {% endif %}
+        </div>
+        <a href="{{ base_path }}/logout" class="btn-logout">🚪 Logout</a>
+    </div>
+
+    <div class="project-header">
+        <div class="project-name-row">
+            <label>📁 Project Name:</label>
+            <input type="text" id="projectName" placeholder="Enter project name" value="">
+        </div>
+    </div>
+
+    <!-- Three Column Layout -->
+    <div class="three-column-layout">
+        <!-- Column 1: Currency Display -->
+        <div class="config-card">
+            <div class="config-title">
+                <i>💱</i> Currency Display
+            </div>
+            <div class="currency-item">
+                <label>Display Currency:</label>
+                <select id="displayCurrency">
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="GHS">GHS (₵)</option>
+                    <option value="NGN">NGN (₦)</option>
+                    <option value="ZAR">ZAR (R)</option>
+                    <option value="CAD">CAD ($)</option>
+                    <option value="AUD">AUD ($)</option>
+                    <option value="JPY">JPY (¥)</option>
+                    <option value="CNY">CNY (¥)</option>
+                    <option value="INR">INR (₹)</option>
+                </select>
+            </div>
+            <div class="currency-item">
+                <label>Exchange Rate (1 USD = ): </label>
+                <input type="number" id="exchangeRate" step="0.01" value="1">
+            </div>
+            <button class="btn-currency-reset" onclick="resetCurrency()">Reset to USD</button>
+        </div>
+
+        <!-- Column 2: Markup Percentage per Tab -->
+        <div class="config-card">
+            <div class="config-title">
+                <i>📊</i> Markup Percentage per Tab
+            </div>
+            <div class="markup-grid">
+                <div class="markup-item">
+                    <label>Implementation:</label>
+                    <div>
+                        <input type="number" id="implMarkup" step="0.5" min="0" value="0" onchange="updateMarkupFromTop('impl', this.value)">
+                        <span class="markup-percent">%</span>
+                    </div>
+                </div>
+                <div class="markup-item">
+                    <label>Software:</label>
+                    <div>
+                        <input type="number" id="swMarkup" step="0.5" min="0" value="0" onchange="updateMarkupFromTop('sw', this.value)">
+                        <span class="markup-percent">%</span>
+                    </div>
+                </div>
+                <div class="markup-item">
+                    <label>Logistics:</label>
+                    <div>
+                        <input type="number" id="logMarkup" step="0.5" min="0" value="0" onchange="updateMarkupFromTop('log', this.value)">
+                        <span class="markup-percent">%</span>
+                    </div>
+                </div>
+                <div class="markup-item">
+                    <label>Maintenance:</label>
+                    <div>
+                        <input type="number" id="maintMarkup" step="0.5" min="0" value="0" onchange="updateMarkupFromTop('maint', this.value)">
+                        <span class="markup-percent">%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 3: ROI Analysis -->
+        <div class="config-card">
+            <div class="config-title">
+                <i>📈</i> ROI Analysis
+            </div>
+            <div class="roi-grid">
+                <div class="roi-item">
+                    <label>Expected Annual Benefit:</label>
+                    <input type="number" id="expectedAnnualBenefit" step="0.01" placeholder="Enter amount">
+                    <small>Estimated annual savings or revenue increase</small>
+                </div>
+                <div class="roi-item">
+                    <label>Project Lifetime:</label>
+                    <input type="number" id="projectLifetimeYears" step="0.5" min="0.5" placeholder="Enter years">
+                    <small>Expected duration of benefits</small>
+                </div>
+                <div class="roi-item">
+                    <label>Discount Rate:</label>
+                    <input type="number" id="discountRate" step="0.5" min="0" placeholder="Enter percentage">
+                    <small>For NPV calculation</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Summary Horizontal -->
+    <div class="cost-summary">
+        <div class="cost-summary-title">💰 COST SUMMARY</div>
+        <div class="cost-summary-grid">
+            <div class="cost-summary-item">
+                <div class="cost-summary-label">Implementation</div>
+                <div class="cost-summary-amount" id="summaryImpl">$0.00</div>
+            </div>
+            <div class="cost-summary-item">
+                <div class="cost-summary-label">Software</div>
+                <div class="cost-summary-amount" id="summarySw">$0.00</div>
+            </div>
+            <div class="cost-summary-item">
+                <div class="cost-summary-label">Logistics</div>
+                <div class="cost-summary-amount" id="summaryLog">$0.00</div>
+            </div>
+            <div class="cost-summary-item">
+                <div class="cost-summary-label">Annual Maintenance</div>
+                <div class="cost-summary-amount" id="summaryMaint">$0.00</div>
+            </div>
+            <div class="cost-summary-grand">
+                <div class="cost-summary-label">GRAND TOTAL</div>
+                <div class="cost-summary-amount" id="summaryGrand">$0.00</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ROI Results -->
+    <div class="roi-results" id="roiResults">
+        <div class="roi-results-grid">
+            <div class="roi-result-item">
+                <div class="roi-result-label">Simple ROI</div>
+                <div class="roi-result-value" id="roiSimple">0%</div>
+                <div id="roiCategory" style="font-size: 11px;"></div>
+            </div>
+            <div class="roi-result-item">
+                <div class="roi-result-label">Net Present Value (NPV)</div>
+                <div class="roi-result-value" id="roiNPV">$0</div>
+            </div>
+            <div class="roi-result-item">
+                <div class="roi-result-label">Payback Period</div>
+                <div class="roi-result-value" id="roiPayback">0 years</div>
+            </div>
+            <div class="roi-result-item">
+                <div class="roi-result-label">Benefit-Cost Ratio</div>
+                <div class="roi-result-value" id="roiBCR">0</div>
+            </div>
+        </div>
+        <div class="roi-note">
+            💡 <span id="roiNote">Enter Expected Annual Benefit and Project Lifetime to calculate ROI</span>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab1">📋 Implementation</button>
+        <button class="tab-btn" data-tab="tab2">💾 Software</button>
+        <button class="tab-btn" data-tab="tab3">✈️ Logistics</button>
+        <button class="tab-btn" data-tab="tab4">🔧 Annual Maintenance</button>
+    </div>
+
+    <div class="tab-content">
+        <!-- TAB 1: Implementation -->
+        <div id="tab1" class="tab-pane active">
+            <div class="excel-actions">
+                {% if role in ['technical_lead', 'admin', 'procurement'] %}
+                    <button class="btn-excel btn-excel-template" onclick="downloadTemplate('implementation')">📥 Download Template</button>
+                {% endif %}
+                <button class="btn-excel btn-excel-export" onclick="exportTabData('implementation')">📤 Export to Excel</button>
+                <button class="btn-excel btn-excel-import" onclick="importExcel('implementation')">📂 Import from Excel</button>
+                <input type="file" id="importFile_implementation" accept=".xlsx,.xls" style="display:none" onchange="processImport('implementation', this)">
+            </div>
+            <div class="table-container">
+                <table id="implTable">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th id="implRateHeader">Rate</th>
+                            <th># Resources</th>
+                            <th>Location</th>
+                            <th>Workplace Type</th>
+                            <th>Allocation (%)</th>
+                            <th>Days</th>
+                            <th>Months</th>
+                            <th id="implTotalHeader">Total</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="implBody"></tbody>
+                </table>
+            </div>
+            <div class="button-row">
+                {% if role not in ['viewer', 'technical_lead', 'ceo'] %}
+                    <button class="btn-add" onclick="addImplRow()">+ Add Resource</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- TAB 2: Software -->
+        <div id="tab2" class="tab-pane">
+            <div class="excel-actions">
+                {% if role in ['technical_lead', 'admin', 'procurement'] %}
+                    <button class="btn-excel btn-excel-template" onclick="downloadTemplate('software')">📥 Download Template</button>
+                {% endif %}
+                <button class="btn-excel btn-excel-export" onclick="exportTabData('software')">📤 Export to Excel</button>
+                <button class="btn-excel btn-excel-import" onclick="importExcel('software')">📂 Import from Excel</button>
+                <input type="file" id="importFile_software" accept=".xlsx,.xls" style="display:none" onchange="processImport('software', this)">
+            </div>
+            <div class="table-container">
+                <table id="swTable">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th>Quantity</th>
+                            <th id="swUnitHeader">Unit Price</th>
+                            <th>Years</th>
+                            <th id="swTotalHeader">Total</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="swBody"></tbody>
+                </table>
+            </div>
+            <div class="button-row">
+                {% if role not in ['viewer', 'technical_lead', 'ceo'] %}
+                    <button class="btn-add" onclick="addSwRow()">+ Add Software Item</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- TAB 3: Logistics -->
+        <div id="tab3" class="tab-pane">
+            <div class="excel-actions">
+                {% if role in ['technical_lead', 'admin', 'procurement'] %}
+                    <button class="btn-excel btn-excel-template" onclick="downloadTemplate('logistics')">📥 Download Template</button>
+                {% endif %}
+                <button class="btn-excel btn-excel-export" onclick="exportTabData('logistics')">📤 Export to Excel</button>
+                <button class="btn-excel btn-excel-import" onclick="importExcel('logistics')">📂 Import from Excel</button>
+                <input type="file" id="importFile_logistics" accept=".xlsx,.xls" style="display:none" onchange="processImport('logistics', this)">
+            </div>
+            <div class="table-container">
+                <table id="logTable">
+                    <thead>
+                        <tr>
+                            <th>Role</th>
+                            <th>Consultant Name</th>
+                            <th>Location Base</th>
+                            <th># Resources</th>
+                            <th># Round Trips</th>
+                            <th># Days Onsite</th>
+                            <th id="logPerDiemHeader">Per Diem</th>
+                            <th id="logAccommodationHeader">Accommodation</th>
+                            <th id="logTransportHeader">Avg Transport/day</th>
+                            <th id="logFlightHeader">Flight Cost</th>
+                            <th id="logTotalHeader">Total</th>
+                            <th style="width:50px"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="logBody"></tbody>
+                </table>
+            </div>
+            <div class="button-row">
+                {% if role not in ['viewer', 'technical_lead', 'ceo'] %}
+                    <button class="btn-add" onclick="addLogRow()">+ Add Logistics Entry</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- TAB 4: Annual Maintenance -->
+        <div id="tab4" class="tab-pane">
+            <div style="background:#eef2fa; padding:30px; border-radius:16px; text-align:center;">
+                <div style="font-size:48px; margin-bottom:15px;">🔄</div>
+                <div style="font-size:18px; font-weight:bold; margin-bottom:15px;">Annual Maintenance Amount</div>
+                <input type="number" id="annualMaintenance" step="0.01" value="0" style="font-size:32px; padding:15px; text-align:center; width:250px; margin:0 auto; display:block; border-radius:12px; border:1px solid #ccc;">
+            </div>
+        </div>
+    </div>
+
+    <div class="actions">
+        {% if role not in ['viewer', 'technical_lead', 'ceo'] %}
+            <button class="btn-new" onclick="newProject()">✨ New Project</button>
+            <button class="btn-save" onclick="saveProject()">💾 Save Project</button>
+        {% endif %}
+        <button class="btn-pdf" onclick="generatePDFReport()">📄 PDF Report</button>
+        <button class="btn-view-projects" onclick="viewAllProjects()">📋 View All Projects</button>
+    </div>
+    <div class="inline-note">💡 Each tab has its own markup percentage | Global currency converter affects all displayed values | Values are stored in USD</div>
+</div>
+
+<script>
+    // Base path for API calls - this is set from the server
+    const BASE_PATH = '{{ base_path }}' || '';
+
+    let currentProjectId = null;
+    let implRows = [];
+    let swRows = [];
+    let logRows = [];
+
+    let implMarkup = 0;
+    let swMarkup = 0;
+    let logMarkup = 0;
+    let maintMarkup = 0;
+
+    let displayCurrencyCode = 'USD';
+    let displayCurrencySymbol = '$';
+    let exchangeRate = 1;
+
+    const currencySymbols = {
+        'USD': '$', 'EUR': '€', 'GBP': '£', 'GHS': '₵', 'NGN': '₦',
+        'ZAR': 'R', 'CAD': '$', 'AUD': '$', 'JPY': '¥', 'CNY': '¥', 'INR': '₹'
+    };
+
+    function formatUSD(value) {
+        return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatConverted(value) {
+        if (displayCurrencyCode === 'JPY' || displayCurrencyCode === 'KRW' || displayCurrencyCode === 'VND') {
+            return displayCurrencySymbol + Math.round(value).toLocaleString();
+        }
+        return displayCurrencySymbol + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function convertCurrency(value) {
+        return value * exchangeRate;
+    }
+
+    function updateTableHeaders() {
+        const currencyText = `${displayCurrencyCode} (${displayCurrencySymbol})`;
+
+        // Implementation table headers
+        const implRateHeader = document.getElementById('implRateHeader');
+        const implTotalHeader = document.getElementById('implTotalHeader');
+        if (implRateHeader) implRateHeader.innerHTML = `Rate ${currencyText}`;
+        if (implTotalHeader) implTotalHeader.innerHTML = `Total ${currencyText}`;
+
+        // Software table headers
+        const swUnitHeader = document.getElementById('swUnitHeader');
+        const swTotalHeader = document.getElementById('swTotalHeader');
+        if (swUnitHeader) swUnitHeader.innerHTML = `Unit Price ${currencyText}`;
+        if (swTotalHeader) swTotalHeader.innerHTML = `Total ${currencyText}`;
+
+        // Logistics table headers
+        const logPerDiemHeader = document.getElementById('logPerDiemHeader');
+        const logAccommodationHeader = document.getElementById('logAccommodationHeader');
+        const logTransportHeader = document.getElementById('logTransportHeader');
+        const logFlightHeader = document.getElementById('logFlightHeader');
+        const logTotalHeader = document.getElementById('logTotalHeader');
+
+        if (logPerDiemHeader) logPerDiemHeader.innerHTML = `Per Diem ${currencyText}/day`;
+        if (logAccommodationHeader) logAccommodationHeader.innerHTML = `Accommodation ${currencyText}/day`;
+        if (logTransportHeader) logTransportHeader.innerHTML = `Avg Transport/day ${currencyText}`;
+        if (logFlightHeader) logFlightHeader.innerHTML = `Flight Cost ${currencyText}`;
+        if (logTotalHeader) logTotalHeader.innerHTML = `Total ${currencyText}`;
+    }
+
+    function updateGlobalCurrency() {
+        displayCurrencyCode = document.getElementById('displayCurrency').value;
+        displayCurrencySymbol = currencySymbols[displayCurrencyCode];
+        exchangeRate = parseFloat(document.getElementById('exchangeRate').value) || 1;
+
+        updateTableHeaders();
+        renderImplTable();
+        renderSwTable();
+        renderLogTable();
+        updateTotals();
+    }
+
+    function resetCurrency() {
+        document.getElementById('displayCurrency').value = 'USD';
+        document.getElementById('exchangeRate').value = 1;
+        updateGlobalCurrency();
+    }
+
+    function refreshAllMarkupDisplays() {
+        document.getElementById('implMarkup').value = implMarkup;
+        document.getElementById('swMarkup').value = swMarkup;
+        document.getElementById('logMarkup').value = logMarkup;
+        document.getElementById('maintMarkup').value = maintMarkup;
+        updateTotals();
+    }
+
+    function updateMarkupFromTop(type, value) {
+        let numValue = parseFloat(value) || 0;
+        if (type === 'impl') implMarkup = numValue;
+        else if (type === 'sw') swMarkup = numValue;
+        else if (type === 'log') logMarkup = numValue;
+        else if (type === 'maint') maintMarkup = numValue;
+        refreshAllMarkupDisplays();
+    }
+
+    function calculateImplTotal(row) {
+        const rate = row.rate || 0;
+        const resources = row.no_of_resource || 0;
+        const allocation = (row.allocation || 100) / 100;
+        const days = row.days || 1;
+        const months = row.months || 1;
+        return rate * resources * allocation * days * months;
+    }
+
+    function calculateSwTotal(row) {
+        const qty = row.qty || 0;
+        const price = row.unit_price || 0;
+        const years = row.years || 1;
+        return qty * price * years;
+    }
+
+    function calculateLogTotal(row) {
+        const resources = row.no_of_resources || 0;
+        const roundTrips = row.round_trips || 0;
+        const flightCost = row.flight_cost || 0;
+        const daysOnsite = row.days_onsite || 0;
+        const transportPerDay = row.transport_per_day || 0;
+        const perDiem = row.per_diem || 0;
+        const accommodation = row.accommodation || 0;
+        return (resources * roundTrips * flightCost) + (resources * daysOnsite * transportPerDay) + (resources * daysOnsite * perDiem) + (resources * daysOnsite * accommodation);
+    }
+
+    function applyMarkup(baseValue, markupPercent) {
+        return baseValue * (1 + markupPercent / 100);
+    }
+
+    function updateTotals() {
+        let implBase = implRows.reduce((sum, row) => sum + calculateImplTotal(row), 0);
+        let swBase = swRows.reduce((sum, row) => sum + calculateSwTotal(row), 0);
+        let logBase = logRows.reduce((sum, row) => sum + calculateLogTotal(row), 0);
+        let maintBase = parseFloat(document.getElementById('annualMaintenance').value) || 0;
+
+        let implWithMarkup = applyMarkup(implBase, implMarkup);
+        let swWithMarkup = applyMarkup(swBase, swMarkup);
+        let logWithMarkup = applyMarkup(logBase, logMarkup);
+        let maintWithMarkup = applyMarkup(maintBase, maintMarkup);
+
+        let grandTotal = implWithMarkup + swWithMarkup + logWithMarkup + maintWithMarkup;
+        let grandTotalConverted = convertCurrency(grandTotal);
+
+        document.getElementById('summaryImpl').innerHTML = formatConverted(convertCurrency(implWithMarkup));
+        document.getElementById('summarySw').innerHTML = formatConverted(convertCurrency(swWithMarkup));
+        document.getElementById('summaryLog').innerHTML = formatConverted(convertCurrency(logWithMarkup));
+        document.getElementById('summaryMaint').innerHTML = formatConverted(convertCurrency(maintWithMarkup));
+        document.getElementById('summaryGrand').innerHTML = formatConverted(grandTotalConverted);
+
+        updateROI();
+    }
+
+    function updateROI() {
+        let implBase = implRows.reduce((sum, row) => sum + calculateImplTotal(row), 0);
+        let swBase = swRows.reduce((sum, row) => sum + calculateSwTotal(row), 0);
+        let logBase = logRows.reduce((sum, row) => sum + calculateLogTotal(row), 0);
+        let maintBase = parseFloat(document.getElementById('annualMaintenance').value) || 0;
+
+        let implWithMarkup = applyMarkup(implBase, implMarkup);
+        let swWithMarkup = applyMarkup(swBase, swMarkup);
+        let logWithMarkup = applyMarkup(logBase, logMarkup);
+        let maintWithMarkup = applyMarkup(maintBase, maintMarkup);
+
+        let totalBaseCost = implBase + swBase + logBase + maintBase;
+        let totalMarkupAmount = (implWithMarkup - implBase) + (swWithMarkup - swBase) + (logWithMarkup - logBase) + (maintWithMarkup - maintBase);
+
+        let expectedAnnualBenefit = parseFloat(document.getElementById('expectedAnnualBenefit').value) || 0;
+        let projectLifetime = parseFloat(document.getElementById('projectLifetimeYears').value) || 0;
+        let discountRate = (parseFloat(document.getElementById('discountRate').value) || 0) / 100;
+
+        let simpleROI = 0;
+        let annualBenefitUsed = 0;
+
+        if (expectedAnnualBenefit > 0 && projectLifetime > 0) {
+            annualBenefitUsed = expectedAnnualBenefit;
+            let totalBenefit = expectedAnnualBenefit * projectLifetime;
+            simpleROI = totalBaseCost > 0 ? ((totalBenefit / totalBaseCost) - 1) * 100 : 0;
+            document.getElementById('roiNote').innerHTML = '💡 ROI calculated from your Expected Annual Benefit.';
+        } else if (totalMarkupAmount > 0 && projectLifetime > 0) {
+            annualBenefitUsed = totalMarkupAmount / projectLifetime;
+            let totalBenefit = annualBenefitUsed * projectLifetime;
+            simpleROI = totalBaseCost > 0 ? ((totalBenefit / totalBaseCost) - 1) * 100 : 0;
+            document.getElementById('roiNote').innerHTML = '💡 Enter Expected Annual Benefit or Project Lifetime to calculate ROI.';
+        } else {
+            document.getElementById('roiNote').innerHTML = '💡 Enter Expected Annual Benefit and Project Lifetime to calculate ROI.';
+            document.getElementById('roiResults').style.display = 'none';
+            return;
+        }
+
+        let npv = -totalBaseCost;
+        for (let year = 1; year <= projectLifetime; year++) {
+            npv += annualBenefitUsed / Math.pow(1 + discountRate, year);
+        }
+
+        let paybackPeriod = annualBenefitUsed > 0 ? totalBaseCost / annualBenefitUsed : 0;
+        let benefitCostRatio = (annualBenefitUsed * projectLifetime) / totalBaseCost;
+
+        simpleROI = Math.max(simpleROI, 0);
+        npv = Math.max(npv, 0);
+
+        let roiCategory = '';
+        if (simpleROI >= 50) roiCategory = 'Excellent';
+        else if (simpleROI >= 25) roiCategory = 'Good';
+        else if (simpleROI >= 10) roiCategory = 'Moderate';
+        else if (simpleROI >= 0) roiCategory = 'Low';
+        else roiCategory = 'Negative';
+
+        document.getElementById('roiSimple').innerHTML = simpleROI.toFixed(1) + '%';
+        document.getElementById('roiCategory').innerHTML = roiCategory;
+        document.getElementById('roiNPV').innerHTML = formatUSD(npv);
+        document.getElementById('roiPayback').innerHTML = paybackPeriod.toFixed(1) + ' years';
+        document.getElementById('roiBCR').innerHTML = benefitCostRatio.toFixed(2);
+        document.getElementById('roiResults').style.display = 'block';
+    }
+
+    function generatePDFReport() {
+        if (currentProjectId) {
+            window.location.href = `${BASE_PATH}/report/${currentProjectId}`;
+        } else {
+            alert('Please save the project first before generating a PDF report.');
+        }
+    }
+
+    function downloadTemplate(tabType) {
+        window.location.href = `${BASE_PATH}/export/template/${tabType}?currency=${displayCurrencyCode}`;
+    }
+
+    async function exportTabData(tabType) {
+        const payload = {
+            project_name: document.getElementById('projectName').value,
+            implementation_items: implRows,
+            software_items: swRows,
+            logistics_items: logRows,
+            annual_maintenance_cost: parseFloat(document.getElementById('annualMaintenance').value) || 0,
+            expected_annual_benefit: parseFloat(document.getElementById('expectedAnnualBenefit').value) || 0,
+            project_lifetime_years: parseFloat(document.getElementById('projectLifetimeYears').value) || 0,
+            discount_rate: parseFloat(document.getElementById('discountRate').value) || 0,
+            markup_percentages: { implementation: implMarkup, software: swMarkup, logistics: logMarkup, maintenance: maintMarkup },
+            currency_code: displayCurrencyCode,
+            currency_symbol: displayCurrencySymbol,
+            exchange_rate: exchangeRate
+        };
+        const response = await fetch(`${BASE_PATH}/export/${tabType}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${document.getElementById('projectName').value}_${tabType}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+
+    function importExcel(tabType) {
+        document.getElementById(`importFile_${tabType}`).click();
+    }
+
+    async function processImport(tabType, fileInput) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        const response = await fetch(`${BASE_PATH}/import/${tabType}`, { method: 'POST', body: formData });
+        const result = await response.json();
+        if (result.error) {
+            alert('Error: ' + result.error);
+        } else {
+            if (tabType === 'implementation') { implRows = result.items; renderImplTable(); }
+            else if (tabType === 'software') { swRows = result.items; renderSwTable(); }
+            else if (tabType === 'logistics') { logRows = result.items; renderLogTable(); }
+            alert(`Imported ${result.count} items successfully!`);
+        }
+        fileInput.value = '';
+    }
+
+    function renderImplTable() {
+        const tbody = document.getElementById('implBody');
+        if (implRows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="empty-state-message">No implementation items yet. Click the button below to add.</td></tr>';
+            updateTotals(); return;
+        }
+        tbody.innerHTML = '';
+        implRows.forEach((row, idx) => {
+            const total = calculateImplTotal(row);
+            const totalConverted = convertCurrency(total);
+            const rateConverted = convertCurrency(row.rate || 0);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" value="${escapeHtml(row.role)}" onchange="updateImpl(${idx}, 'role', this.value)"></td>
+                <td class="numeric-cell"><input type="number" step="0.01" value="${row.rate || 0}" onchange="updateImpl(${idx}, 'rate', parseFloat(this.value))"> <span style="font-size:10px;">(${formatConverted(rateConverted)})</span></td>
+                <td class="numeric-cell"><input type="number" value="${row.no_of_resource || 1}" onchange="updateImpl(${idx}, 'no_of_resource', parseInt(this.value))"></td>
+                <td><input type="text" value="${escapeHtml(row.location)}" onchange="updateImpl(${idx}, 'location', this.value)"></td>
+                <td><select onchange="updateImpl(${idx}, 'workplace_type', this.value)"><option value="Onsite" ${row.workplace_type === 'Onsite' ? 'selected' : ''}>Onsite</option><option value="Remote" ${row.workplace_type === 'Remote' ? 'selected' : ''}>Remote</option><option value="Hybrid" ${row.workplace_type === 'Hybrid' ? 'selected' : ''}>Hybrid</option></select></td>
+                <td class="numeric-cell"><input type="number" step="1" min="0" max="100" value="${row.allocation || 100}" onchange="updateImpl(${idx}, 'allocation', parseFloat(this.value))"></td>
+                <td class="numeric-cell"><input type="number" step="1" min="0" value="${row.days || 1}" onchange="updateImpl(${idx}, 'days', parseFloat(this.value))"></td>
+                <td class="numeric-cell"><input type="number" step="1" min="0" value="${row.months || 1}" onchange="updateImpl(${idx}, 'months', parseFloat(this.value))"></td>
+                <td class="total-cell numeric-cell">${formatUSD(total)}<br><span style="font-size:10px;">${formatConverted(totalConverted)}</span></td>
+                <td><button class="btn-remove" onclick="removeImpl(${idx})">✖</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+        updateTotals();
+    }
+
+    function renderSwTable() {
+        const tbody = document.getElementById('swBody');
+        if (swRows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state-message">No software items yet. Click the button below to add.</td></tr>';
+            updateTotals(); return;
+        }
+        tbody.innerHTML = '';
+        swRows.forEach((row, idx) => {
+            const total = calculateSwTotal(row);
+            const totalConverted = convertCurrency(total);
+            const priceConverted = convertCurrency(row.unit_price || 0);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" value="${escapeHtml(row.description)}" onchange="updateSw(${idx}, 'description', this.value)"></td>
+                <td class="numeric-cell"><input type="number" value="${row.qty || 1}" onchange="updateSw(${idx}, 'qty', parseInt(this.value))"></td>
+                <td class="numeric-cell"><input type="number" step="0.01" value="${row.unit_price || 0}" onchange="updateSw(${idx}, 'unit_price', parseFloat(this.value))"> <span style="font-size:10px;">(${formatConverted(priceConverted)})</span></td>
+                <td class="numeric-cell"><input type="number" step="1" min="1" value="${row.years || 1}" onchange="updateSw(${idx}, 'years', parseFloat(this.value))"></td>
+                <td class="total-cell numeric-cell">${formatUSD(total)}<br><span style="font-size:10px;">${formatConverted(totalConverted)}</span></td>
+                <td><button class="btn-remove" onclick="removeSw(${idx})">✖</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+        updateTotals();
+    }
+
+    function renderLogTable() {
+        const tbody = document.getElementById('logBody');
+        if (logRows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="12" class="empty-state-message">No logistics items yet. Click the button below to add.</td></tr>';
+            updateTotals(); return;
+        }
+        tbody.innerHTML = '';
+        logRows.forEach((row, idx) => {
+            const total = calculateLogTotal(row);
+            const totalConverted = convertCurrency(total);
+            const perDiemConverted = convertCurrency(row.per_diem || 0);
+            const accommodationConverted = convertCurrency(row.accommodation || 0);
+            const transportConverted = convertCurrency(row.transport_per_day || 0);
+            const flightConverted = convertCurrency(row.flight_cost || 0);
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" value="${escapeHtml(row.role)}" onchange="updateLog(${idx}, 'role', this.value)" style="width:100px"></td>
+                <td><input type="text" value="${escapeHtml(row.consultant_name)}" onchange="updateLog(${idx}, 'consultant_name', this.value)" style="width:120px"></td>
+                <td><input type="text" value="${escapeHtml(row.location_base)}" onchange="updateLog(${idx}, 'location_base', this.value)" style="width:100px"></td>
+                <td class="numeric-cell"><input type="number" value="${row.no_of_resources || 1}" onchange="updateLog(${idx}, 'no_of_resources', parseInt(this.value))"></td>
+                <td class="numeric-cell"><input type="number" value="${row.round_trips || 0}" onchange="updateLog(${idx}, 'round_trips', parseInt(this.value))"></td>
+                <td class="numeric-cell"><input type="number" value="${row.days_onsite || 0}" onchange="updateLog(${idx}, 'days_onsite', parseInt(this.value))"></td>
+                <td class="numeric-cell"><input type="number" step="0.01" value="${row.per_diem || 0}" onchange="updateLog(${idx}, 'per_diem', parseFloat(this.value))"><br><span style="font-size:10px;">(${formatConverted(perDiemConverted)})</span></td>
+                <td class="numeric-cell"><input type="number" step="0.01" value="${row.accommodation || 0}" onchange="updateLog(${idx}, 'accommodation', parseFloat(this.value))"><br><span style="font-size:10px;">(${formatConverted(accommodationConverted)})</span></td>
+                <td class="numeric-cell"><input type="number" step="0.01" value="${row.transport_per_day || 0}" onchange="updateLog(${idx}, 'transport_per_day', parseFloat(this.value))"><br><span style="font-size:10px;">(${formatConverted(transportConverted)})</span></td>
+                <td class="numeric-cell"><input type="number" step="0.01" value="${row.flight_cost || 0}" onchange="updateLog(${idx}, 'flight_cost', parseFloat(this.value))"><br><span style="font-size:10px;">(${formatConverted(flightConverted)})</span></td>
+                <td class="total-cell numeric-cell">${formatUSD(total)}<br><span style="font-size:10px;">${formatConverted(totalConverted)}</span></td>
+                <td><button class="btn-remove" onclick="removeLog(${idx})">✖</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+        updateTotals();
+    }
+
+    function addImplRow() { implRows.push({ role: "", rate: 0, no_of_resource: 1, location: "", workplace_type: "Remote", allocation: 100, days: 1, months: 1 }); renderImplTable(); }
+    function updateImpl(idx, field, value) { implRows[idx][field] = value; renderImplTable(); }
+    function removeImpl(idx) { implRows.splice(idx, 1); renderImplTable(); }
+
+    function addSwRow() { swRows.push({ description: "", qty: 1, unit_price: 0, years: 1 }); renderSwTable(); }
+    function updateSw(idx, field, value) { swRows[idx][field] = value; renderSwTable(); }
+    function removeSw(idx) { swRows.splice(idx, 1); renderSwTable(); }
+
+    function addLogRow() { logRows.push({ role: "", consultant_name: "", location_base: "", no_of_resources: 1, round_trips: 0, days_onsite: 0, per_diem: 0, accommodation: 0, transport_per_day: 0, flight_cost: 0 }); renderLogTable(); }
+    function updateLog(idx, field, value) { logRows[idx][field] = value; renderLogTable(); }
+    function removeLog(idx) { logRows.splice(idx, 1); renderLogTable(); }
+
+    async function loadProject(projectId) {
+        try {
+            const response = await fetch(`${BASE_PATH}/api/projects/${projectId}`);
+            if (response.ok) {
+                const project = await response.json();
+                currentProjectId = project.id;
+                document.getElementById('projectName').value = project.project_name;
+                document.getElementById('annualMaintenance').value = project.annual_maintenance_cost || 0;
+                document.getElementById('expectedAnnualBenefit').value = project.expected_annual_benefit || '';
+                document.getElementById('projectLifetimeYears').value = project.project_lifetime_years || '';
+                document.getElementById('discountRate').value = project.discount_rate || '';
+                implRows = project.implementation_items || [];
+                swRows = project.software_items || [];
+                logRows = project.logistics_items || [];
+                if (project.markup_percentages) {
+                    implMarkup = project.markup_percentages.implementation || 0;
+                    swMarkup = project.markup_percentages.software || 0;
+                    logMarkup = project.markup_percentages.logistics || 0;
+                    maintMarkup = project.markup_percentages.maintenance || 0;
+                }
+                if (project.currency_code) {
+                    displayCurrencyCode = project.currency_code;
+                    displayCurrencySymbol = currencySymbols[displayCurrencyCode];
+                    exchangeRate = project.exchange_rate || 1;
+                    document.getElementById('displayCurrency').value = displayCurrencyCode;
+                    document.getElementById('exchangeRate').value = exchangeRate;
+                }
+                refreshAllMarkupDisplays();
+                updateTableHeaders();
+                renderImplTable();
+                renderSwTable();
+                renderLogTable();
+                updateTotals();
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    function viewAllProjects() { window.location.href = `${BASE_PATH}/projects`; }
+
+    function newProject() {
+        if (confirm('Create a new project? Current unsaved data will be lost.')) {
+            currentProjectId = null;
+            implRows = []; swRows = []; logRows = [];
+            document.getElementById('projectName').value = "";
+            document.getElementById('annualMaintenance').value = 0;
+            document.getElementById('expectedAnnualBenefit').value = '';
+            document.getElementById('projectLifetimeYears').value = '';
+            document.getElementById('discountRate').value = '';
+            implMarkup = 0; swMarkup = 0; logMarkup = 0; maintMarkup = 0;
+            displayCurrencyCode = 'USD'; displayCurrencySymbol = '$'; exchangeRate = 1;
+            document.getElementById('displayCurrency').value = 'USD';
+            document.getElementById('exchangeRate').value = 1;
+            refreshAllMarkupDisplays();
+            updateTableHeaders();
+            renderImplTable(); renderSwTable(); renderLogTable();
+            window.history.pushState({}, '', `${BASE_PATH}/`);
+        }
+    }
+
+    async function saveProject() {
+        const payload = {
+            id: currentProjectId,
+            project_name: document.getElementById('projectName').value,
+            implementation_items: implRows,
+            software_items: swRows,
+            logistics_items: logRows,
+            annual_maintenance_cost: parseFloat(document.getElementById('annualMaintenance').value) || 0,
+            expected_annual_benefit: parseFloat(document.getElementById('expectedAnnualBenefit').value) || 0,
+            project_lifetime_years: parseFloat(document.getElementById('projectLifetimeYears').value) || 0,
+            discount_rate: parseFloat(document.getElementById('discountRate').value) || 0,
+            markup_percentages: { implementation: implMarkup, software: swMarkup, logistics: logMarkup, maintenance: maintMarkup },
+            currency_code: displayCurrencyCode,
+            currency_symbol: displayCurrencySymbol,
+            exchange_rate: exchangeRate
+        };
+        try {
+            const res = await fetch(`${BASE_PATH}/api/projects`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            currentProjectId = data.id;
+            alert(`✅ Project "${data.project_name}" saved successfully!`);
+        } catch(e) {
+            alert("Save failed. Make sure server is running.");
+        }
+    }
+
+    function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => { switchTab(btn.getAttribute('data-tab')); });
+    });
+
+    document.getElementById('annualMaintenance').addEventListener('input', updateTotals);
+    document.getElementById('expectedAnnualBenefit').addEventListener('input', updateROI);
+    document.getElementById('projectLifetimeYears').addEventListener('input', updateROI);
+    document.getElementById('discountRate').addEventListener('input', updateROI);
+    document.getElementById('displayCurrency').addEventListener('change', updateGlobalCurrency);
+    document.getElementById('exchangeRate').addEventListener('input', updateGlobalCurrency);
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('id')) {
+        loadProject(urlParams.get('id'));
+    } else {
+        updateTableHeaders();
+        renderImplTable(); renderSwTable(); renderLogTable();
+    }
+</script>
+</body>
+</html>

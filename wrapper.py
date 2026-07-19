@@ -9,10 +9,20 @@ import sqlite3
 
 from extensions import db, migrate
 
+# ============================================================
+# IMPORTANT: Set BASE_PATH before importing any apps
+# This tells each app what subpath it's mounted under
+# ============================================================
+os.environ['BASE_PATH'] = '/app5'
+# ============================================================
+
+# Now import the apps - they will see the BASE_PATH environment variable
 from app1.app import app as app1
 from app2.app import app as app2
 from app3.app import app as app3
 from app4.app import app as app4
+from app5.app import app as app5
+
 
 # ========== APP CONFIGURATION ==========
 # Define all available apps in one place - Add new apps here!
@@ -44,6 +54,13 @@ AVAILABLE_APPS = {
         'color': 'warning',
         'description': 'Payment Voucher System',
         'route': '/app4/'
+    },
+    'app5': {
+        'name': 'Projects',
+        'icon': 'fa-tasks',
+        'color': 'success',
+        'description': 'Project Costing System',
+        'route': '/app5/'
     }
 }
 
@@ -593,10 +610,12 @@ application = DispatcherMiddleware(
         "/app2": app2,
         "/app3": app3,
         "/app4": app4,
+        "/app5": app5,
     }
 )
 
 app = application
+
 
 if __name__ == "__main__":
     from werkzeug.serving import run_simple

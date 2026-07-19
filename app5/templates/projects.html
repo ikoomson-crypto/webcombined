@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Projects - Project Costing System</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; }
+
+        .company-header {
+            background: linear-gradient(135deg, #1e3c72, #2c3e50);
+            border-radius: 16px;
+            padding: 15px 25px;
+            margin-bottom: 20px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .company-logo-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .company-logo {
+            background: rgba(255,255,255,0.2);
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        .company-name {
+            margin: 0;
+            font-size: 18px;
+        }
+        .company-system {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        .company-address {
+            text-align: right;
+            font-size: 11px;
+            margin: 0;
+        }
+        .company-contact {
+            margin: 3px 0 0 0;
+            font-size: 11px;
+        }
+
+        .user-bar {
+            background: white;
+            border-radius: 16px;
+            padding: 12px 25px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .welcome-text {
+            font-size: 14px;
+            color: #666;
+        }
+        .username {
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        .btn-dashboard {
+            background: #667eea;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-dashboard:hover {
+            background: #5a67d8;
+        }
+        .btn-admin {
+            background: #f39c12;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-admin:hover {
+            background: #e67e22;
+        }
+        .btn-logout {
+            background: #e74c3c;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-logout:hover {
+            background: #c0392b;
+        }
+        .btn-back {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-back:hover { background: #2980b9; }
+
+        .role-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .role-admin { background: #e74c3c; color: white; }
+        .role-ceo { background: #8e44ad; color: white; }
+        .role-procurement { background: #27ae60; color: white; }
+        .role-technical_lead { background: #2980b9; color: white; }
+        .role-viewer { background: #f39c12; color: white; }
+        .role-user { background: #3498db; color: white; }
+
+        .stats {
+            background: linear-gradient(135deg, #1e3c72, #2c3e50);
+            border-radius: 16px;
+            padding: 15px 25px;
+            margin-bottom: 25px;
+            color: white;
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .stat-item { font-size: 14px; }
+        .stat-value { font-size: 28px; font-weight: bold; margin-top: 5px; }
+
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .search-bar {
+            flex: 2;
+        }
+        .search-bar input {
+            width: 100%;
+            padding: 12px 20px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            font-size: 14px;
+        }
+        .currency-filter {
+            flex: 1;
+        }
+        .currency-filter select {
+            width: 100%;
+            padding: 12px 20px;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .projects-table-container {
+            background: white;
+            border-radius: 16px;
+            padding: 0;
+            overflow-x: auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .projects-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .projects-table th {
+            background: #1e3c72;
+            color: white;
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .projects-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+
+        .projects-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .project-name {
+            font-weight: 600;
+            color: #1e3c72;
+            text-decoration: none;
+        }
+
+        .project-name:hover {
+            text-decoration: underline;
+        }
+
+        .currency-badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2c3e50;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .grand-total {
+            font-weight: bold;
+            color: #1e3c72;
+            font-size: 16px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn-action {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-edit {
+            background: #3498db;
+            color: white;
+        }
+        .btn-edit:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-delete:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        .btn-approve {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-approve:hover {
+            background: #219653;
+            transform: translateY(-2px);
+        }
+
+        .btn-convert {
+            background: #f39c12;
+            color: white;
+        }
+        .btn-convert:hover {
+            background: #e67e22;
+            transform: translateY(-2px);
+        }
+
+        .btn-pdf {
+            background: #e67e22;
+            color: white;
+        }
+        .btn-pdf:hover {
+            background: #d35400;
+            transform: translateY(-2px);
+        }
+
+        .approval-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-approved { background: #27ae60; color: white; }
+        .status-pending { background: #f39c12; color: white; }
+        .status-rejected { background: #e74c3c; color: white; }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 16px;
+        }
+        .empty-state h3 { color: #666; margin-bottom: 10px; }
+        .empty-state p { color: #999; }
+        .btn-new {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        .btn-new:hover { background: #219653; }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            width: 90%;
+            max-width: 450px;
+        }
+        .modal-content h3 {
+            margin-bottom: 20px;
+            color: #1e3c72;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .form-group select, .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .modal-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        @media (max-width: 1000px) {
+            .projects-table {
+                font-size: 12px;
+            }
+            .projects-table th,
+            .projects-table td {
+                padding: 8px;
+            }
+            .action-buttons {
+                flex-direction: column;
+            }
+            .btn-action {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="company-header">
+        <div class="company-logo-area">
+            {% if settings and settings.logo_filename and settings.logo_filename != '' %}
+            <img src="{{ base_path }}/static/{{ settings.logo_filename }}" alt="Logo" style="height: 50px; width: auto; border-radius: 10px;">
+            {% else %}
+            <div class="company-logo">🏢</div>
+            {% endif %}
+            <div>
+                <h2 class="company-name">{{ settings.company_name if settings else 'Your Company Name' }}</h2>
+                <p class="company-system">{{ settings.system_name if settings else 'Project Costing System' }}</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <p class="company-address">{{ settings.company_address if settings else '123 Business Street, City, State 12345' }}</p>
+            <p class="company-contact">📞 {{ settings.company_phone if settings else '+1 (555) 123-4567' }} | ✉️ {{ settings.company_email if settings else 'info@yourcompany.com' }}</p>
+        </div>
+    </div>
+
+    <div class="user-bar">
+        <div class="user-info">
+            <span class="welcome-text">Welcome,</span>
+            <span class="username">{{ user }}</span>
+            <span class="role-badge role-{{ role }}">{{ role|replace('_', ' ') }}</span>
+            <a href="{{ base_path }}/dashboard" class="btn-dashboard">📊 Dashboard</a>
+            {% if role == 'admin' %}
+                <a href="{{ base_path }}/admin" class="btn-admin">⚙️ Admin Panel</a>
+            {% endif %}
+        </div>
+        <div style="display: flex; gap: 10px;">
+            {% if role not in ['technical_lead', 'ceo', 'viewer'] %}
+                <a href="{{ base_path }}/" class="btn-back">✏️ Data Entry</a>
+            {% else %}
+                <span class="btn-back" style="background: #95a5a6; cursor: not-allowed;">🚫 Data Entry (Access Denied)</span>
+            {% endif %}
+            <a href="{{ base_path }}/logout" class="btn-logout">🚪 Logout</a>
+        </div>
+    </div>
+
+    <div class="stats" id="stats">
+        <div class="stat-item">Total Projects<br><span class="stat-value" id="totalProjects">0</span></div>
+        <div class="stat-item">Combined Value<br><span class="stat-value" id="totalValue">$0</span></div>
+        <div class="stat-item">Pending Approval<br><span class="stat-value" id="pendingCount">0</span></div>
+        <div class="stat-item">Average ROI<br><span class="stat-value" id="avgROI">0%</span></div>
+    </div>
+
+    <div class="filter-bar">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Search by project name..." onkeyup="filterProjects()">
+        </div>
+        <div class="currency-filter">
+            <select id="currencyFilter" onchange="filterProjects()">
+                <option value="">All Currencies</option>
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="GHS">GHS (₵)</option>
+                <option value="NGN">NGN (₦)</option>
+                <option value="ZAR">ZAR (R)</option>
+                <option value="CAD">CAD ($)</option>
+                <option value="AUD">AUD ($)</option>
+                <option value="JPY">JPY (¥)</option>
+                <option value="CNY">CNY (¥)</option>
+                <option value="INR">INR (₹)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="projects-table-container">
+        <div id="projectsContainer">
+            <div class="loading"><div class="spinner"></div>Loading projects...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Approval Modal -->
+<div id="approvalModal" class="modal">
+    <div class="modal-content">
+        <h3>Approve / Reject Project</h3>
+        <input type="hidden" id="approvalProjectId">
+        <div class="form-group">
+            <label>Comments (Optional)</label>
+            <textarea id="approvalComments" rows="3"></textarea>
+        </div>
+        <div class="modal-buttons">
+            <button class="btn-approve" onclick="submitApproval('approved')">✓ Approve</button>
+            <button style="background:#e74c3c; color:white;" onclick="submitApproval('rejected')">✗ Reject</button>
+            <button style="background:#95a5a6; color:white;" onclick="closeApprovalModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Convert Currency Modal -->
+<div id="convertModal" class="modal">
+    <div class="modal-content">
+        <h3>Convert Project Currency</h3>
+        <input type="hidden" id="convertProjectId">
+        <div class="form-group">
+            <label>Target Currency</label>
+            <select id="targetCurrency">
+                <option value="USD">USD ($)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="GHS">GHS (₵)</option>
+                <option value="NGN">NGN (₦)</option>
+                <option value="ZAR">ZAR (R)</option>
+                <option value="CAD">CAD ($)</option>
+                <option value="AUD">AUD ($)</option>
+                <option value="JPY">JPY (¥)</option>
+                <option value="CNY">CNY (¥)</option>
+                <option value="INR">INR (₹)</option>
+            </select>
+        </div>
+        <div class="modal-buttons">
+            <button class="btn-convert" onclick="submitConversion()">Convert Project</button>
+            <button style="background:#95a5a6; color:white;" onclick="closeConvertModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Base path for API calls - this is set from the server
+    const BASE_PATH = '{{ base_path }}' || '';
+
+    let allProjects = [];
+
+    const currencySymbols = {
+        'USD': '$', 'EUR': '€', 'GBP': '£', 'GHS': '₵', 'NGN': '₦',
+        'ZAR': 'R', 'CAD': '$', 'AUD': '$', 'JPY': '¥', 'CNY': '¥', 'INR': '₹'
+    };
+
+    function formatCurrency(value, currencyCode = 'USD') {
+        const symbol = currencySymbols[currencyCode] || '$';
+        if (value === undefined || value === null) return symbol + '0.00';
+        if (currencyCode === 'JPY' || currencyCode === 'KRW' || currencyCode === 'VND') {
+            return symbol + Math.round(value).toLocaleString();
+        }
+        return symbol + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function loadProjects() {
+        const container = document.getElementById('projectsContainer');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading projects...</div>';
+
+        try {
+            // Use BASE_PATH for the API call
+            const response = await fetch(`${BASE_PATH}/api/projects`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const projectsData = await response.json();
+            allProjects = Array.isArray(projectsData) ? projectsData : [];
+            displayProjects(allProjects);
+            updateStats(allProjects);
+        } catch (err) {
+            console.error("Error loading projects:", err);
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>❌ Error Loading Projects</h3>
+                    <p>${err.message}</p>
+                    <button onclick="loadProjects()" style="margin-top:15px; padding:8px 20px; background:#3498db; color:white; border:none; border-radius:25px; cursor:pointer;">Retry</button>
+                    <a href="${BASE_PATH}/dashboard" style="margin-top:15px; margin-left:10px; padding:8px 20px; background:#667eea; color:white; border:none; border-radius:25px; cursor:pointer; text-decoration:none; display:inline-block;">Go to Dashboard</a>
+                </div>
+            `;
+        }
+    }
+
+    function updateStats(projects) {
+        document.getElementById('totalProjects').innerText = projects.length;
+        const pendingCount = projects.filter(p => p.approval_status === 'pending').length;
+        document.getElementById('pendingCount').innerText = pendingCount;
+
+        let totalROI = 0;
+        let projectsWithROI = 0;
+        projects.forEach(project => {
+            if (project.roi !== undefined && project.roi !== null && project.roi !== 0) {
+                totalROI += project.roi;
+                projectsWithROI++;
+            }
+        });
+        const avgROI = projectsWithROI > 0 ? totalROI / projectsWithROI : 0;
+        document.getElementById('avgROI').innerHTML = avgROI.toFixed(1) + '%';
+
+        let totalValue = 0;
+        projects.forEach(p => {
+            let implTotal = (p.implementation_items || []).reduce((s, item) => s + ((item.rate || 0) * (item.no_of_resource || 0) * ((item.allocation || 100)/100) * (item.days || 1) * (item.months || 1)), 0);
+            let swTotal = (p.software_items || []).reduce((s, item) => s + ((item.qty || 0) * (item.unit_price || 0) * (item.years || 1)), 0);
+            let logTotal = (p.logistics_items || []).reduce((s, item) => {
+                return s + ((item.no_of_resources || 0) * (item.round_trips || 0) * (item.flight_cost || 0)) +
+                           ((item.no_of_resources || 0) * (item.days_onsite || 0) * (item.transport_per_day || 0)) +
+                           ((item.no_of_resources || 0) * (item.days_onsite || 0) * (item.per_diem || 0)) +
+                           ((item.no_of_resources || 0) * (item.days_onsite || 0) * (item.accommodation || 0));
+            }, 0);
+            let maint = p.annual_maintenance_cost || 0;
+            let markups = p.markup_percentages || { implementation: 0, software: 0, logistics: 0, maintenance: 0 };
+
+            implTotal = implTotal * (1 + (markups.implementation || 0) / 100);
+            swTotal = swTotal * (1 + (markups.software || 0) / 100);
+            logTotal = logTotal * (1 + (markups.logistics || 0) / 100);
+            maint = maint * (1 + (markups.maintenance || 0) / 100);
+
+            totalValue += implTotal + swTotal + logTotal + maint;
+        });
+        document.getElementById('totalValue').innerHTML = formatCurrency(totalValue);
+    }
+
+    function calculateGrandTotal(project) {
+        let implTotal = (project.implementation_items || []).reduce((s, item) => s + ((item.rate || 0) * (item.no_of_resource || 0) * ((item.allocation || 100)/100) * (item.days || 1) * (item.months || 1)), 0);
+        let swTotal = (project.software_items || []).reduce((s, item) => s + ((item.qty || 0) * (item.unit_price || 0) * (item.years || 1)), 0);
+        let logTotal = (project.logistics_items || []).reduce((s, item) => {
+            return s + ((item.no_of_resources || 0) * (item.round_trips || 0) * (item.flight_cost || 0)) +
+                       ((item.no_of_resources || 0) * (item.days_onsite || 0) * (item.transport_per_day || 0)) +
+                       ((item.no_of_resources || 0) * (item.days_onsite || 0) * (item.per_diem || 0)) +
+                       ((item.no_of_resources || 0) * (item.days_onsite || 0) * (item.accommodation || 0));
+        }, 0);
+        let maint = project.annual_maintenance_cost || 0;
+        let markups = project.markup_percentages || { implementation: 0, software: 0, logistics: 0, maintenance: 0 };
+
+        implTotal = implTotal * (1 + (markups.implementation || 0) / 100);
+        swTotal = swTotal * (1 + (markups.software || 0) / 100);
+        logTotal = logTotal * (1 + (markups.logistics || 0) / 100);
+        maint = maint * (1 + (markups.maintenance || 0) / 100);
+
+        return implTotal + swTotal + logTotal + maint;
+    }
+
+    function getStatusClass(status) {
+        switch(status) {
+            case 'approved': return 'status-approved';
+            case 'rejected': return 'status-rejected';
+            default: return 'status-pending';
+        }
+    }
+
+    function openApprovalModal(projectId) {
+        document.getElementById('approvalProjectId').value = projectId;
+        document.getElementById('approvalComments').value = '';
+        document.getElementById('approvalModal').style.display = 'flex';
+    }
+
+    function closeApprovalModal() {
+        document.getElementById('approvalModal').style.display = 'none';
+    }
+
+    function openConvertModal(projectId) {
+        document.getElementById('convertProjectId').value = projectId;
+        document.getElementById('convertModal').style.display = 'flex';
+    }
+
+    function closeConvertModal() {
+        document.getElementById('convertModal').style.display = 'none';
+    }
+
+    async function submitApproval(status) {
+        const projectId = document.getElementById('approvalProjectId').value;
+        const comments = document.getElementById('approvalComments').value;
+
+        try {
+            // Use BASE_PATH for the API call
+            const response = await fetch(`${BASE_PATH}/api/projects/${projectId}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: status, comments: comments })
+            });
+            if (response.ok) {
+                closeApprovalModal();
+                loadProjects();
+                alert(`Project ${status === 'approved' ? 'approved' : 'rejected'} successfully!`);
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Error updating approval status');
+            }
+        } catch (err) {
+            alert('Error updating approval status');
+        }
+    }
+
+    async function submitConversion() {
+        const projectId = document.getElementById('convertProjectId').value;
+        const targetCurrency = document.getElementById('targetCurrency').value;
+
+        if (!confirm(`Convert this project to ${targetCurrency}? All consultant rates, software prices, and logistics costs will be converted.`)) {
+            return;
+        }
+
+        try {
+            // Use BASE_PATH for the API call
+            const response = await fetch(`${BASE_PATH}/api/projects/${projectId}/convert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ currency_code: targetCurrency })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                closeConvertModal();
+                loadProjects();
+                alert(`Project successfully converted to ${targetCurrency}`);
+            } else {
+                alert('Error converting currency: ' + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            alert('Error converting currency');
+        }
+    }
+
+    function filterProjects() {
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        const currencyFilter = document.getElementById('currencyFilter').value;
+
+        let filtered = allProjects.filter(p => (p.project_name || '').toLowerCase().includes(searchTerm));
+
+        if (currencyFilter) {
+            filtered = filtered.filter(p => (p.currency_code || 'USD') === currencyFilter);
+        }
+
+        displayProjects(filtered);
+    }
+
+    function displayProjects(projects) {
+        const container = document.getElementById('projectsContainer');
+
+        if (projects.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <h3>📭 No projects found</h3>
+                    <p>Try adjusting your search or filter criteria.</p>
+                    <a href="${BASE_PATH}/" class="btn-new">+ Create New Project</a>
+                </div>
+            `;
+            return;
+        }
+
+        let tableHTML = `
+            <table class="projects-table">
+                <thead>
+                    <tr>
+                        <th>Project Name</th>
+                        <th>Grand Total</th>
+                        <th>Edit</th>
+                        <th>Delete</th>
+                        <th>Approve/Reject</th>
+                        <th>Convert Currency</th>
+                        <th>PDF Report</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        projects.forEach(project => {
+            const grandTotal = calculateGrandTotal(project);
+            const currencyCode = project.currency_code || 'USD';
+            const statusClass = getStatusClass(project.approval_status || 'pending');
+            const statusText = (project.approval_status || 'pending').toUpperCase();
+
+            tableHTML += `
+                <tr>
+                    <td>
+                        <a href="${BASE_PATH}/?id=${project.id}" class="project-name">
+                            📌 ${escapeHtml(project.project_name || 'Unnamed Project')}
+                        </a>
+                        <span class="currency-badge">${currencyCode}</span>
+                        <br>
+                        <span class="approval-status ${statusClass}" style="margin-top: 5px; display: inline-block;">${statusText}</span>
+                    </td>
+                    <td class="grand-total">${formatCurrency(grandTotal, currencyCode)}</td>
+                    <td>
+                        ${project.can_edit ?
+                            `<button class="btn-action btn-edit" onclick="editProject('${project.id}')">✏️ Edit</button>` :
+                            '<span style="color:#999; font-size:11px;">No access</span>'}
+                    </td>
+                    <td>
+                        ${project.can_delete ?
+                            `<button class="btn-action btn-delete" onclick="deleteProject('${project.id}')">🗑️ Delete</button>` :
+                            '<span style="color:#999; font-size:11px;">No access</span>'}
+                    </td>
+                    <td>
+                        ${project.can_approve ?
+                            `<button class="btn-action btn-approve" onclick="openApprovalModal('${project.id}')">✓ Approve/Reject</button>` :
+                            '<span style="color:#999; font-size:11px;">No access</span>'}
+                    </td>
+                    <td>
+                        ${project.can_edit ?
+                            `<button class="btn-action btn-convert" onclick="openConvertModal('${project.id}')">💱 Convert</button>` :
+                            '<span style="color:#999; font-size:11px;">No access</span>'}
+                    </td>
+                    <td>
+                        <button class="btn-action btn-pdf" onclick="downloadPDF('${project.id}')">📄 PDF</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tableHTML += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = tableHTML;
+    }
+
+    function downloadPDF(projectId) {
+        window.location.href = `${BASE_PATH}/report/${projectId}`;
+    }
+
+    function editProject(projectId) {
+        window.location.href = `${BASE_PATH}/?id=${projectId}`;
+    }
+
+    async function deleteProject(projectId) {
+        if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+            try {
+                // Use BASE_PATH for the API call
+                const response = await fetch(`${BASE_PATH}/api/projects/${projectId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadProjects();
+                    alert('Project deleted successfully!');
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Error deleting project');
+                }
+            } catch (err) {
+                alert('Error deleting project');
+            }
+        }
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Click outside modal to close
+    window.onclick = function(event) {
+        const approvalModal = document.getElementById('approvalModal');
+        const convertModal = document.getElementById('convertModal');
+        if (event.target === approvalModal) closeApprovalModal();
+        if (event.target === convertModal) closeConvertModal();
+    }
+
+    loadProjects();
+</script>
+</body>
+</html>

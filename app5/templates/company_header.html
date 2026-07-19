@@ -1,0 +1,18 @@
+<!-- templates/company_header.html -->
+<div class="company-header" style="background: linear-gradient(135deg, #1e3c72, #2c3e50); border-radius: 16px; padding: 20px 25px; margin-bottom: 20px; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div style="display: flex; align-items: center; gap: 20px;">
+        {% if logo_exists %}
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Company Logo" style="height: 60px; width: auto; border-radius: 10px;">
+        {% else %}
+        <div style="background: rgba(255,255,255,0.2); width: 60px; height: 60px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 30px;">🏢</div>
+        {% endif %}
+        <div>
+            <h2 style="margin: 0; font-size: 20px;">{{ company_name }}</h2>
+            <p style="margin: 5px 0 0 0; font-size: 12px; opacity: 0.8;">Project Costing System</p>
+        </div>
+    </div>
+    <div style="text-align: right; font-size: 12px;">
+        <p style="margin: 0;">{{ company_address }}</p>
+        <p style="margin: 5px 0 0 0;">📞 {{ company_phone }} | ✉️ {{ company_email }}</p>
+    </div>
+</div>
