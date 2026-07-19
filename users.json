@@ -1,0 +1,13 @@
+[
+  {
+    "id": "c6d7a73b-c4a0-4e8a-9dab-d20aabaae2ea",
+    "username": "admin",
+    "password_hash": "scrypt:32768:8:1$EnwD86VQW5bnDkbm$691d63372a0e734f407ef819ec51a085c1e25f226a7970ee51b433874b97711b6fd0eb7b4404c2a3350842f874712b32138feaa01b14faccbb6e081c034c81ce",
+    "email": "",
+    "full_name": "",
+    "role": "user",
+    "created_date": "2026-07-17T14:48:31.206497",
+    "last_login": "2026-07-17T23:20:19.578209",
+    "is_active": true
+  }
+]
