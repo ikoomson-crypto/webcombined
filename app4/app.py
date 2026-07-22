@@ -357,23 +357,27 @@ class Company(db.Model):
 
 class User(db.Model):
     __tablename__ = 'users'
+    __table_args__ = {'extend_existing': True}
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     email = db.Column(db.String(120))
     full_name = db.Column(db.String(120))
     role = db.Column(db.String(50), default='user')
-    company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
+    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=True)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
 
-    customers = db.relationship('Customer', backref='creator', lazy=True)
-    invoices = db.relationship('Invoice', backref='created_by_user', lazy=True)
-
+    # This relationship should work if Customer has a foreign key to User
+    customers = db.relationship('Customer', backref='creator', lazy=True, foreign_keys='Customer.created_by')
+    invoices = db.relationship('Invoice', backref='created_by_user', lazy=True, foreign_keys='Invoice.created_by')
 
 class Customer(db.Model):
     __tablename__ = 'customers'
+    __table_args__ = {'extend_existing': True}
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     email = db.Column(db.String(120))
@@ -382,10 +386,10 @@ class Customer(db.Model):
     tax_id = db.Column(db.String(50))
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    # This needs to be a ForeignKey to users.id
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
     invoices = db.relationship('Invoice', backref='customer', lazy=True)
-
 
 class Invoice(db.Model):
     __tablename__ = 'invoices'
