@@ -372,6 +372,7 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
 
+
 class Customer(db.Model):
     __tablename__ = 'customers'
     __table_args__ = {'extend_existing': True}
@@ -384,8 +385,8 @@ class Customer(db.Model):
     tax_id = db.Column(db.String(50))
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    # This needs to be a ForeignKey to users.id
-    created_by = db.Column(db.String(36), nullable=True)  # UUID is 36 characters
+    created_by = db.Column(db.String(36), nullable=True)  # Store UUID as string
+
     invoices = db.relationship('Invoice', backref='customer', lazy=True)
 
 class Invoice(db.Model):
