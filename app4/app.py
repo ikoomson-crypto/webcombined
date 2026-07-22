@@ -306,7 +306,10 @@ def init_db():
         if User.query.count() == 0:
             active_company = get_active_company()
             if active_company:
+                # Use a proper UUID for the admin user
+                import uuid
                 admin = User(
+                    id=str(uuid.uuid4()),  # Generate a UUID
                     username='admin',
                     password_hash=generate_password_hash('admin123'),
                     email='admin@example.com',
@@ -329,12 +332,11 @@ def init_db():
                     phone='+1 (555) 987-6543',
                     address='456 Client Ave, City, State',
                     company_id=active_company.id,
-                    created_by=admin.id if admin else None
+                    created_by=admin.id if admin else None  # This will be a UUID string
                 )
                 db.session.add(customer)
                 db.session.commit()
                 print('✅ Sample customer created!')
-
 
 # ==================== MODELS ====================
 class Company(db.Model):
@@ -359,7 +361,7 @@ class User(db.Model):
     __tablename__ = 'users'
     __table_args__ = {'extend_existing': True}
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(36), primary_key=True)  # UUID as string
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     email = db.Column(db.String(120))
@@ -369,7 +371,6 @@ class User(db.Model):
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
-
 
 class Customer(db.Model):
     __tablename__ = 'customers'
@@ -384,8 +385,7 @@ class Customer(db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # This needs to be a ForeignKey to users.id
-    created_by = db.Column(db.Integer, nullable=True)
-
+    created_by = db.Column(db.String(36), nullable=True)  # UUID is 36 characters
     invoices = db.relationship('Invoice', backref='customer', lazy=True)
 
 class Invoice(db.Model):
@@ -396,8 +396,7 @@ class Invoice(db.Model):
     invoice_number = db.Column(db.String(50), unique=True, nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
-    created_by = db.Column(db.Integer, nullable=True)  # No ForeignKey
-
+    created_by = db.Column(db.String(36), nullable=True)
     invoice_date = db.Column(db.Date, nullable=False)
     due_date = db.Column(db.Date, nullable=False)
 
@@ -471,8 +470,7 @@ class InvoicePayment(db.Model):
     notes = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    created_by = db.Column(db.Integer, nullable=True)  # No ForeignKey
-
+    created_by = db.Column(db.String(36), nullable=True)
 
 class Supplier(db.Model):
     __tablename__ = 'supplier'
