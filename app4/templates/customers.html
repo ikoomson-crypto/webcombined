@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-people"></i> Customers - {{ company.name }}</h2>
+    <div>
+        <button class="btn btn-primary" onclick="openAddCustomerModal()">
+            <i class="bi bi-plus-circle"></i> Add Customer
+        </button>
+    </div>
+</div>
+
+<!-- Customers Table -->
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-list"></i> Customer List</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover" id="customersTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Address</th>
+                        <th>Tax ID</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="customersBody">
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">Loading customers...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Customer Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="customerModalLabel">
+                    <i class="bi bi-person"></i> Add Customer
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="customerForm">
+                    <input type="hidden" id="customerId" value="">
+
+                    <div class="mb-3">
+                        <label for="customerName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="customerName" placeholder="Enter customer name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customerEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="customerEmail" placeholder="customer@example.com">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customerPhone" class="form-label">Phone</label>
+                        <input type="text" class="form-control" id="customerPhone" placeholder="+1 (555) 123-4567">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customerAddress" class="form-label">Address</label>
+                        <textarea class="form-control" id="customerAddress" rows="2" placeholder="Customer address"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customerTaxId" class="form-label">Tax ID</label>
+                        <input type="text" class="form-control" id="customerTaxId" placeholder="Tax ID / VAT number">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveCustomer()">
+                    <i class="bi bi-save"></i> Save Customer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Base path for API calls
+    const BASE_PATH = '{{ base_path }}' || '';
+
+    // Global variables
+    let customerModal = null;
+    let customers = [];
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Bootstrap modal
+        const modalElement = document.getElementById('customerModal');
+        if (modalElement) {
+            customerModal = new bootstrap.Modal(modalElement);
+        }
+
+        // Load customers
+        loadCustomers();
+
+        // Add event listener for Enter key in modal
+        document.getElementById('customerForm').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveCustomer();
+            }
+        });
+    });
+
+    // Load customers from API
+    async function loadCustomers() {
+        try {
+            const response = await fetch(`${BASE_PATH}/api/customers`);
+            if (!response.ok) {
+                throw new Error('Failed to load customers');
+            }
+            customers = await response.json();
+            renderCustomers();
+        } catch (error) {
+            console.error('Error loading customers:', error);
+            document.getElementById('customersBody').innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-danger">
+                        <i class="bi bi-exclamation-triangle"></i> Error loading customers
+                    </td>
+                </tr>
+            `;
+        }
+    }
+
+    // Render customers in table
+    function renderCustomers() {
+        const tbody = document.getElementById('customersBody');
+
+        if (!customers || customers.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-muted">
+                        <i class="bi bi-info-circle"></i> No customers found. Click "Add Customer" to create one.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = customers.map(customer => `
+            <tr>
+                <td><strong>${escapeHtml(customer.name)}</strong></td>
+                <td>${escapeHtml(customer.email || '-')}</td>
+                <td>${escapeHtml(customer.phone || '-')}</td>
+                <td>${escapeHtml(customer.address || '-')}</td>
+                <td>${escapeHtml(customer.tax_id || '-')}</td>
+                <td>${formatDate(customer.created_at)}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-warning" onclick="editCustomer(${customer.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteCustomer(${customer.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // Open modal to add new customer
+    function openAddCustomerModal() {
+        document.getElementById('customerModalLabel').innerHTML = '<i class="bi bi-person-plus"></i> Add Customer';
+        document.getElementById('customerId').value = '';
+        document.getElementById('customerName').value = '';
+        document.getElementById('customerEmail').value = '';
+        document.getElementById('customerPhone').value = '';
+        document.getElementById('customerAddress').value = '';
+        document.getElementById('customerTaxId').value = '';
+
+        // Remove any existing validation errors
+        document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        if (customerModal) {
+            customerModal.show();
+        } else {
+            // Fallback if modal not initialized
+            const modalElement = document.getElementById('customerModal');
+            if (modalElement) {
+                customerModal = new bootstrap.Modal(modalElement);
+                customerModal.show();
+            }
+        }
+
+        // Focus on name field
+        setTimeout(() => {
+            document.getElementById('customerName').focus();
+        }, 300);
+    }
+
+    // Edit existing customer
+    function editCustomer(id) {
+        const customer = customers.find(c => c.id === id);
+        if (!customer) {
+            showToast('Customer not found', 'error');
+            return;
+        }
+
+        document.getElementById('customerModalLabel').innerHTML = '<i class="bi bi-person"></i> Edit Customer';
+        document.getElementById('customerId').value = customer.id;
+        document.getElementById('customerName').value = customer.name;
+        document.getElementById('customerEmail').value = customer.email || '';
+        document.getElementById('customerPhone').value = customer.phone || '';
+        document.getElementById('customerAddress').value = customer.address || '';
+        document.getElementById('customerTaxId').value = customer.tax_id || '';
+
+        // Remove any existing validation errors
+        document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+        if (customerModal) {
+            customerModal.show();
+        }
+    }
+
+    // Save customer (create or update)
+    async function saveCustomer() {
+        const id = document.getElementById('customerId').value;
+        const name = document.getElementById('customerName').value.trim();
+        const email = document.getElementById('customerEmail').value.trim();
+        const phone = document.getElementById('customerPhone').value.trim();
+        const address = document.getElementById('customerAddress').value.trim();
+        const taxId = document.getElementById('customerTaxId').value.trim();
+
+        // Validate name
+        if (!name) {
+            document.getElementById('customerName').classList.add('is-invalid');
+            showToast('Customer name is required', 'error');
+            document.getElementById('customerName').focus();
+            return;
+        } else {
+            document.getElementById('customerName').classList.remove('is-invalid');
+        }
+
+        // Validate email if provided
+        if (email && !isValidEmail(email)) {
+            document.getElementById('customerEmail').classList.add('is-invalid');
+            showToast('Please enter a valid email address', 'error');
+            document.getElementById('customerEmail').focus();
+            return;
+        } else {
+            document.getElementById('customerEmail').classList.remove('is-invalid');
+        }
+
+        const data = { name, email, phone, address, tax_id: taxId };
+        const url = id ? `${BASE_PATH}/api/customers/${id}` : `${BASE_PATH}/api/customers`;
+        const method = id ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                // Close modal
+                if (customerModal) {
+                    customerModal.hide();
+                }
+
+                // Reload customers
+                await loadCustomers();
+
+                // Show success message
+                showToast(id ? 'Customer updated successfully!' : 'Customer created successfully!', 'success');
+            } else {
+                showToast(result.error || 'Failed to save customer', 'error');
+            }
+        } catch (error) {
+            console.error('Error saving customer:', error);
+            showToast('Error saving customer: ' + error.message, 'error');
+        }
+    }
+
+    // Delete customer
+    async function deleteCustomer(id) {
+        const customer = customers.find(c => c.id === id);
+        if (!customer) return;
+
+        if (!confirm(`Are you sure you want to delete "${customer.name}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${BASE_PATH}/api/customers/${id}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                await loadCustomers();
+                showToast('Customer deleted successfully!', 'success');
+            } else {
+                showToast(result.error || 'Failed to delete customer', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting customer:', error);
+            showToast('Error deleting customer: ' + error.message, 'error');
+        }
+    }
+
+    // Utility functions
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    function showToast(message, type = 'success') {
+        // Check if Swal is available (SweetAlert2)
+        if (typeof Swal !== 'undefined') {
+            const iconMap = {
+                'success': 'success',
+                'error': 'error',
+                'warning': 'warning',
+                'info': 'info'
+            };
+            Swal.fire({
+                icon: iconMap[type] || 'info',
+                title: message,
+                timer: 3000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        } else {
+            // Fallback to basic toast
+            const toast = document.createElement('div');
+            const colors = {
+                'success': '#198754',
+                'error': '#dc3545',
+                'warning': '#ffc107',
+                'info': '#0dcaf0'
+            };
+            toast.style.cssText = `
+                position: fixed; top: 20px; right: 20px;
+                background: ${colors[type] || '#198754'};
+                color: ${type === 'warning' ? '#000' : '#fff'};
+                padding: 12px 24px;
+                border-radius: 8px;
+                z-index: 9999;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                animation: slideIn 0.3s ease;
+                max-width: 400px;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    }
+</script>
+
+<style>
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .table td {
+        vertical-align: middle;
+    }
+
+    .modal-header .btn-close {
+        filter: brightness(0) invert(1);
+    }
+
+    .is-invalid {
+        border-color: #dc3545 !important;
+    }
+
+    .is-invalid:focus {
+        box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
+    }
+</style>
+{% endblock %}

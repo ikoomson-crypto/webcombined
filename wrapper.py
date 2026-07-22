@@ -10,19 +10,32 @@ import sqlite3
 from extensions import db, migrate
 
 # ============================================================
-# IMPORTANT: Set BASE_PATH before importing any apps
-# This tells each app what subpath it's mounted under
-# ============================================================
-os.environ['BASE_PATH'] = '/app5'
+# IMPORTANT: Set BASE_PATH for each app before importing
+# Each app needs to know its own mount path
 # ============================================================
 
-# Now import the apps - they will see the BASE_PATH environment variable
+# First, import app1 with its base path
+os.environ['BASE_PATH'] = '/app1'
 from app1.app import app as app1
+
+# Import app2 with its base path
+os.environ['BASE_PATH'] = '/app2'
 from app2.app import app as app2
+
+# Import app3 with its base path
+os.environ['BASE_PATH'] = '/app3'
 from app3.app import app as app3
+
+# Import app4 with its base path (Payment System)
+os.environ['BASE_PATH'] = '/app4'
 from app4.app import app as app4
+
+# Import app5 with its base path (Projects)
+os.environ['BASE_PATH'] = '/app5'
 from app5.app import app as app5
 
+# Reset BASE_PATH to default (optional)
+os.environ['BASE_PATH'] = ''
 
 # ========== APP CONFIGURATION ==========
 # Define all available apps in one place - Add new apps here!
@@ -49,10 +62,10 @@ AVAILABLE_APPS = {
         'route': '/app3/'
     },
     'app4': {
-        'name': 'Payment Voucher',
+        'name': 'Billing and Payment Platform',
         'icon': 'fa-money-bill-wave',
         'color': 'warning',
-        'description': 'Payment Voucher System',
+        'description': 'Payment Voucher System with Invoicing',
         'route': '/app4/'
     },
     'app5': {
@@ -138,10 +151,8 @@ class UserAppAccess(db.Model):
 
 
 # ========== DATABASE MIGRATION HELPER ==========
-def migrate_database():
+def migrate_database(db_path):
     """Add missing columns to existing database"""
-    db_path = os.path.join(os.path.dirname(__file__), 'auth.db')
-
     if not os.path.exists(db_path):
         return
 
@@ -233,18 +244,18 @@ def create_app():
     flask_app = Flask(__name__)
 
     # ===== DATABASE CONFIGURATION FOR AUTH =====
-    # MUST BE SET BEFORE db.init_app()
-    if os.environ.get('DATABASE_URL_AUTH'):
-        # Use PostgreSQL on Render
-        database_url = os.environ.get('DATABASE_URL_AUTH')
+    # Use the same DATABASE_URL as the apps
+    if os.environ.get('DATABASE_URL'):
+        database_url = os.environ.get('DATABASE_URL')
         if database_url and database_url.startswith('postgres://'):
             database_url = database_url.replace('postgres://', 'postgresql://', 1)
         flask_app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        print(f"✅ Auth using PostgreSQL on Render")
+        print(f"✅ Auth using shared PostgreSQL database")
     else:
         # Use SQLite locally
-        flask_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///auth.db'
-        print(f"✅ Auth using SQLite locally")
+        db_path = os.path.join(os.path.dirname(__file__), 'auth.db')
+        flask_app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+        print(f"✅ Auth using SQLite locally at: {db_path}")
 
     flask_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     flask_app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
@@ -254,7 +265,11 @@ def create_app():
     migrate.init_app(flask_app, db)
 
     with flask_app.app_context():
-        migrate_database()
+        # Only run SQLite migration for local SQLite database
+        if 'sqlite' in flask_app.config['SQLALCHEMY_DATABASE_URI']:
+            db_path = flask_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+            migrate_database(db_path)
+
         db.create_all()
 
         if not User.query.filter_by(username='admin').first():
@@ -616,14 +631,23 @@ application = DispatcherMiddleware(
 
 app = application
 
-
 if __name__ == "__main__":
     from werkzeug.serving import run_simple
 
     print("=" * 60)
     print("🚀 WEB APPLICATION PORTAL WITH AUTHENTICATION")
     print("=" * 60)
-    print("📊 Database: auth.db")
+
+    # Show database configuration
+    if os.environ.get('DATABASE_URL'):
+        database_url = os.environ.get('DATABASE_URL')
+        if 'postgres' in database_url:
+            print("📊 Database: PostgreSQL (Production)")
+        else:
+            print("📊 Database: " + database_url)
+    else:
+        print("📊 Database: SQLite (Local)")
+
     print("👤 Default admin: admin / admin123")
     print("📝 Users can sign up and choose their own password")
     print("✅ No approval needed - users can log in immediately")

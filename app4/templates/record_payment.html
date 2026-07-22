@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="bi bi-credit-card"></i> Record Payment</h4>
+        <a href="{{ base_path }}/invoices" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back to Invoices
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0"><i class="bi bi-file-earmark-text"></i> Invoice #{{ invoice.invoice_number }}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td><strong>Customer:</strong></td>
+                                    <td>{{ invoice.customer.name if invoice.customer else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Invoice Date:</strong></td>
+                                    <td>{{ invoice.invoice_date.strftime('%Y-%m-%d') if invoice.invoice_date else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Due Date:</strong></td>
+                                    <td>{{ invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td><strong>Currency:</strong></td>
+                                    <td>{{ invoice.currency or 'USD' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Total Amount:</strong></td>
+                                    <td><strong>{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(invoice.total) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Amount Paid:</strong></td>
+                                    <td class="text-success">{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(invoice.amount_paid or 0) }}</td>
+                                </tr>
+                                <tr class="table-warning">
+                                    <td><strong>Outstanding:</strong></td>
+                                    <td><strong>{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(outstanding) }}</strong></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.payment_date.label(class="form-label") }}
+                                    {{ form.payment_date(class="form-control", type="date") }}
+                                    {% for error in form.payment_date.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="mb-3">
+                                    {{ form.amount.label(class="form-label") }}
+                                    <div class="input-group">
+                                        <span class="input-group-text">{{ invoice.currency or 'USD' }}</span>
+                                        {{ form.amount(class="form-control", step="0.01", min="0.01", placeholder="Enter amount") }}
+                                    </div>
+                                    <small class="text-muted">Outstanding balance: {{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(outstanding) }}</small>
+                                    {% for error in form.amount.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="mb-3">
+                                    {{ form.payment_method.label(class="form-label") }}
+                                    {{ form.payment_method(class="form-select") }}
+                                    {% for error in form.payment_method.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.reference.label(class="form-label") }}
+                                    {{ form.reference(class="form-control", placeholder="Reference number (optional)") }}
+                                    {% for error in form.reference.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="mb-3">
+                                    {{ form.notes.label(class="form-label") }}
+                                    {{ form.notes(class="form-control", rows="3", placeholder="Payment notes (optional)") }}
+                                    {% for error in form.notes.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Record Payment
+                            </button>
+                            <a href="{{ base_path }}/invoices" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> Payment Summary</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center py-3">
+                        <div class="display-6">{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(outstanding) }}</div>
+                        <small class="text-muted">Outstanding Balance</small>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <span>Total Invoice:</span>
+                        <strong>{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(invoice.total) }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-success">
+                        <span>Paid:</span>
+                        <strong>{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(invoice.amount_paid or 0) }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-warning">
+                        <span>Outstanding:</span>
+                        <strong>{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(outstanding) }}</strong>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <span>Status:</span>
+                        <span class="badge bg-{{ 'success' if invoice.payment_status == 'paid' else 'warning' if invoice.payment_status == 'partial' else 'secondary' }}">
+                            {{ invoice.payment_status.upper() if invoice.payment_status else 'UNPAID' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment History with Edit/Delete -->
+            {% if invoice.payments %}
+            <div class="card shadow-sm mt-3">
+                <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-clock-history"></i> Payment History</h6>
+                    <span class="badge bg-light text-dark">{{ invoice.payments|length }} payment(s)</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Reference</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in invoice.payments|sort(attribute='payment_date', reverse=True) %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else 'N/A' }}</td>
+                                    <td class="fw-bold">{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(payment.amount) }}</td>
+                                    <td>{{ payment.payment_method|replace('_', ' ')|title if payment.payment_method else 'N/A' }}</td>
+                                    <td>{{ payment.reference or '-' }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ base_path }}/invoices/payment/edit/{{ payment.id }}"
+                                               class="btn btn-outline-primary"
+                                               title="Edit Payment">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <button onclick="deletePayment({{ payment.id }})"
+                                                    class="btn btn-outline-danger"
+                                                    title="Delete Payment">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-success">
+                                <tr>
+                                    <td colspan="2"><strong>Total Paid:</strong></td>
+                                    <td><strong>{{ invoice.currency or 'USD' }} {{ "{:,.2f}".format(invoice.amount_paid or 0) }}</strong></td>
+                                    <td colspan="3"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    const BASE_PATH = '{{ base_path }}' || '';
+
+    // Delete payment function with SweetAlert
+    function deletePayment(paymentId) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Delete Payment?',
+                text: 'This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Deleting...',
+                        allowOutsideClick: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+
+                    fetch(`${BASE_PATH}/invoices/payment/delete/${paymentId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({})
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        Swal.close();
+                        if (data.success) {
+                            Swal.fire('Deleted!', data.message || 'Payment deleted successfully.', 'success');
+                            location.reload();
+                        } else {
+                            Swal.fire('Error', data.message || 'Failed to delete payment.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        Swal.close();
+                        console.error('Error:', error);
+                        Swal.fire('Error', 'An error occurred while deleting the payment.', 'error');
+                    });
+                }
+            });
+        } else {
+            // Fallback if SweetAlert is not available
+            if (confirm('Are you sure you want to delete this payment? This action cannot be undone.')) {
+                fetch(`${BASE_PATH}/invoices/payment/delete/${paymentId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Payment deleted successfully!');
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.message || 'Failed to delete payment.'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while deleting the payment.');
+                });
+            }
+        }
+    }
+
+    // Auto-dismiss flash messages after 5 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            document.querySelectorAll('.alert-dismissible').forEach(function(alert) {
+                if (typeof bootstrap !== 'undefined') {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            });
+        }, 5000);
+    });
+</script>
+
+<style>
+    .table-sm td, .table-sm th {
+        vertical-align: middle;
+        font-size: 0.8rem;
+        padding: 0.4rem 0.4rem;
+    }
+    .btn-group-sm .btn {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.7rem;
+    }
+    .table tfoot td {
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    .badge {
+        font-size: 0.7rem;
+        padding: 0.3rem 0.6rem;
+    }
+</style>
+{% endblock %}

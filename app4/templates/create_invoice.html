@@ -1,0 +1,587 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create Invoice</h5>
+        <a href="{{ base_path }}/invoices" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+
+    <form method="POST" id="invoiceForm">
+        {{ form.hidden_tag() }}
+
+        <!-- Customer and Invoice Details - Compact -->
+        <div class="row g-1 mb-2">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header py-1 bg-primary text-white">
+                        <h6 class="mb-0"><i class="bi bi-person"></i> Customer</h6>
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row g-1">
+                            <div class="col-12">
+                                <select name="customer_id" id="customer_id" class="form-select form-select-sm" required>
+                                    <option value="">-- Select Customer --</option>
+                                    {% for value, label in form.customer_id.choices %}
+                                        <option value="{{ value }}" {% if form.customer_id.data == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% for error in form.customer_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-6">
+                                <input type="date" name="invoice_date" id="invoice_date" class="form-control form-control-sm"
+                                       value="{{ form.invoice_date.data.strftime('%Y-%m-%d') if form.invoice_date.data else '' }}" required>
+                                {% for error in form.invoice_date.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-6">
+                                <input type="date" name="due_date" id="due_date" class="form-control form-control-sm"
+                                       value="{{ form.due_date.data.strftime('%Y-%m-%d') if form.due_date.data else '' }}" required>
+                                {% for error in form.due_date.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header py-1 bg-success text-white">
+                        <h6 class="mb-0"><i class="bi bi-gear"></i> Settings</h6>
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row g-1">
+                            <div class="col-4">
+                                <select name="currency" id="currency" class="form-select form-select-sm" required>
+                                    <option value="USD" {% if form.currency.data == 'USD' %}selected{% endif %}>USD</option>
+                                    <option value="EUR" {% if form.currency.data == 'EUR' %}selected{% endif %}>EUR</option>
+                                    <option value="GBP" {% if form.currency.data == 'GBP' %}selected{% endif %}>GBP</option>
+                                    <option value="GHS" {% if form.currency.data == 'GHS' %}selected{% endif %}>GHS</option>
+                                    <option value="JPY" {% if form.currency.data == 'JPY' %}selected{% endif %}>JPY</option>
+                                    <option value="CHF" {% if form.currency.data == 'CHF' %}selected{% endif %}>CHF</option>
+                                    <option value="CAD" {% if form.currency.data == 'CAD' %}selected{% endif %}>CAD</option>
+                                    <option value="AUD" {% if form.currency.data == 'AUD' %}selected{% endif %}>AUD</option>
+                                    <option value="CNY" {% if form.currency.data == 'CNY' %}selected{% endif %}>CNY</option>
+                                    <option value="INR" {% if form.currency.data == 'INR' %}selected{% endif %}>INR</option>
+                                    <option value="BRL" {% if form.currency.data == 'BRL' %}selected{% endif %}>BRL</option>
+                                    <option value="ZAR" {% if form.currency.data == 'ZAR' %}selected{% endif %}>ZAR</option>
+                                    <option value="AED" {% if form.currency.data == 'AED' %}selected{% endif %}>AED</option>
+                                    <option value="NGN" {% if form.currency.data == 'NGN' %}selected{% endif %}>NGN</option>
+                                    <option value="KES" {% if form.currency.data == 'KES' %}selected{% endif %}>KES</option>
+                                    <option value="TZS" {% if form.currency.data == 'TZS' %}selected{% endif %}>TZS</option>
+                                    <option value="UGX" {% if form.currency.data == 'UGX' %}selected{% endif %}>UGX</option>
+                                    <option value="ZMW" {% if form.currency.data == 'ZMW' %}selected{% endif %}>ZMW</option>
+                                </select>
+                                {% for error in form.currency.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-4">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">1 {{ active_company.base_currency if active_company else 'USD' }}</span>
+                                    <input type="number" name="exchange_rate" id="exchange_rate" class="form-control form-control-sm"
+                                           value="{{ form.exchange_rate.data or 1.0 }}" step="0.0001" min="0.01">
+                                </div>
+                                {% for error in form.exchange_rate.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-4">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text" id="discountCurrencySymbol">$</span>
+                                    <input type="number" name="discount" id="discount" class="form-control form-control-sm"
+                                           value="{{ form.discount.data or 0 }}" step="0.01" min="0" placeholder="Discount">
+                                </div>
+                                {% for error in form.discount.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="row g-1 mt-1">
+                            <div class="col-6">
+                                <input type="text" name="notes" id="notes" class="form-control form-control-sm" placeholder="Notes" value="{{ form.notes.data or '' }}">
+                            </div>
+                            <div class="col-6">
+                                <input type="text" name="terms" id="terms" class="form-control form-control-sm" placeholder="Terms" value="{{ form.terms.data or '' }}">
+                            </div>
+                        </div>
+                        <!-- Bank Selection -->
+                        <div class="row g-1 mt-1">
+                            <div class="col-12">
+                                <select name="bank_id" id="bank_id" class="form-select form-select-sm">
+                                    <option value="0">-- Select Bank for Payment --</option>
+                                    {% for value, label in form.bank_id.choices %}
+                                        <option value="{{ value }}" {% if form.bank_id.data == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted" style="font-size: 0.65rem;">
+                                    <i class="bi bi-building"></i> Select the bank account for customer payment
+                                </small>
+                                {% for error in form.bank_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Items - Compact -->
+        <div class="card shadow-sm mb-2">
+            <div class="card-header py-1 bg-warning text-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-list"></i> Items <span class="badge bg-light text-dark ms-1" id="currencyDisplay" style="font-size:0.7rem;">USD</span></h6>
+                <div>
+                    <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItemWithTemplate('Consulting', 1, 100, 0, 0)" style="font-size:0.7rem;">
+                        <i class="bi bi-clock"></i>
+                    </button>
+                    <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItemWithTemplate('Software', 1, 200, 15, 2.5)" style="font-size:0.7rem;">
+                        <i class="bi bi-software"></i>
+                    </button>
+                    <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItem()" style="font-size:0.7rem;">
+                        <i class="bi bi-plus-circle"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-1">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover table-sm mb-0" id="itemsTable" style="font-size:0.8rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="min-width: 140px;">Description</th>
+                                <th style="width: 60px;">Qty</th>
+                                <th style="width: 90px;">Unit Price</th>
+                                <th style="width: 70px;">VAT %</th>
+                                <th style="width: 70px;">Levy %</th>
+                                <th style="width: 85px;">Subtotal</th>
+                                <th style="width: 85px;">VAT</th>
+                                <th style="width: 85px;">Levy</th>
+                                <th style="width: 90px;">Total</th>
+                                <th style="width: 35px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody">
+                            {% for item in form.items %}
+                            <tr class="item-row" data-index="{{ loop.index0 }}">
+                                <td>
+                                    <input type="text" name="items-{{ loop.index0 }}-description"
+                                           class="form-control form-control-sm"
+                                           value="{{ item.description.data or '' }}"
+                                           placeholder="Description" required>
+                                    {% for error in item.description.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <input type="number" name="items-{{ loop.index0 }}-quantity"
+                                           class="form-control form-control-sm quantity"
+                                           value="{{ item.quantity.data or 1 }}"
+                                           step="0.01" min="0.01" required>
+                                    {% for error in item.quantity.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <input type="number" name="items-{{ loop.index0 }}-unit_price"
+                                           class="form-control form-control-sm unit-price"
+                                           value="{{ item.unit_price.data or 0 }}"
+                                           step="0.01" min="0" required>
+                                    {% for error in item.unit_price.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <input type="number" name="items-{{ loop.index0 }}-vat_rate"
+                                           class="form-control form-control-sm vat-rate"
+                                           value="{{ item.vat_rate.data or 0 }}"
+                                           step="0.01" min="0" max="100">
+                                </td>
+                                <td>
+                                    <input type="number" name="items-{{ loop.index0 }}-levy_rate"
+                                           class="form-control form-control-sm levy-rate"
+                                           value="{{ item.levy_rate.data or 0 }}"
+                                           step="0.01" min="0" max="100">
+                                </td>
+                                <td class="subtotal-cell text-end fw-semibold">$0.00</td>
+                                <td class="vat-cell text-end fw-semibold">$0.00</td>
+                                <td class="levy-cell text-end fw-semibold">$0.00</td>
+                                <td class="item-total text-end fw-bold text-primary">$0.00</td>
+                                <td>
+                                    <button type="button" class="btn btn-danger btn-sm py-0 px-1" onclick="removeItem(this)" style="font-size:0.7rem;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer py-1 bg-light">
+                <div class="row justify-content-end">
+                    <div class="col-md-4">
+                        <table class="table table-sm table-borderless mb-0" style="font-size:0.8rem;">
+                            <tr>
+                                <td><strong>Subtotal:</strong></td>
+                                <td class="text-end" id="subtotalDisplay">$0.00</td>
+                            </tr>
+                            <tr>
+                                <td><strong>VAT:</strong></td>
+                                <td class="text-end" id="totalVatDisplay">$0.00</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Levy:</strong></td>
+                                <td class="text-end" id="totalLevyDisplay">$0.00</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Discount:</strong></td>
+                                <td class="text-end text-danger" id="discountDisplay">-$0.00</td>
+                            </tr>
+                            <tr class="table-active">
+                                <td><strong>TOTAL:</strong></td>
+                                <td class="text-end fw-bold text-primary" id="grandTotalDisplay" style="font-size:1rem;">$0.00</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons - Compact -->
+        <div class="d-flex gap-1 mb-2">
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-save"></i> Save
+            </button>
+            <button type="submit" class="btn btn-success btn-sm" name="action" value="save_send">
+                <i class="bi bi-send"></i> Save & Send
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="previewInvoice()">
+                <i class="bi bi-eye"></i> Preview
+            </button>
+            <a href="{{ base_path }}/invoices" class="btn btn-secondary btn-sm">
+                <i class="bi bi-x-circle"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Base path for API calls
+    const BASE_PATH = '{{ base_path }}' || '';
+
+    // Currency symbols mapping
+    const currencySymbols = {
+        'USD': '$', 'EUR': '€', 'GBP': '£', 'GHS': '₵',
+        'JPY': '¥', 'CHF': 'Fr', 'CAD': '$', 'AUD': '$',
+        'CNY': '¥', 'INR': '₹', 'BRL': 'R$', 'ZAR': 'R',
+        'AED': 'د.إ', 'NGN': '₦', 'KES': 'KSh', 'TZS': 'TSh',
+        'UGX': 'USh', 'ZMW': 'ZK'
+    };
+
+    let currentCurrency = '{{ form.currency.data or "USD" }}';
+    let currentSymbol = currencySymbols[currentCurrency] || '$';
+
+    // Update currency display
+    function updateCurrencyDisplay() {
+        const currencySelect = document.getElementById('currency');
+        currentCurrency = currencySelect.value;
+        currentSymbol = currencySymbols[currentCurrency] || '$';
+
+        document.getElementById('currencyDisplay').textContent = currentCurrency;
+        document.getElementById('discountCurrencySymbol').textContent = currentSymbol;
+        updateTotals();
+    }
+
+    // Add new item row
+    function addItem() {
+        const tbody = document.getElementById('itemsBody');
+        const rowCount = tbody.children.length;
+
+        const tr = document.createElement('tr');
+        tr.className = 'item-row';
+        tr.dataset.index = rowCount;
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       name="items-${rowCount}-description"
+                       placeholder="Description" required>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm quantity"
+                       name="items-${rowCount}-quantity" value="1" step="0.01" min="0.01" required>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm unit-price"
+                       name="items-${rowCount}-unit_price" value="0" step="0.01" min="0" required>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm vat-rate"
+                       name="items-${rowCount}-vat_rate" value="0" step="0.01" min="0" max="100">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm levy-rate"
+                       name="items-${rowCount}-levy_rate" value="0" step="0.01" min="0" max="100">
+            </td>
+            <td class="subtotal-cell text-end fw-semibold">${currentSymbol}0.00</td>
+            <td class="vat-cell text-end fw-semibold">${currentSymbol}0.00</td>
+            <td class="levy-cell text-end fw-semibold">${currentSymbol}0.00</td>
+            <td class="item-total text-end fw-bold text-primary">${currentSymbol}0.00</td>
+            <td>
+                <button type="button" class="btn btn-danger btn-sm py-0 px-1" onclick="removeItem(this)" style="font-size:0.7rem;">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        addRowEventListeners(tr);
+        updateTotals();
+        tr.querySelector('input[name$="-description"]').focus();
+    }
+
+    // Add item with template values
+    function addItemWithTemplate(description, quantity, unitPrice, vatRate, levyRate) {
+        const tbody = document.getElementById('itemsBody');
+        const rowCount = tbody.children.length;
+
+        const tr = document.createElement('tr');
+        tr.className = 'item-row';
+        tr.dataset.index = rowCount;
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       name="items-${rowCount}-description"
+                       value="${description}"
+                       placeholder="Description" required>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm quantity"
+                       name="items-${rowCount}-quantity" value="${quantity}" step="0.01" min="0.01" required>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm unit-price"
+                       name="items-${rowCount}-unit_price" value="${unitPrice}" step="0.01" min="0" required>
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm vat-rate"
+                       name="items-${rowCount}-vat_rate" value="${vatRate}" step="0.01" min="0" max="100">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm levy-rate"
+                       name="items-${rowCount}-levy_rate" value="${levyRate}" step="0.01" min="0" max="100">
+            </td>
+            <td class="subtotal-cell text-end fw-semibold">${currentSymbol}0.00</td>
+            <td class="vat-cell text-end fw-semibold">${currentSymbol}0.00</td>
+            <td class="levy-cell text-end fw-semibold">${currentSymbol}0.00</td>
+            <td class="item-total text-end fw-bold text-primary">${currentSymbol}0.00</td>
+            <td>
+                <button type="button" class="btn btn-danger btn-sm py-0 px-1" onclick="removeItem(this)" style="font-size:0.7rem;">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        addRowEventListeners(tr);
+        updateTotals();
+    }
+
+    // Remove item row
+    function removeItem(button) {
+        const row = button.closest('tr');
+        if (document.querySelectorAll('.item-row').length > 1) {
+            row.remove();
+            updateTotals();
+        } else {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Warning', 'You must have at least one item.', 'warning');
+            } else {
+                alert('You must have at least one item.');
+            }
+        }
+    }
+
+    // Add event listeners to a row
+    function addRowEventListeners(row) {
+        const inputs = row.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                if (this.type === 'number') {
+                    const val = parseFloat(this.value);
+                    if (isNaN(val) || val < 0) {
+                        this.classList.add('is-invalid');
+                    } else {
+                        this.classList.remove('is-invalid');
+                    }
+                }
+                updateTotals();
+            });
+            input.addEventListener('change', updateTotals);
+        });
+    }
+
+    // Update all totals with current currency symbol
+    function updateTotals() {
+        let subtotal = 0;
+        let totalVat = 0;
+        let totalLevy = 0;
+
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach(row => {
+            const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
+            const unitPrice = parseFloat(row.querySelector('.unit-price').value) || 0;
+            const vatRate = parseFloat(row.querySelector('.vat-rate').value) || 0;
+            const levyRate = parseFloat(row.querySelector('.levy-rate').value) || 0;
+
+            const itemSubtotal = quantity * unitPrice;
+            const itemVat = itemSubtotal * (vatRate / 100);
+            const itemLevy = itemSubtotal * (levyRate / 100);
+            const itemTotal = itemSubtotal + itemVat + itemLevy;
+
+            row.querySelector('.subtotal-cell').textContent = currentSymbol + itemSubtotal.toFixed(2);
+            row.querySelector('.vat-cell').textContent = currentSymbol + itemVat.toFixed(2);
+            row.querySelector('.levy-cell').textContent = currentSymbol + itemLevy.toFixed(2);
+            row.querySelector('.item-total').textContent = currentSymbol + itemTotal.toFixed(2);
+
+            subtotal += itemSubtotal;
+            totalVat += itemVat;
+            totalLevy += itemLevy;
+        });
+
+        const discount = parseFloat(document.getElementById('discount').value) || 0;
+        const grandTotal = subtotal + totalVat + totalLevy - discount;
+
+        document.getElementById('subtotalDisplay').textContent = currentSymbol + subtotal.toFixed(2);
+        document.getElementById('totalVatDisplay').textContent = currentSymbol + totalVat.toFixed(2);
+        document.getElementById('totalLevyDisplay').textContent = currentSymbol + totalLevy.toFixed(2);
+        document.getElementById('discountDisplay').textContent = '-' + currentSymbol + discount.toFixed(2);
+        document.getElementById('grandTotalDisplay').textContent = currentSymbol + grandTotal.toFixed(2);
+    }
+
+    // Preview invoice
+    function previewInvoice() {
+        const customerSelect = document.getElementById('customer_id');
+        if (!customerSelect.value) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Error', 'Please select a customer first.', 'error');
+            } else {
+                alert('Please select a customer first.');
+            }
+            customerSelect.focus();
+            return;
+        }
+        window.print();
+    }
+
+    // Form validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('invoiceForm');
+        const currencySelect = document.getElementById('currency');
+
+        currencySelect.addEventListener('change', function() {
+            updateCurrencyDisplay();
+        });
+
+        updateCurrencyDisplay();
+
+        form.addEventListener('submit', function(e) {
+            const rows = document.querySelectorAll('.item-row');
+            let hasValidItem = false;
+            rows.forEach(row => {
+                const desc = row.querySelector('input[name$="-description"]');
+                if (desc && desc.value.trim() !== '') {
+                    hasValidItem = true;
+                }
+            });
+
+            if (!hasValidItem) {
+                e.preventDefault();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Please add at least one item.', 'error');
+                } else {
+                    alert('Please add at least one item.');
+                }
+                return false;
+            }
+
+            const customerSelect = document.getElementById('customer_id');
+            if (!customerSelect.value) {
+                e.preventDefault();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Please select a customer.', 'error');
+                } else {
+                    alert('Please select a customer.');
+                }
+                customerSelect.focus();
+                return false;
+            }
+
+            const invoiceDate = document.getElementById('invoice_date');
+            const dueDate = document.getElementById('due_date');
+            if (!invoiceDate.value || !dueDate.value) {
+                e.preventDefault();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Please set both dates.', 'error');
+                } else {
+                    alert('Please set both dates.');
+                }
+                return false;
+            }
+        });
+
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach(row => addRowEventListeners(row));
+
+        document.getElementById('discount').addEventListener('input', updateTotals);
+
+        document.getElementById('invoice_date').addEventListener('change', function() {
+            const dueDateInput = document.getElementById('due_date');
+            if (this.value && !dueDateInput.value) {
+                const date = new Date(this.value);
+                date.setDate(date.getDate() + 30);
+                dueDateInput.value = date.toISOString().split('T')[0];
+            }
+        });
+
+        updateTotals();
+    });
+</script>
+
+<style>
+    .item-row td { vertical-align: middle; }
+    .item-row input { min-width: 50px; }
+    .item-row input[type="number"] { text-align: right; }
+    #itemsTable th { white-space: nowrap; font-size: 0.7rem; }
+    .subtotal-cell, .vat-cell, .levy-cell, .item-total { font-family: 'Courier New', monospace; font-size: 0.8rem; }
+    .item-total { color: #1e3c72 !important; }
+    #grandTotalDisplay { color: #1e3c72 !important; }
+    .item-row input.is-invalid { border-color: #dc3545; }
+    .item-row input:focus { box-shadow: 0 0 0 0.15rem rgba(30, 60, 114, 0.25); }
+    #currencyDisplay { font-size: 0.65rem; padding: 0.15rem 0.5rem; }
+    .card-header { padding: 0.25rem 0.5rem; }
+    .card-body { padding: 0.35rem 0.5rem; }
+    .card-footer { padding: 0.25rem 0.5rem; }
+    .form-control-sm { font-size: 0.75rem; padding: 0.15rem 0.3rem; }
+    .form-select-sm { font-size: 0.75rem; padding: 0.15rem 0.3rem; }
+    .input-group-sm > .form-control, .input-group-sm > .input-group-text { font-size: 0.75rem; padding: 0.15rem 0.3rem; }
+    .btn-sm { font-size: 0.75rem; padding: 0.15rem 0.4rem; }
+    .table-sm > :not(caption) > * > * { padding: 0.2rem 0.3rem; }
+    .gap-1 { gap: 0.2rem !important; }
+    .g-1 { --bs-gutter-y: 0.15rem; --bs-gutter-x: 0.15rem; }
+    #bank_id { margin-top: 0.15rem; }
+    .text-muted i { margin-right: 3px; }
+    @media print {
+        .btn, .no-print, .card-footer .btn, .card-header .btn { display: none !important; }
+        .card { border: 1px solid #ddd !important; box-shadow: none !important; }
+        .card-header { background-color: #f8f9fa !important; color: #000 !important; }
+    }
+</style>
+{% endblock %}

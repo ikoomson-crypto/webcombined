@@ -3,7 +3,7 @@
 {% block content %}
 <div class="row">
     <div class="col-md-12">
-        <h1>Welcome to Payment System</h1>
+        <h1>Welcome to Billing & Payment Platform</h1>
         {% if active_company %}
             <div class="alert alert-success">
                 <h4>Active Company: {{ active_company.name }}</h4>
@@ -23,7 +23,7 @@
 </div>
 
 <div class="row mt-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-white bg-primary">
             <div class="card-body">
                 <h5 class="card-title">Total Suppliers</h5>
@@ -31,7 +31,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-white bg-success">
             <div class="card-body">
                 <h5 class="card-title">Total Payments</h5>
@@ -39,11 +39,32 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card text-white bg-info">
             <div class="card-body">
-                <h5 class="card-title">Total Amount</h5>
-                <h2 class="card-text">
+                <h5 class="card-title">Total Invoices</h5>
+                <h2 class="card-text">{{ "{:,.0f}".format(invoice_count) }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">Total Customers</h5>
+                <h2 class="card-text">{{ "{:,.0f}".format(customer_count) }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Total Payment Amount</h5>
+            </div>
+            <div class="card-body text-center">
+                <h2>
                     {% if active_company %}
                         {{ active_company.base_currency }} {{ "{:,.2f}".format(total_amount) }}
                     {% else %}
@@ -56,33 +77,43 @@
 </div>
 
 <div class="row mt-4">
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card">
             <div class="card-body text-center">
                 <i class="bi bi-people" style="font-size: 3rem;"></i>
                 <h5 class="mt-2">Manage Suppliers</h5>
                 <p>Add, edit, and manage your suppliers</p>
-                <a href="{{ url_for('suppliers') }}" class="btn btn-primary">Go to Suppliers</a>
+                <a href="{{ base_path }}/suppliers" class="btn btn-primary">Go to Suppliers</a>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card">
             <div class="card-body text-center">
                 <i class="bi bi-credit-card" style="font-size: 3rem;"></i>
                 <h5 class="mt-2">Manage Payments</h5>
                 <p>Track and manage all payments</p>
-                <a href="{{ url_for('payments') }}" class="btn btn-success">Go to Payments</a>
+                <a href="{{ base_path }}/payments" class="btn btn-success">Go to Payments</a>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-file-earmark-text" style="font-size: 3rem;"></i>
+                <h5 class="mt-2">Manage Invoices</h5>
+                <p>Create and manage invoices</p>
+                <a href="{{ base_path }}/invoices" class="btn btn-info">Go to Invoices</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card">
             <div class="card-body text-center">
                 <i class="bi bi-building" style="font-size: 3rem;"></i>
                 <h5 class="mt-2">Manage Companies</h5>
                 <p>Switch between different companies</p>
-                <a href="{{ url_for('companies') }}" class="btn btn-info">Go to Companies</a>
+                <a href="{{ base_path }}/companies" class="btn btn-secondary">Go to Companies</a>
             </div>
         </div>
     </div>

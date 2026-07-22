@@ -3,20 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment System</title>
+    <title>{% block title %}Billing and Payment Platform{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ base_path }}/static/css/style.css">
+
+    <!-- Additional CSS Block -->
+    {% block extra_css %}{% endblock %}
+
+    <style>
+        body {
+            background: #f0f2f5;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, #1e3c72, #2c3e50) !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.3rem;
+        }
+        .navbar-brand small {
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+        .nav-link:hover {
+            color: white !important;
+            transform: translateY(-2px);
+        }
+        .nav-link i {
+            margin-right: 5px;
+        }
+        .nav-link.active {
+            color: white !important;
+            font-weight: bold;
+            border-bottom: 2px solid #f39c12;
+        }
+        .dropdown-menu {
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border: none;
+        }
+        .dropdown-item {
+            padding: 8px 20px;
+            transition: all 0.2s;
+        }
+        .dropdown-item:hover {
+            background: #f0f2f5;
+            transform: translateX(5px);
+        }
+        .alert {
+            border-radius: 12px;
+            border: none;
+        }
+        .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        .card {
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: none;
+        }
+        .card-header {
+            border-radius: 16px 16px 0 0 !important;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
+            margin-top: 30px;
+        }
+        .badge-invoice-draft { background: #6c757d; }
+        .badge-invoice-sent { background: #0d6efd; }
+        .badge-invoice-paid { background: #198754; }
+        .badge-invoice-overdue { background: #dc3545; }
+        .badge-invoice-cancelled { background: #6c757d; }
+
+        .badge-payment-draft { background: #6c757d; }
+        .badge-payment-sent { background: #0d6efd; }
+        .badge-payment-paid { background: #198754; }
+        .badge-payment-overdue { background: #dc3545; }
+        .badge-payment-cancelled { background: #6c757d; }
+
+        .company-logo {
+            max-height: 40px;
+            width: auto;
+            border-radius: 8px;
+        }
+        @media (max-width: 768px) {
+            .navbar-brand {
+                font-size: 1rem;
+            }
+            .navbar-brand small {
+                font-size: 0.7rem;
+            }
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
             {% if active_company and active_company.logo_filename %}
-                <img src="{{ url_for('static', filename='uploads/logos/' + active_company.logo_filename) }}"
-                     alt="{{ active_company.name }}" height="40" class="me-2">
+                <img src="{{ base_path }}/static/uploads/logos/{{ active_company.logo_filename }}"
+                     alt="{{ active_company.name }}" class="company-logo me-2">
+            {% else %}
+                <i class="bi bi-credit-card-2-front text-white me-2" style="font-size: 1.5rem;"></i>
             {% endif %}
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                Payment System
+            <a class="navbar-brand" href="{{ base_path }}/">
+                Billing & Payment Platform
                 {% if active_company %}
                     <small class="text-light">- {{ active_company.name }}</small>
                 {% endif %}
@@ -27,37 +128,95 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">
+                        <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ base_path }}/">
                             <i class="bi bi-house"></i> Dashboard
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('suppliers') }}">
-                            <i class="bi bi-people"></i> Suppliers
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('payments') }}">
+
+                    <!-- Payment Management Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint in ['payments', 'add_payment', 'suppliers', 'banks', 'signatures'] %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-credit-card"></i> Payments
                         </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ base_path }}/payments">
+                                <i class="bi bi-list"></i> All Payments
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/add_payment">
+                                <i class="bi bi-plus-circle"></i> Add Payment
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/suppliers">
+                                <i class="bi bi-people"></i> Suppliers
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/banks">
+                                <i class="bi bi-building"></i> Banks
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/signatures">
+                                <i class="bi bi-pen"></i> Signatures
+                            </a></li>
+                        </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('banks') }}">
-                            <i class="bi bi-building"></i> Banks
+
+                    <!-- Invoice Management Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint in ['invoices_list', 'create_invoice', 'customers'] %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-file-earmark-text"></i> Invoices
                         </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ base_path }}/invoices">
+                                <i class="bi bi-list"></i> All Invoices
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/invoices/create">
+                                <i class="bi bi-plus-circle"></i> Create Invoice
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/customers">
+                                <i class="bi bi-people"></i> Customers
+                            </a></li>
+                        </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('signatures') }}">
-                            <i class="bi bi-pen"></i> Signatures
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('reports_dashboard') }}">
+
+                    <!-- Reports Dropdown -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.endpoint == 'reports_dashboard' %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-file-text"></i> Reports
                         </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports">
+                                <i class="bi bi-grid"></i> Reports Dashboard
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports/wht">
+                                <i class="bi bi-percent"></i> WHT Report
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports/vat">
+                                <i class="bi bi-percent"></i> VAT Report
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports/supplier">
+                                <i class="bi bi-people"></i> Supplier Transactions
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports/sales">
+                                <i class="bi bi-graph-up"></i> Sales Summary
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports/aging">
+                                <i class="bi bi-clock-history"></i> Invoice Aging
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports/customers">
+                                <i class="bi bi-people"></i> Customer Activity
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ base_path }}/reports/invoice_payments">
+                                <i class="bi bi-credit-card-2-front"></i> Invoice Payment Report
+                            </a></li>
+                        </ul>
                     </li>
+
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('companies') }}">
+                        <a class="nav-link {% if request.endpoint == 'companies' %}active{% endif %}" href="{{ base_path }}/companies">
                             <i class="bi bi-building"></i> Companies
                         </a>
                     </li>
@@ -67,10 +226,12 @@
     </nav>
 
     <div class="container mt-4">
+        <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show">
+                    <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show fade-in">
+                        <i class="bi bi-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-circle{% elif category == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
@@ -78,11 +239,86 @@
             {% endif %}
         {% endwith %}
 
+        <!-- Page Content -->
         {% block content %}{% endblock %}
     </div>
 
+    <!-- Footer -->
+    <div class="footer">
+        <p>&copy; 2024 Billing and Payment Platform. All rights reserved.</p>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ base_path }}/static/js/main.js"></script>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 1050;"></div>
+
+    <script>
+        // Base path for API calls
+        const BASE_PATH = '{{ base_path }}' || '';
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast align-items-center text-white bg-' + (type === 'success' ? 'success' : type === 'danger' ? 'danger' : type === 'warning' ? 'warning' : 'info') + ' border-0 show';
+            toast.role = 'alert';
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Format currency
+        function formatCurrency(amount, currency = 'USD') {
+            const symbols = {
+                'USD': '$', 'EUR': '€', 'GBP': '£', 'GHS': '₵',
+                'JPY': '¥', 'CHF': 'Fr', 'CAD': '$', 'AUD': '$'
+            };
+            const symbol = symbols[currency] || '$';
+            return symbol + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Escape HTML
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // Auto-dismiss alerts after 5 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                document.querySelectorAll('.alert-dismissible').forEach(alert => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                });
+            }, 5000);
+        });
+    </script>
+
+    <!-- Extra JavaScript Block -->
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
