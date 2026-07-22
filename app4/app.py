@@ -370,9 +370,6 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
 
-    # This relationship should work if Customer has a foreign key to User
-    customers = db.relationship('Customer', backref='creator', lazy=True, foreign_keys='Customer.created_by')
-    invoices = db.relationship('Invoice', backref='created_by_user', lazy=True, foreign_keys='Invoice.created_by')
 
 class Customer(db.Model):
     __tablename__ = 'customers'
@@ -387,7 +384,7 @@ class Customer(db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     # This needs to be a ForeignKey to users.id
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_by = db.Column(db.Integer, nullable=True)
 
     invoices = db.relationship('Invoice', backref='customer', lazy=True)
 
@@ -399,7 +396,7 @@ class Invoice(db.Model):
     invoice_number = db.Column(db.String(50), unique=True, nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_by = db.Column(db.Integer, nullable=True)  # No ForeignKey
 
     invoice_date = db.Column(db.Date, nullable=False)
     due_date = db.Column(db.Date, nullable=False)
@@ -474,7 +471,7 @@ class InvoicePayment(db.Model):
     notes = db.Column(db.Text)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_by = db.Column(db.Integer, nullable=True)  # No ForeignKey
 
 
 class Supplier(db.Model):
@@ -665,6 +662,11 @@ def calculate_invoice_item_totals(quantity, unit_price, vat_rate, levy_rate):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
+def get_user_by_id(user_id):
+    """Get a user by ID from the auth system"""
+    if not user_id:
+        return None
+    return User.query.get(user_id)
 
 # ==================== FORMS ====================
 class CustomerForm(FlaskForm):
