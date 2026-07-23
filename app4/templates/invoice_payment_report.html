@@ -108,17 +108,16 @@
                         <th>#</th>
                         <th>Invoice #</th>
                         <th>Date</th>
-                        <th>Due Date</th>
                         <th>Customer</th>
                         <th>Currency</th>
                         <th>Subtotal</th>
                         <th>VAT</th>
+                        <th>Levy</th>
+                        <th>WHT</th>
+                        <th>VAT on WHT</th>
                         <th>Total</th>
                         <th>Amount Paid</th>
                         <th>Outstanding</th>
-                        <th>Payment Status</th>
-                        <th>Invoice Status</th>
-                        <th>Last Payment</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -127,39 +126,32 @@
                         <td>{{ loop.index }}</td>
                         <td><strong>{{ row['Invoice #'] }}</strong></td>
                         <td>{{ row['Date'] }}</td>
-                        <td>{{ row['Due Date'] }}</td>
                         <td>{{ row['Customer'] }}</td>
                         <td>{{ row['Currency'] }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(row['Subtotal']) }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(row['VAT']) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(row['Levy']) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(row['WHT']) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(row['VAT on WHT']) }}</td>
                         <td class="text-end"><strong>{{ "{:,.2f}".format(row['Total']) }}</strong></td>
                         <td class="text-end text-success">{{ "{:,.2f}".format(row['Amount Paid']) }}</td>
                         <td class="text-end {% if row['Outstanding'] > 0 %}text-danger{% else %}text-muted{% endif %}">
                             {{ "{:,.2f}".format(row['Outstanding']) }}
                         </td>
-                        <td>
-                            <span class="badge {% if row['Payment Status'] == 'PAID' %}bg-success{% elif row['Payment Status'] == 'PARTIAL' %}bg-warning{% else %}bg-danger{% endif %}">
-                                {{ row['Payment Status'] }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge {% if row['Invoice Status'] == 'PAID' %}bg-success{% elif row['Invoice Status'] == 'OVERDUE' %}bg-danger{% elif row['Invoice Status'] == 'SENT' %}bg-primary{% else %}bg-secondary{% endif %}">
-                                {{ row['Invoice Status'] }}
-                            </span>
-                        </td>
-                        <td>{{ row['Last Payment Date'] }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
                 <tfoot class="table-success fw-bold">
                     <tr>
-                        <td colspan="6" class="text-end">TOTALS:</td>
+                        <td colspan="5" class="text-end">TOTALS:</td>
                         <td class="text-end">{{ "{:,.2f}".format(totals.total_subtotal) }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(totals.total_vat) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(totals.total_levy) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(totals.total_wht) }}</td>
+                        <td class="text-end">{{ "{:,.2f}".format(totals.total_wht_on_vat) }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(totals.total_amount) }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(totals.total_paid) }}</td>
                         <td class="text-end">{{ "{:,.2f}".format(totals.total_outstanding) }}</td>
-                        <td colspan="3"></td>
                     </tr>
                 </tfoot>
             </table>

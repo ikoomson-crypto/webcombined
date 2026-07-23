@@ -3,39 +3,103 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">
-        <h2>Add New Company</h2>
+        <h2><i class="bi bi-building"></i> Add New Company</h2>
         <hr>
-        <form method="POST" enctype="multipart/form-data">
-            {{ form.hidden_tag() }}
 
-            <div class="mb-3">
-                {{ form.name.label(class="form-label") }}
-                {{ form.name(class="form-control") }}
-                {% for error in form.name.errors %}
-                    <div class="text-danger">{{ error }}</div>
-                {% endfor %}
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control", placeholder="Enter company name") }}
+                        <small class="text-muted">Company name as it will appear on invoices</small>
+                        {% for error in form.name.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.base_currency.label(class="form-label") }}
+                        {{ form.base_currency(class="form-select") }}
+                        <small class="text-muted">Default currency for all transactions</small>
+                        {% for error in form.base_currency.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.tin.label(class="form-label") }}
+                        {{ form.tin(class="form-control", placeholder="Enter Tax Identification Number (TIN)") }}
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            Tax Identification Number (TIN) - will appear on invoices
+                        </small>
+                        {% for error in form.tin.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.logo.label(class="form-label") }}
+                        {{ form.logo(class="form-control", accept=".jpg,.jpeg,.png,.gif,.svg") }}
+                        <small class="text-muted">
+                            <i class="bi bi-image"></i>
+                            Upload company logo (JPG, PNG, GIF, SVG) - Recommended size: 200x80px
+                        </small>
+                        {% for error in form.logo.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Add Company
+                        </button>
+                        <a href="{{ url_for('companies') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
+                </form>
             </div>
+        </div>
 
-            <div class="mb-3">
-                {{ form.base_currency.label(class="form-label") }}
-                {{ form.base_currency(class="form-select") }}
-                {% for error in form.base_currency.errors %}
-                    <div class="text-danger">{{ error }}</div>
-                {% endfor %}
+        <!-- Help Section -->
+        <div class="card mt-4 shadow-sm">
+            <div class="card-header bg-light">
+                <h6 class="mb-0"><i class="bi bi-question-circle"></i> Company Setup Tips</h6>
             </div>
-
-            <div class="mb-3">
-                {{ form.logo.label(class="form-label") }}
-                {{ form.logo(class="form-control") }}
-                {% for error in form.logo.errors %}
-                    <div class="text-danger">{{ error }}</div>
-                {% endfor %}
-                <small class="text-muted">Upload company logo (JPG, PNG, GIF, SVG)</small>
+            <div class="card-body">
+                <ul class="mb-0" style="font-size: 0.9rem;">
+                    <li><strong>Company Name:</strong> This will appear on all invoices and documents</li>
+                    <li><strong>Base Currency:</strong> Choose the default currency for your company's transactions</li>
+                    <li><strong>TIN:</strong> Your Tax Identification Number will be displayed on invoices</li>
+                    <li><strong>Logo:</strong> Upload your company logo for a professional look on invoices</li>
+                    <li>After creating the company, you can <strong>activate</strong> it from the companies list</li>
+                </ul>
             </div>
-
-            <button type="submit" class="btn btn-primary">Add Company</button>
-            <a href="{{ url_for('companies') }}" class="btn btn-secondary">Cancel</a>
-        </form>
+        </div>
     </div>
 </div>
+
+<style>
+    .card {
+        border-radius: 12px;
+        border: none;
+    }
+    .card-header {
+        border-radius: 12px 12px 0 0 !important;
+        background-color: #f8f9fa;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #1e3c72;
+        box-shadow: 0 0 0 0.2rem rgba(30, 60, 114, 0.25);
+    }
+    .text-muted i {
+        margin-right: 4px;
+    }
+</style>
 {% endblock %}

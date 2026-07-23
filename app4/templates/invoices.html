@@ -102,6 +102,12 @@
         .text-nowrap {
             white-space: nowrap;
         }
+        .delete-btn {
+            cursor: pointer;
+        }
+        .delete-btn:hover {
+            color: #dc3545 !important;
+        }
     </style>
 </head>
 <body>
@@ -351,6 +357,9 @@
                                         <i class="fas fa-credit-card"></i>
                                     </a>
                                 ` : ''}
+                                <button class="btn btn-outline-danger" onclick="deleteInvoice(${inv.id})" title="Delete Invoice">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                                 ${inv.payment_status !== 'paid' ? `
                                     <button class="btn btn-outline-success" onclick="updateStatus(${inv.id}, 'paid')" title="Mark as Paid">
                                         <i class="fas fa-check"></i>
@@ -417,6 +426,35 @@
             } catch (error) {
                 console.error('Error updating status:', error);
                 alert('Error updating status');
+            }
+        }
+
+        async function deleteInvoice(invoiceId) {
+            // Get invoice details for confirmation
+            const invoice = invoices.find(inv => inv.id === invoiceId);
+            if (!invoice) return;
+
+            if (!confirm(`Are you sure you want to delete invoice #${invoice.invoice_number}? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${BASE_PATH}/api/invoices/${invoiceId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast(`Invoice #${invoice.invoice_number} deleted successfully!`);
+                    loadInvoices();
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to delete invoice'));
+                }
+            } catch (error) {
+                console.error('Error deleting invoice:', error);
+                alert('Error deleting invoice');
             }
         }
 

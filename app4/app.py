@@ -99,7 +99,21 @@ def migrate_database():
             print("✅ Invoice tables created")
             return
 
-        # Check for new columns in invoices
+        # ============ ADD TIN COLUMN TO COMPANY TABLE ============
+        if 'company' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('company')]
+
+            with db.engine.connect() as conn:
+                if 'tin' not in columns:
+                    print("🔧 Adding tin column to company table...")
+                    try:
+                        conn.execute(text("ALTER TABLE company ADD COLUMN tin VARCHAR(50)"))
+                        conn.commit()
+                        print("✅ Added tin column to company table")
+                    except Exception as e:
+                        print(f"⚠️ Could not add tin column: {e}")
+
+        # ============ CHECK INVOICES TABLE ============
         if 'invoices' in inspector.get_table_names():
             columns = [col['name'] for col in inspector.get_columns('invoices')]
 
@@ -108,10 +122,7 @@ def migrate_database():
                 if 'bank_id' not in columns:
                     print("🔧 Adding bank_id column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN bank_id INTEGER REFERENCES bank(id)"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN bank_id INTEGER REFERENCES bank(id)"))
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN bank_id INTEGER REFERENCES bank(id)"))
                         conn.commit()
                         print("✅ Added bank_id column")
                     except Exception as e:
@@ -121,10 +132,7 @@ def migrate_database():
                 if 'currency' not in columns:
                     print("🔧 Adding currency column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN currency VARCHAR(3) DEFAULT 'USD'"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN currency VARCHAR(3) DEFAULT 'USD'"))
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN currency VARCHAR(3) DEFAULT 'USD'"))
                         conn.commit()
                         print("✅ Added currency column")
                     except Exception as e:
@@ -134,11 +142,7 @@ def migrate_database():
                 if 'exchange_rate' not in columns:
                     print("🔧 Adding exchange_rate column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoices ADD COLUMN exchange_rate NUMERIC(10, 4) DEFAULT 1.0000"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN exchange_rate FLOAT DEFAULT 1.0"))
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN exchange_rate FLOAT DEFAULT 1.0"))
                         conn.commit()
                         print("✅ Added exchange_rate column")
                     except Exception as e:
@@ -148,11 +152,7 @@ def migrate_database():
                 if 'amount_paid' not in columns:
                     print("🔧 Adding amount_paid column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoices ADD COLUMN amount_paid NUMERIC(15, 2) DEFAULT 0.00"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN amount_paid FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN amount_paid FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added amount_paid column")
                     except Exception as e:
@@ -162,12 +162,8 @@ def migrate_database():
                 if 'payment_status' not in columns:
                     print("🔧 Adding payment_status column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoices ADD COLUMN payment_status VARCHAR(20) DEFAULT 'unpaid'"))
-                        else:
-                            conn.execute(
-                                text("ALTER TABLE invoices ADD COLUMN payment_status VARCHAR(20) DEFAULT 'unpaid'"))
+                        conn.execute(
+                            text("ALTER TABLE invoices ADD COLUMN payment_status VARCHAR(20) DEFAULT 'unpaid'"))
                         conn.commit()
                         print("✅ Added payment_status column")
                     except Exception as e:
@@ -177,12 +173,7 @@ def migrate_database():
                 if 'base_currency_subtotal' not in columns:
                     print("🔧 Adding base_currency_subtotal column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(text(
-                                "ALTER TABLE invoices ADD COLUMN base_currency_subtotal NUMERIC(15, 2) DEFAULT 0.00"))
-                        else:
-                            conn.execute(
-                                text("ALTER TABLE invoices ADD COLUMN base_currency_subtotal FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN base_currency_subtotal FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added base_currency_subtotal column")
                     except Exception as e:
@@ -191,11 +182,7 @@ def migrate_database():
                 if 'base_currency_tax' not in columns:
                     print("🔧 Adding base_currency_tax column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoices ADD COLUMN base_currency_tax NUMERIC(15, 2) DEFAULT 0.00"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN base_currency_tax FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN base_currency_tax FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added base_currency_tax column")
                     except Exception as e:
@@ -204,29 +191,53 @@ def migrate_database():
                 if 'base_currency_total' not in columns:
                     print("🔧 Adding base_currency_total column to invoices...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoices ADD COLUMN base_currency_total NUMERIC(15, 2) DEFAULT 0.00"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoices ADD COLUMN base_currency_total FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN base_currency_total FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added base_currency_total column")
                     except Exception as e:
                         print(f"⚠️ Could not add base_currency_total column: {e}")
 
-        # Check for new columns in invoice_items
+                # ============ ADD WHT COLUMNS TO INVOICES ============
+                if 'wht_total' not in columns:
+                    print("🔧 Adding wht_total column to invoices...")
+                    try:
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN wht_total FLOAT DEFAULT 0.0"))
+                        conn.commit()
+                        print("✅ Added wht_total column")
+                    except Exception as e:
+                        print(f"⚠️ Could not add wht_total column: {e}")
+
+                # ============ ADD VAT CALCULATION METHOD COLUMN ============
+                if 'vat_calculation_method' not in columns:
+                    print("🔧 Adding vat_calculation_method column to invoices...")
+                    try:
+                        conn.execute(text(
+                            "ALTER TABLE invoices ADD COLUMN vat_calculation_method VARCHAR(20) DEFAULT 'subtotal_only'"))
+                        conn.commit()
+                        print("✅ Added vat_calculation_method column")
+                    except Exception as e:
+                        print(f"⚠️ Could not add vat_calculation_method column: {e}")
+
+                # ============ ADD WHT ON VAT TOTAL COLUMN TO INVOICES ============
+                if 'wht_on_vat_total' not in columns:
+                    print("🔧 Adding wht_on_vat_total column to invoices...")
+                    try:
+                        conn.execute(text("ALTER TABLE invoices ADD COLUMN wht_on_vat_total FLOAT DEFAULT 0.0"))
+                        conn.commit()
+                        print("✅ Added wht_on_vat_total column")
+                    except Exception as e:
+                        print(f"⚠️ Could not add wht_on_vat_total column: {e}")
+
+        # ============ CHECK INVOICE_ITEMS TABLE ============
         if 'invoice_items' in inspector.get_table_names():
             columns = [col['name'] for col in inspector.get_columns('invoice_items')]
 
             with db.engine.connect() as conn:
+                # VAT columns
                 if 'vat_rate' not in columns:
                     print("🔧 Adding vat_rate column to invoice_items...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoice_items ADD COLUMN vat_rate NUMERIC(5, 2) DEFAULT 0.0"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoice_items ADD COLUMN vat_rate FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN vat_rate FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added vat_rate column")
                     except Exception as e:
@@ -235,24 +246,55 @@ def migrate_database():
                 if 'vat_amount' not in columns:
                     print("🔧 Adding vat_amount column to invoice_items...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoice_items ADD COLUMN vat_amount NUMERIC(15, 2) DEFAULT 0.0"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoice_items ADD COLUMN vat_amount FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN vat_amount FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added vat_amount column")
                     except Exception as e:
                         print(f"⚠️ Could not add vat_amount column: {e}")
 
+                # ============ ADD WHT COLUMNS TO INVOICE_ITEMS ============
+                if 'wht_rate' not in columns:
+                    print("🔧 Adding wht_rate column to invoice_items...")
+                    try:
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN wht_rate FLOAT DEFAULT 0.0"))
+                        conn.commit()
+                        print("✅ Added wht_rate column")
+                    except Exception as e:
+                        print(f"⚠️ Could not add wht_rate column: {e}")
+
+                if 'wht_amount' not in columns:
+                    print("🔧 Adding wht_amount column to invoice_items...")
+                    try:
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN wht_amount FLOAT DEFAULT 0.0"))
+                        conn.commit()
+                        print("✅ Added wht_amount column")
+                    except Exception as e:
+                        print(f"⚠️ Could not add wht_amount column: {e}")
+
+                # ============ ADD WHT ON VAT COLUMNS TO INVOICE_ITEMS ============
+                if 'wht_on_vat_rate' not in columns:
+                    print("🔧 Adding wht_on_vat_rate column to invoice_items...")
+                    try:
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN wht_on_vat_rate FLOAT DEFAULT 0.0"))
+                        conn.commit()
+                        print("✅ Added wht_on_vat_rate column")
+                    except Exception as e:
+                        print(f"⚠️ Could not add wht_on_vat_rate column: {e}")
+
+                if 'wht_on_vat_amount' not in columns:
+                    print("🔧 Adding wht_on_vat_amount column to invoice_items...")
+                    try:
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN wht_on_vat_amount FLOAT DEFAULT 0.0"))
+                        conn.commit()
+                        print("✅ Added wht_on_vat_amount column")
+                    except Exception as e:
+                        print(f"⚠️ Could not add wht_on_vat_amount column: {e}")
+
+                # Levy columns
                 if 'levy_rate' not in columns:
                     print("🔧 Adding levy_rate column to invoice_items...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoice_items ADD COLUMN levy_rate NUMERIC(5, 2) DEFAULT 0.0"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoice_items ADD COLUMN levy_rate FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN levy_rate FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added levy_rate column")
                     except Exception as e:
@@ -261,11 +303,7 @@ def migrate_database():
                 if 'levy_amount' not in columns:
                     print("🔧 Adding levy_amount column to invoice_items...")
                     try:
-                        if os.environ.get('DATABASE_URL'):
-                            conn.execute(
-                                text("ALTER TABLE invoice_items ADD COLUMN levy_amount NUMERIC(15, 2) DEFAULT 0.0"))
-                        else:
-                            conn.execute(text("ALTER TABLE invoice_items ADD COLUMN levy_amount FLOAT DEFAULT 0.0"))
+                        conn.execute(text("ALTER TABLE invoice_items ADD COLUMN levy_amount FLOAT DEFAULT 0.0"))
                         conn.commit()
                         print("✅ Added levy_amount column")
                     except Exception as e:
@@ -289,11 +327,12 @@ def init_db():
             company = Company(
                 name='Default Company',
                 base_currency='GHS',
-                is_active=True
+                is_active=True,
+                tin='1234567890'
             )
             db.session.add(company)
             db.session.commit()
-            print('✅ Default company created: Default Company (GHS)')
+            print('✅ Default company created: Default Company (GHS) with TIN 1234567890')
         else:
             active_company = Company.query.filter_by(is_active=True).first()
             if not active_company:
@@ -306,10 +345,9 @@ def init_db():
         if User.query.count() == 0:
             active_company = get_active_company()
             if active_company:
-                # Use a proper UUID for the admin user
                 import uuid
                 admin = User(
-                    id=str(uuid.uuid4()),  # Generate a UUID
+                    id=str(uuid.uuid4()),
                     username='admin',
                     password_hash=generate_password_hash('admin123'),
                     email='admin@example.com',
@@ -332,11 +370,12 @@ def init_db():
                     phone='+1 (555) 987-6543',
                     address='456 Client Ave, City, State',
                     company_id=active_company.id,
-                    created_by=admin.id if admin else None  # This will be a UUID string
+                    created_by=admin.id if admin else None
                 )
                 db.session.add(customer)
                 db.session.commit()
                 print('✅ Sample customer created!')
+
 
 # ==================== MODELS ====================
 class Company(db.Model):
@@ -347,6 +386,8 @@ class Company(db.Model):
     logo_filename = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=False)
+
+    tin = db.Column(db.String(50), nullable=True)
 
     suppliers = db.relationship('Supplier', backref='company', lazy=True)
     payments = db.relationship('Payment', backref='company', lazy=True)
@@ -361,7 +402,7 @@ class User(db.Model):
     __tablename__ = 'users'
     __table_args__ = {'extend_existing': True}
 
-    id = db.Column(db.String(36), primary_key=True)  # UUID as string
+    id = db.Column(db.String(36), primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
     email = db.Column(db.String(120))
@@ -385,9 +426,10 @@ class Customer(db.Model):
     tax_id = db.Column(db.String(50))
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    created_by = db.Column(db.String(36), nullable=True)  # Store UUID as string
+    created_by = db.Column(db.String(36), nullable=True)
 
     invoices = db.relationship('Invoice', backref='customer', lazy=True)
+
 
 class Invoice(db.Model):
     __tablename__ = 'invoices'
@@ -397,7 +439,8 @@ class Invoice(db.Model):
     invoice_number = db.Column(db.String(50), unique=True, nullable=False)
     customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'))
-    created_by = db.Column(db.String(36), nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
     invoice_date = db.Column(db.Date, nullable=False)
     due_date = db.Column(db.Date, nullable=False)
 
@@ -411,19 +454,28 @@ class Invoice(db.Model):
     discount = db.Column(db.Numeric(15, 2), default=0.00)
     total = db.Column(db.Numeric(15, 2), default=0.00)
 
+    # VAT calculation method: 'subtotal_only' or 'subtotal_plus_levy'
+    vat_calculation_method = db.Column(db.String(20), default='subtotal_only')
+
+    # WHT total (sum of line item WHT on subtotal)
+    wht_total = db.Column(db.Numeric(15, 2), default=0.00)
+
+    # WHT on VAT total (sum of line item WHT on VAT - uses same base as VAT)
+    wht_on_vat_total = db.Column(db.Numeric(15, 2), default=0.00)
+
     # Payment tracking fields
     amount_paid = db.Column(db.Numeric(15, 2), default=0.00)
-    payment_status = db.Column(db.String(20), default='unpaid')  # unpaid, partial, paid
+    payment_status = db.Column(db.String(20), default='unpaid')
 
     # Bank selection for payment
-    bank_id = db.Column(db.Integer, db.ForeignKey('bank.id'))
+    bank_id = db.Column(db.Integer, db.ForeignKey('bank.id'), nullable=True)
 
-    # Base currency equivalent (for reporting in company currency)
+    # Base currency equivalent
     base_currency_subtotal = db.Column(db.Numeric(15, 2), default=0.00)
     base_currency_tax = db.Column(db.Numeric(15, 2), default=0.00)
     base_currency_total = db.Column(db.Numeric(15, 2), default=0.00)
 
-    status = db.Column(db.String(20), default='draft')  # draft, sent, paid, overdue, cancelled
+    status = db.Column(db.String(20), default='draft')
     notes = db.Column(db.Text)
     terms = db.Column(db.Text)
 
@@ -432,8 +484,6 @@ class Invoice(db.Model):
 
     items = db.relationship('InvoiceItem', backref='invoice', lazy=True, cascade='all, delete-orphan')
     payments = db.relationship('InvoicePayment', backref='invoice', lazy=True, cascade='all, delete-orphan')
-
-    # Relationship to bank
     bank = db.relationship('Bank', backref='invoices', lazy=True)
 
 
@@ -449,8 +499,19 @@ class InvoiceItem(db.Model):
     unit_price = db.Column(db.Numeric(15, 2), default=0.00)
     total = db.Column(db.Numeric(15, 2), default=0.00)
 
+    # VAT fields
     vat_rate = db.Column(db.Numeric(5, 2), default=0.00)
     vat_amount = db.Column(db.Numeric(15, 2), default=0.00)
+
+    # WHT fields (calculated on subtotal)
+    wht_rate = db.Column(db.Numeric(5, 2), default=0.00)
+    wht_amount = db.Column(db.Numeric(15, 2), default=0.00)
+
+    # WHT on VAT fields (calculated on the SAME base as VAT - subtotal OR subtotal+levy)
+    wht_on_vat_rate = db.Column(db.Numeric(5, 2), default=0.00)
+    wht_on_vat_amount = db.Column(db.Numeric(15, 2), default=0.00)
+
+    # Levy fields
     levy_rate = db.Column(db.Numeric(5, 2), default=0.00)
     levy_amount = db.Column(db.Numeric(15, 2), default=0.00)
 
@@ -472,6 +533,7 @@ class InvoicePayment(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(36), nullable=True)
+
 
 class Supplier(db.Model):
     __tablename__ = 'supplier'
@@ -645,27 +707,66 @@ def calculate_line_item_totals(quantity, unit_price, wht_rate, vat_rate):
     }
 
 
-def calculate_invoice_item_totals(quantity, unit_price, vat_rate, levy_rate):
+def calculate_invoice_item_totals(quantity, unit_price, vat_rate, wht_rate, wht_on_vat_rate, levy_rate,
+                                  vat_calculation_method='subtotal_only'):
+    """
+    Calculate invoice item totals including VAT, WHT, WHT on VAT, and Levy.
+
+    - WHT is calculated on subtotal (quantity * unit_price)
+    - Levy is calculated on subtotal
+    - VAT calculation depends on vat_calculation_method:
+        - 'subtotal_only': VAT = subtotal * vat_rate
+        - 'subtotal_plus_levy': VAT = (subtotal + levy_amount) * vat_rate
+    - WHT on VAT uses the SAME base as VAT:
+        - If method is 'subtotal_only': WHT on VAT = subtotal * wht_on_vat_rate
+        - If method is 'subtotal_plus_levy': WHT on VAT = (subtotal + levy_amount) * wht_on_vat_rate
+    - Total = subtotal + VAT - WHT - WHT_on_VAT + Levy
+    """
     subtotal = quantity * unit_price
-    vat_amount = (subtotal * vat_rate) / 100 if vat_rate else 0
+
+    # Levy calculated on subtotal
     levy_amount = (subtotal * levy_rate) / 100 if levy_rate else 0
-    total = subtotal + vat_amount + levy_amount
+
+    # Determine VAT base based on method
+    if vat_calculation_method == 'subtotal_plus_levy':
+        vat_base = subtotal + levy_amount
+    else:
+        vat_base = subtotal
+
+    # VAT calculated on VAT Base
+    vat_amount = (vat_base * vat_rate) / 100 if vat_rate else 0
+
+    # WHT calculated on subtotal only
+    wht_amount = (subtotal * wht_rate) / 100 if wht_rate else 0
+
+    # WHT on VAT - uses the SAME base as VAT
+    wht_on_vat_amount = (vat_base * wht_on_vat_rate) / 100 if wht_on_vat_rate else 0
+
+    # Total = subtotal + VAT - WHT - WHT_on_VAT + Levy
+    total = subtotal + vat_amount - wht_amount - wht_on_vat_amount + levy_amount
+
     return {
         'subtotal': round(subtotal, 2),
-        'vat_amount': round(vat_amount, 2),
         'levy_amount': round(levy_amount, 2),
-        'total': round(total, 2)
+        'vat_base': round(vat_base, 2),
+        'vat_amount': round(vat_amount, 2),
+        'wht_amount': round(wht_amount, 2),
+        'wht_on_vat_amount': round(wht_on_vat_amount, 2),
+        'total': round(total, 2),
+        'vat_calculation_method': vat_calculation_method
     }
 
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
+
 def get_user_by_id(user_id):
     """Get a user by ID from the auth system"""
     if not user_id:
         return None
     return User.query.get(user_id)
+
 
 # ==================== FORMS ====================
 class CustomerForm(FlaskForm):
@@ -680,7 +781,12 @@ class InvoiceItemForm(FlaskForm):
     description = StringField('Description', validators=[DataRequired(), Length(max=500)])
     quantity = FloatField('Quantity', validators=[DataRequired(), NumberRange(min=0.01)], default=1.0)
     unit_price = FloatField('Unit Price', validators=[DataRequired(), NumberRange(min=0.01)])
+
+    # VAT, WHT, WHT on VAT, and Levy fields
     vat_rate = FloatField('VAT Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)], default=0.0)
+    wht_rate = FloatField('WHT Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)], default=0.0)
+    wht_on_vat_rate = FloatField('WHT on VAT Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)],
+                                 default=0.0)
     levy_rate = FloatField('Levy Rate (%)', validators=[Optional(), NumberRange(min=0, max=100)], default=0.0)
 
 
@@ -695,10 +801,17 @@ class InvoiceForm(FlaskForm):
         ('INR', 'INR - Indian Rupee'), ('BRL', 'BRL - Brazilian Real'), ('ZAR', 'ZAR - South African Rand'),
         ('AED', 'AED - UAE Dirham'), ('NGN', 'NGN - Nigerian Naira'), ('KES', 'KES - Kenyan Shilling'),
         ('TZS', 'TZS - Tanzanian Shilling'), ('UGX', 'UGX - Ugandan Shilling'), ('ZMW', 'ZMW - Zambian Kwacha')
-    ], validators=[DataRequired()], default='USD')
+    ], validators=[DataRequired()], default='')
     exchange_rate = FloatField('Exchange Rate (1 USD = ?)', validators=[Optional(), NumberRange(min=0.01)], default=1.0)
     bank_id = SelectField('Bank Account', coerce=int, validators=[Optional()])
     discount = FloatField('Discount', validators=[Optional(), NumberRange(min=0)], default=0.0)
+
+    # VAT Calculation Method
+    vat_calculation_method = SelectField('VAT Calculation Method', choices=[
+        ('subtotal_only', 'VAT on Subtotal Only'),
+        ('subtotal_plus_levy', 'VAT on Subtotal + Levy (Legacy)')
+    ], validators=[DataRequired()], default='subtotal_only')
+
     notes = TextAreaField('Notes', validators=[Optional()])
     terms = TextAreaField('Terms', validators=[Optional()])
     items = FieldList(FormField(InvoiceItemForm), min_entries=1)
@@ -711,7 +824,6 @@ class InvoiceForm(FlaskForm):
             customers = sorted(customers, key=lambda c: c.name.lower())
             self.customer_id.choices = [(0, '-- Select Customer --')] + [(c.id, c.name) for c in customers]
 
-            # Add bank choices
             banks = Bank.query.filter_by(company_id=active_company.id, is_active=True).all()
             banks = sorted(banks, key=lambda b: b.name.lower())
             self.bank_id.choices = [(0, '-- Select Bank --')] + [(b.id, f"{b.name} - {b.account_number or 'N/A'}") for b
@@ -842,6 +954,7 @@ class CompanyForm(FlaskForm):
         ('AED', 'AED - UAE Dirham'), ('NGN', 'NGN - Nigerian Naira'), ('KES', 'KES - Kenyan Shilling'),
         ('TZS', 'TZS - Tanzanian Shilling'), ('UGX', 'UGX - Ugandan Shilling'), ('ZMW', 'ZMW - Zambian Kwacha')
     ], validators=[DataRequired()])
+    tin = StringField('Tax Identification Number (TIN)', validators=[Optional(), Length(max=50)])
     logo = FileField('Company Logo',
                      validators=[Optional(), FileAllowed(['jpg', 'jpeg', 'png', 'gif', 'svg'], 'Images only!')])
 
@@ -880,6 +993,7 @@ class PaymentImportForm(FlaskForm):
         FileAllowed(['xlsx', 'xls', 'xlsm'], 'Excel files only!')
     ])
 
+
 class InvoicePaymentReportForm(FlaskForm):
     date_from = DateField('Date From', format='%Y-%m-%d', validators=[DataRequired()])
     date_to = DateField('Date To', format='%Y-%m-%d', validators=[DataRequired()])
@@ -901,6 +1015,7 @@ class InvoicePaymentReportForm(FlaskForm):
             self.customer_id.choices = [(0, '-- All Customers --')] + [(c.id, c.name) for c in customers]
         else:
             self.customer_id.choices = [(0, '-- No Customers --')]
+
 
 # ==================== REPORT FUNCTIONS ====================
 def generate_wht_report(company_id, date_from, date_to, supplier_id=None):
@@ -1130,7 +1245,7 @@ def generate_report_pdf(report_data, title, total_amount, currency, report_type)
 
 
 def generate_invoice_pdf(invoice):
-    """Generate PDF for an invoice with simplified line items"""
+    """Generate PDF for an invoice with simplified line items - NO WHT display, NO VAT Method"""
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             rightMargin=0.5 * inch, leftMargin=0.5 * inch,
@@ -1178,7 +1293,7 @@ def generate_invoice_pdf(invoice):
     elements = []
     company = invoice.company
 
-    # Company header
+    # Company header with TIN
     if company and company.logo_filename:
         try:
             logo_path = os.path.join(app.config['UPLOAD_FOLDER'], company.logo_filename)
@@ -1190,10 +1305,12 @@ def generate_invoice_pdf(invoice):
             pass
     if company:
         elements.append(Paragraph(company.name, title_style))
+        if company.tin:
+            elements.append(Paragraph(f"TIN: {company.tin}", normal_style))
         elements.append(Paragraph("INVOICE", heading_style))
     elements.append(Spacer(1, 10))
 
-    # Invoice header info
+    # Invoice header info - NO VAT METHOD
     col_widths = [3 * inch, 3 * inch]
     info_data = []
     left_info = [
@@ -1205,6 +1322,7 @@ def generate_invoice_pdf(invoice):
     if invoice.exchange_rate and float(invoice.exchange_rate) != 1.0:
         left_info.append(
             f"<b>Exchange Rate:</b> 1 {invoice.company.base_currency if invoice.company else 'USD'} = {float(invoice.exchange_rate):.4f} {currency_code}")
+
     right_info = []
     if invoice.customer:
         right_info = [
@@ -1235,31 +1353,32 @@ def generate_invoice_pdf(invoice):
     elements.append(info_table)
     elements.append(Spacer(1, 12))
 
-    # Simplified Line items: Description, Qty, Unit Price, Total
+    # Simplified Line items: Description, Qty, Unit Price, Subtotal
     if invoice.items:
         elements.append(Paragraph("Line Items", heading_style))
         elements.append(Spacer(1, 4))
         line_data = []
 
-        # Simple headers - only 5 columns
+        # Simple headers - 5 columns
         headers = [
             '#',
             'Description',
             'Qty',
             f'Unit Price\n({currency_code})',
-            f'Total\n({currency_code})'
+            f'Subtotal\n({currency_code})'
         ]
         line_data.append([Paragraph(h, normal_style) for h in headers])
 
-        total_amount = 0
+        total_subtotal = 0
 
         # Track max content length for ALL columns with minimum values
         max_lengths = [1, 10, 3, 8, 8]  # Minimum lengths for each column
-        # Index 0: #, 1: Description, 2: Qty, 3: Unit Price, 4: Total
+        # Index 0: #, 1: Description, 2: Qty, 3: Unit Price, 4: Subtotal
 
         for idx, item in enumerate(invoice.items, 1):
-            total = float(item.total)
-            total_amount += total
+            # Calculate subtotal (quantity * unit price)
+            subtotal = float(item.quantity) * float(item.unit_price)
+            total_subtotal += subtotal
 
             # Track lengths for each column
             desc_len = len(item.description)
@@ -1279,31 +1398,31 @@ def generate_invoice_pdf(invoice):
             if len(price_str) > max_lengths[3]:
                 max_lengths[3] = len(price_str)
 
-            total_str = f"{total:,.2f}"
-            if len(total_str) > max_lengths[4]:
-                max_lengths[4] = len(total_str)
+            subtotal_str = f"{subtotal:,.2f}"
+            if len(subtotal_str) > max_lengths[4]:
+                max_lengths[4] = len(subtotal_str)
 
             line_data.append([
                 Paragraph(str(idx), normal_style),
                 Paragraph(item.description, normal_style),
                 Paragraph(qty_str, normal_style),
                 Paragraph(f"{float(item.unit_price):,.2f}", normal_style),
-                Paragraph(f"{total:,.2f}", normal_style)
+                Paragraph(f"{subtotal:,.2f}", normal_style)
             ])
 
         # Update max lengths with header lengths
-        header_texts = ['#', 'Description', 'Qty', f'Unit Price ({currency_code})', f'Total ({currency_code})']
+        header_texts = ['#', 'Description', 'Qty', f'Unit Price ({currency_code})', f'Subtotal ({currency_code})']
         for i, text in enumerate(header_texts):
             if len(text) > max_lengths[i]:
                 max_lengths[i] = len(text)
 
-        # Totals row - only Total column has a value
+        # Totals row - only Subtotal column has a value
         line_data.append([
             Paragraph('', normal_style),
             Paragraph('', normal_style),
             Paragraph('', normal_style),
             Paragraph('', normal_style),
-            Paragraph(f"{total_amount:,.2f}", value_style)
+            Paragraph(f"{total_subtotal:,.2f}", value_style)
         ])
 
         # Calculate dynamic column widths based on content
@@ -1337,11 +1456,10 @@ def generate_invoice_pdf(invoice):
             # Give extra space to description column, but cap it
             col_widths[1] = min(col_widths[1] + extra_space, max_column_width * 1.6)
 
-            # If still extra space, distribute to Qty, Unit Price, and Total columns
+            # If still extra space, distribute to Qty, Unit Price, and Subtotal columns
             remaining_extra = total_available_width - sum(col_widths)
             if remaining_extra > 0:
-                # Distribute remaining extra to Qty (index 2), Unit Price (index 3), and Total (index 4)
-                # Give more weight to Qty since it should resize
+                # Distribute remaining extra to Qty (index 2), Unit Price (index 3), and Subtotal (index 4)
                 distribute_cols = [2, 3, 4]
                 weights = [1.5, 1.0, 1.0]  # Qty gets more weight
                 total_weight = sum(weights)
@@ -1400,26 +1518,24 @@ def generate_invoice_pdf(invoice):
         elements.append(line_table)
         elements.append(Spacer(1, 12))
 
-        # Summary with VAT, Levy, and Discount
-        total_subtotal = sum(float(item.quantity) * float(item.unit_price) for item in invoice.items)
+        # Summary with Subtotal, Levy, VAT, Discount - NO VAT METHOD, NO WHT
         total_vat = sum(float(item.vat_amount or 0) for item in invoice.items)
         total_levy = sum(float(item.levy_amount or 0) for item in invoice.items)
 
+        summary_data = [
+            ['Subtotal:', f"{currency_code} {total_subtotal:,.2f}"],
+            ['Levy:', f"{currency_code} {total_levy:,.2f}"],
+            ['VAT:', f"{currency_code} {total_vat:,.2f}"],
+        ]
+
+        # Add discount if applicable
         if float(invoice.discount) > 0:
-            summary_data = [
-                ['Subtotal:', f"{currency_code} {total_subtotal:,.2f}"],
-                ['VAT:', f"{currency_code} {total_vat:,.2f}"],
-                ['Levy:', f"{currency_code} {total_levy:,.2f}"],
-                ['Discount:', f"-{currency_code} {float(invoice.discount):,.2f}"],
-                ['TOTAL:', f"{currency_code} {float(invoice.total):,.2f}"]
-            ]
-        else:
-            summary_data = [
-                ['Subtotal:', f"{currency_code} {total_subtotal:,.2f}"],
-                ['VAT:', f"{currency_code} {total_vat:,.2f}"],
-                ['Levy:', f"{currency_code} {total_levy:,.2f}"],
-                ['TOTAL:', f"{currency_code} {float(invoice.total):,.2f}"]
-            ]
+            summary_data.append(['Discount:', f"-{currency_code} {float(invoice.discount):,.2f}"])
+
+        # Final total - Subtotal + VAT + Levy - Discount (WHT is NOT deducted)
+        final_total = total_subtotal + total_vat + total_levy - float(invoice.discount or 0)
+        summary_data.append(['TOTAL:', f"{currency_code} {final_total:,.2f}"])
+
         summary_table = Table(summary_data, colWidths=[2.0 * inch, 2.5 * inch])
         summary_table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
@@ -1444,7 +1560,7 @@ def generate_invoice_pdf(invoice):
     if invoice.terms:
         elements.append(Paragraph(f"<b>Terms:</b> {invoice.terms}", normal_style))
 
-    # Payment Details Section - at the bottom
+    # Payment Details Section
     if invoice.bank_id:
         bank = invoice.bank
         if bank:
@@ -1491,10 +1607,10 @@ def generate_invoice_pdf(invoice):
     pdf_data = buffer.getvalue()
     buffer.close()
     return pdf_data
+
 # ==================== IMPORT FUNCTIONS ====================
 def generate_invoice_import_template():
-    """Generate Excel template for importing invoices"""
-    # Make sure all arrays have the same length
+    """Generate Excel template for importing invoices with WHT and WHT on VAT"""
     data = {
         'Customer Name': ['Sample Customer', 'Sample Customer', 'Another Customer'],
         'Invoice Date': ['2024-01-15', '2024-01-15', '2024-01-20'],
@@ -1503,7 +1619,10 @@ def generate_invoice_import_template():
         'Quantity': ['1', '2', '1'],
         'Unit Price': ['1000.00', '500.00', '1500.00'],
         'VAT Rate (%)': ['15.0', '0.0', '15.0'],
+        'WHT Rate (%)': ['5.0', '0.0', '0.0'],
+        'WHT on VAT Rate (%)': ['2.0', '0.0', '0.0'],
         'Levy Rate (%)': ['2.5', '0.0', '0.0'],
+        'VAT Calculation Method': ['subtotal_only', 'subtotal_only', 'subtotal_plus_levy'],
         'Discount': ['0.00', '0.00', '50.00'],
         'Notes': ['Payment for services', '', 'Project completion'],
         'Terms': ['Net 30 days', '', 'Net 15 days']
@@ -1513,16 +1632,18 @@ def generate_invoice_import_template():
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='Invoices', index=False)
 
-        # Add instructions sheet
         instructions = pd.DataFrame({
             'Instruction': [
                 '1. Each row represents one line item',
                 '2. Multiple rows with the same Customer Name and Invoice Date will be grouped into one invoice',
                 '3. Customer must already exist in the system',
                 '4. Date format: YYYY-MM-DD',
-                '5. VAT Rate and Levy Rate are percentages (e.g., 15 for 15%)',
-                '6. Leave fields blank for optional values',
-                '7. The first two rows (Sample Customer) will be combined into a single invoice with 2 line items'
+                '5. VAT Rate, WHT Rate, WHT on VAT Rate, and Levy Rate are percentages (e.g., 15 for 15%)',
+                '6. WHT is calculated on Subtotal only',
+                '7. WHT on VAT uses the SAME base as VAT (Subtotal OR Subtotal+Levy based on method)',
+                '8. VAT Calculation Method: "subtotal_only" or "subtotal_plus_levy"',
+                '9. Leave fields blank for optional values',
+                '10. The first two rows (Sample Customer) will be combined into a single invoice with 2 line items'
             ]
         })
         instructions.to_excel(writer, sheet_name='Instructions', index=False)
@@ -1532,11 +1653,10 @@ def generate_invoice_import_template():
 
 
 def import_invoices_from_excel(df, company_id):
-    """Import invoices from Excel file"""
+    """Import invoices from Excel file with WHT, WHT on VAT, and VAT method support"""
     errors = []
     invoices_created = []
 
-    # Column mappings
     column_mappings = {
         'Customer Name': ['Customer Name', 'Customer', 'Client'],
         'Invoice Date': ['Invoice Date', 'Date', 'InvoiceDate'],
@@ -1545,13 +1665,15 @@ def import_invoices_from_excel(df, company_id):
         'Quantity': ['Quantity', 'Qty'],
         'Unit Price': ['Unit Price', 'UnitPrice', 'Price'],
         'VAT Rate (%)': ['VAT Rate (%)', 'VAT %', 'VAT'],
+        'WHT Rate (%)': ['WHT Rate (%)', 'WHT %', 'WHT'],
+        'WHT on VAT Rate (%)': ['WHT on VAT Rate (%)', 'WHT on VAT %', 'WHT on VAT'],
         'Levy Rate (%)': ['Levy Rate (%)', 'Levy %', 'Levy'],
+        'VAT Calculation Method': ['VAT Calculation Method', 'VAT Method', 'VATCalc'],
         'Discount': ['Discount', 'Disc'],
         'Notes': ['Notes', 'Note'],
         'Terms': ['Terms', 'Term']
     }
 
-    # Find actual columns
     actual_columns = {}
     for expected, variations in column_mappings.items():
         for col in df.columns:
@@ -1560,17 +1682,14 @@ def import_invoices_from_excel(df, company_id):
                 actual_columns[expected] = col
                 break
 
-    # Validate required columns
     required = ['Customer Name', 'Invoice Date', 'Item Description', 'Quantity', 'Unit Price']
     missing = [req for req in required if req not in actual_columns]
     if missing:
         raise ValueError(f'Missing required columns: {", ".join(missing)}')
 
-    # Get existing customers
     db_customers = Customer.query.filter_by(company_id=company_id).all()
     customer_names = {c.name.lower(): c.id for c in db_customers}
 
-    # Group rows by invoice (customer name + invoice date)
     invoice_groups = {}
 
     for idx, row in df.iterrows():
@@ -1581,10 +1700,8 @@ def import_invoices_from_excel(df, company_id):
                 errors.append(f"Row {idx + 2}: Customer name is required")
                 continue
 
-            # Find customer ID
             customer_id = customer_names.get(customer_name.lower())
             if not customer_id:
-                # Try fuzzy matching
                 for name in customer_names:
                     if customer_name.lower() in name or name in customer_name.lower():
                         customer_id = customer_names[name]
@@ -1594,7 +1711,6 @@ def import_invoices_from_excel(df, company_id):
                     errors.append(f"Row {idx + 2}: Customer '{customer_name}' not found. Please add customer first.")
                     continue
 
-            # Get invoice date
             invoice_date = None
             if 'Invoice Date' in actual_columns and pd.notna(row[actual_columns['Invoice Date']]):
                 try:
@@ -1607,7 +1723,6 @@ def import_invoices_from_excel(df, company_id):
             else:
                 invoice_date = datetime.now().date()
 
-            # Get due date (default to 30 days after invoice date)
             due_date = None
             if 'Due Date' in actual_columns and pd.notna(row[actual_columns['Due Date']]):
                 try:
@@ -1620,7 +1735,6 @@ def import_invoices_from_excel(df, company_id):
             else:
                 due_date = invoice_date + timedelta(days=30)
 
-            # Get item details
             item_desc = str(row[actual_columns['Item Description']]) if pd.notna(
                 row[actual_columns['Item Description']]) else ''
             quantity = float(row[actual_columns['Quantity']]) if pd.notna(row[actual_columns['Quantity']]) else 1
@@ -1630,13 +1744,26 @@ def import_invoices_from_excel(df, company_id):
                 errors.append(f"Row {idx + 2}: Invalid item data. Description and Unit Price are required.")
                 continue
 
-            # Get VAT and Levy rates
             vat_rate = 0.0
             if 'VAT Rate (%)' in actual_columns and pd.notna(row[actual_columns['VAT Rate (%)']]):
                 try:
                     vat_rate = float(row[actual_columns['VAT Rate (%)']])
                 except:
                     vat_rate = 0.0
+
+            wht_rate = 0.0
+            if 'WHT Rate (%)' in actual_columns and pd.notna(row[actual_columns['WHT Rate (%)']]):
+                try:
+                    wht_rate = float(row[actual_columns['WHT Rate (%)']])
+                except:
+                    wht_rate = 0.0
+
+            wht_on_vat_rate = 0.0
+            if 'WHT on VAT Rate (%)' in actual_columns and pd.notna(row[actual_columns['WHT on VAT Rate (%)']]):
+                try:
+                    wht_on_vat_rate = float(row[actual_columns['WHT on VAT Rate (%)']])
+                except:
+                    wht_on_vat_rate = 0.0
 
             levy_rate = 0.0
             if 'Levy Rate (%)' in actual_columns and pd.notna(row[actual_columns['Levy Rate (%)']]):
@@ -1645,7 +1772,13 @@ def import_invoices_from_excel(df, company_id):
                 except:
                     levy_rate = 0.0
 
-            # Get discount (if provided)
+            # Get VAT calculation method
+            vat_method = 'subtotal_only'
+            if 'VAT Calculation Method' in actual_columns and pd.notna(row[actual_columns['VAT Calculation Method']]):
+                val = str(row[actual_columns['VAT Calculation Method']]).strip().lower()
+                if val in ['subtotal_plus_levy', 'subtotal+levy', 'subtotal plus levy', 'subtotal_plus_levy (legacy)']:
+                    vat_method = 'subtotal_plus_levy'
+
             discount = 0.0
             if 'Discount' in actual_columns and pd.notna(row[actual_columns['Discount']]):
                 try:
@@ -1653,7 +1786,6 @@ def import_invoices_from_excel(df, company_id):
                 except:
                     discount = 0.0
 
-            # Get notes and terms
             notes = ''
             if 'Notes' in actual_columns and pd.notna(row[actual_columns['Notes']]):
                 notes = str(row[actual_columns['Notes']])
@@ -1662,7 +1794,6 @@ def import_invoices_from_excel(df, company_id):
             if 'Terms' in actual_columns and pd.notna(row[actual_columns['Terms']]):
                 terms = str(row[actual_columns['Terms']])
 
-            # Create unique key for grouping
             key = f"{customer_id}_{invoice_date.strftime('%Y-%m-%d')}"
 
             if key not in invoice_groups:
@@ -1671,59 +1802,68 @@ def import_invoices_from_excel(df, company_id):
                     'customer_name': customer_name,
                     'invoice_date': invoice_date,
                     'due_date': due_date,
+                    'vat_calculation_method': vat_method,
                     'discount': discount,
                     'notes': notes,
                     'terms': terms,
                     'items': [],
                     'total_subtotal': 0,
                     'total_vat': 0,
+                    'total_wht': 0,
+                    'total_wht_on_vat': 0,
                     'total_levy': 0
                 }
 
-            # Calculate item totals
-            calc = calculate_invoice_item_totals(quantity, unit_price, vat_rate, levy_rate)
+            calc = calculate_invoice_item_totals(
+                quantity, unit_price, vat_rate, wht_rate, wht_on_vat_rate, levy_rate, vat_method)
 
             invoice_groups[key]['items'].append({
                 'description': item_desc,
                 'quantity': quantity,
                 'unit_price': unit_price,
                 'vat_rate': vat_rate,
+                'wht_rate': wht_rate,
+                'wht_on_vat_rate': wht_on_vat_rate,
                 'levy_rate': levy_rate,
                 'subtotal': calc['subtotal'],
                 'vat_amount': calc['vat_amount'],
+                'wht_amount': calc['wht_amount'],
+                'wht_on_vat_amount': calc['wht_on_vat_amount'],
                 'levy_amount': calc['levy_amount'],
                 'total': calc['total']
             })
 
             invoice_groups[key]['total_subtotal'] += calc['subtotal']
             invoice_groups[key]['total_vat'] += calc['vat_amount']
+            invoice_groups[key]['total_wht'] += calc['wht_amount']
+            invoice_groups[key]['total_wht_on_vat'] += calc['wht_on_vat_amount']
             invoice_groups[key]['total_levy'] += calc['levy_amount']
 
         except Exception as e:
             errors.append(f"Row {idx + 2}: {str(e)}")
             continue
 
-    # Create invoices
     for key, data in invoice_groups.items():
         try:
-            # Generate invoice number
             invoice_number = generate_invoice_number()
 
-            # Calculate grand total
-            total = data['total_subtotal'] + data['total_vat'] + data['total_levy'] - data['discount']
+            total = data['total_subtotal'] + data['total_vat'] + data['total_levy'] - data['total_wht'] - data[
+                'total_wht_on_vat'] - data['discount']
 
-            # Create invoice
             invoice = Invoice(
                 invoice_number=invoice_number,
                 customer_id=data['customer_id'],
                 company_id=company_id,
                 invoice_date=data['invoice_date'],
                 due_date=data['due_date'],
-                currency='USD',  # Default currency for imported invoices
+                currency='USD',
                 exchange_rate=1.0,
                 subtotal=data['total_subtotal'],
                 tax_rate=0,
                 tax_amount=data['total_vat'],
+                vat_calculation_method=data['vat_calculation_method'],
+                wht_total=data['total_wht'],
+                wht_on_vat_total=data['total_wht_on_vat'],
                 discount=data['discount'],
                 total=total,
                 base_currency_subtotal=data['total_subtotal'],
@@ -1737,7 +1877,6 @@ def import_invoices_from_excel(df, company_id):
             db.session.add(invoice)
             db.session.flush()
 
-            # Add items
             for item_data in data['items']:
                 item = InvoiceItem(
                     invoice_id=invoice.id,
@@ -1746,6 +1885,10 @@ def import_invoices_from_excel(df, company_id):
                     unit_price=item_data['unit_price'],
                     vat_rate=item_data['vat_rate'],
                     vat_amount=item_data['vat_amount'],
+                    wht_rate=item_data['wht_rate'],
+                    wht_amount=item_data['wht_amount'],
+                    wht_on_vat_rate=item_data['wht_on_vat_rate'],
+                    wht_on_vat_amount=item_data['wht_on_vat_amount'],
                     levy_rate=item_data['levy_rate'],
                     levy_amount=item_data['levy_amount'],
                     total=item_data['total']
@@ -1763,6 +1906,7 @@ def import_invoices_from_excel(df, company_id):
             errors.append(f"Error creating invoice for {data['customer_name']}: {str(e)}")
 
     return invoices_created, errors
+
 
 def generate_invoice_payment_report(company_id, date_from, date_to, customer_id=None, payment_status=None):
     """Generate invoice payment report with payment details"""
@@ -1783,37 +1927,28 @@ def generate_invoice_payment_report(company_id, date_from, date_to, customer_id=
     report_data = []
     total_subtotal = 0
     total_vat = 0
+    total_wht = 0
+    total_wht_on_vat = 0
+    total_levy = 0
     total_amount = 0
     total_paid = 0
     total_outstanding = 0
 
     for invoice in invoices:
-        # Get the latest payment date if any payments exist
-        payment_date = None
-        if invoice.payments:
-            # Sort payments by date and get the latest
-            sorted_payments = sorted(invoice.payments,
-                                     key=lambda p: p.payment_date if p.payment_date else datetime.min.date(),
-                                     reverse=True)
-            if sorted_payments:
-                latest_payment = sorted_payments[0]
-                payment_date = latest_payment.payment_date.strftime('%d-%m-%Y') if latest_payment.payment_date else None
-
-        # Get all payment dates
-        payment_dates = []
-        for payment in invoice.payments:
-            if payment.payment_date:
-                payment_dates.append(payment.payment_date.strftime('%d-%m-%Y'))
-        payment_dates_str = ', '.join(payment_dates) if payment_dates else 'No payments'
-
         subtotal = float(invoice.subtotal or 0)
         vat = float(invoice.tax_amount or 0)
+        wht = float(invoice.wht_total or 0)
+        wht_on_vat = float(invoice.wht_on_vat_total or 0)
+        levy = sum(float(item.levy_amount or 0) for item in invoice.items)
         total = float(invoice.total or 0)
         paid = float(invoice.amount_paid or 0)
         outstanding = total - paid
 
         total_subtotal += subtotal
         total_vat += vat
+        total_wht += wht
+        total_wht_on_vat += wht_on_vat
+        total_levy += levy
         total_amount += total
         total_paid += paid
         total_outstanding += outstanding
@@ -1821,23 +1956,24 @@ def generate_invoice_payment_report(company_id, date_from, date_to, customer_id=
         report_data.append({
             'Invoice #': invoice.invoice_number,
             'Date': invoice.invoice_date.strftime('%d-%m-%Y') if invoice.invoice_date else 'N/A',
-            'Due Date': invoice.due_date.strftime('%d-%m-%Y') if invoice.due_date else 'N/A',
             'Customer': invoice.customer.name if invoice.customer else 'N/A',
             'Currency': invoice.currency or 'USD',
             'Subtotal': subtotal,
             'VAT': vat,
+            'Levy': levy,
+            'WHT': wht,
+            'VAT on WHT': wht_on_vat,
             'Total': total,
             'Amount Paid': paid,
-            'Outstanding': outstanding,
-            'Payment Status': invoice.payment_status.upper() if invoice.payment_status else 'UNPAID',
-            'Invoice Status': invoice.status.upper() if invoice.status else 'DRAFT',
-            'Payment Date(s)': payment_dates_str,
-            'Last Payment Date': payment_date or 'No payments'
+            'Outstanding': outstanding
         })
 
     return report_data, {
         'total_subtotal': total_subtotal,
         'total_vat': total_vat,
+        'total_wht': total_wht,
+        'total_wht_on_vat': total_wht_on_vat,
+        'total_levy': total_levy,
         'total_amount': total_amount,
         'total_paid': total_paid,
         'total_outstanding': total_outstanding,
@@ -1910,11 +2046,11 @@ def generate_invoice_payment_report_pdf(report_data, totals, title, currency):
     elements.append(Spacer(1, 6))
 
     if report_data:
-        col_headers = ['#', 'Invoice #', 'Date', 'Due Date', 'Customer', 'Currency',
-                       'Subtotal', 'VAT', 'Total', 'Amount Paid', 'Outstanding',
+        col_headers = ['#', 'Invoice #', 'Date', 'Due Date', 'Customer', 'Currency', 'VAT Method',
+                       'Subtotal', 'VAT', 'WHT', 'WHT on VAT', 'Total', 'Amount Paid', 'Outstanding',
                        'Payment Status', 'Invoice Status', 'Last Payment']
-        col_widths = [0.3 * inch, 0.8 * inch, 0.6 * inch, 0.6 * inch, 0.9 * inch, 0.4 * inch,
-                      0.6 * inch, 0.6 * inch, 0.6 * inch, 0.6 * inch, 0.6 * inch,
+        col_widths = [0.3 * inch, 0.8 * inch, 0.6 * inch, 0.6 * inch, 0.9 * inch, 0.4 * inch, 0.6 * inch,
+                      0.6 * inch, 0.6 * inch, 0.6 * inch, 0.6 * inch, 0.6 * inch, 0.6 * inch, 0.6 * inch,
                       0.6 * inch, 0.6 * inch, 0.7 * inch]
 
         data = []
@@ -1926,8 +2062,11 @@ def generate_invoice_payment_report_pdf(report_data, totals, title, currency):
                 row['Due Date'],
                 row['Customer'][:20] + '...' if len(row['Customer']) > 20 else row['Customer'],
                 row['Currency'],
+                row['VAT Method'][:15] + '...' if len(row['VAT Method']) > 15 else row['VAT Method'],
                 f"{row['Subtotal']:,.2f}",
                 f"{row['VAT']:,.2f}",
+                f"{row['WHT']:,.2f}",
+                f"{row['WHT on VAT']:,.2f}",
                 f"{row['Total']:,.2f}",
                 f"{row['Amount Paid']:,.2f}",
                 f"{row['Outstanding']:,.2f}",
@@ -1942,22 +2081,23 @@ def generate_invoice_payment_report_pdf(report_data, totals, title, currency):
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a237e')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('FONTSIZE', (0, 0), (-1, 0), 6),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -2), 0.5, colors.grey),
             ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-            ('FONTSIZE', (0, 1), (-1, -2), 7),
+            ('FONTSIZE', (0, 1), (-1, -2), 6),
         ]))
         elements.append(table)
         elements.append(Spacer(1, 12))
 
-        # Summary section
         summary_data = [
             ['TOTALS:'],
             ['Total Invoices:', f"{totals['total_invoices']}"],
             ['Total Subtotal:', f"{currency} {totals['total_subtotal']:,.2f}"],
             ['Total VAT:', f"{currency} {totals['total_vat']:,.2f}"],
+            ['Total WHT:', f"{currency} {totals['total_wht']:,.2f}"],
+            ['Total WHT on VAT:', f"{currency} {totals['total_wht_on_vat']:,.2f}"],
             ['Total Amount:', f"{currency} {totals['total_amount']:,.2f}"],
             ['Total Paid:', f"{currency} {totals['total_paid']:,.2f}"],
             ['Total Outstanding:', f"{currency} {totals['total_outstanding']:,.2f}"]
@@ -2472,17 +2612,24 @@ def create_invoice():
                     exchange_rate = float(request.form.get('exchange_rate', 1.0))
                 except ValueError:
                     exchange_rate = 1.0
-                # Get bank_id
+
                 bank_id = request.form.get('bank_id')
                 if bank_id and bank_id != '0':
                     bank_id = int(bank_id)
                 else:
                     bank_id = None
+
+                # Get VAT calculation method
+                vat_calculation_method = request.form.get('vat_calculation_method', 'subtotal_only')
+
                 total_subtotal = 0
                 total_vat = 0
+                total_wht = 0
+                total_wht_on_vat = 0
                 total_levy = 0
                 items_data = []
                 item_count = 0
+
                 for key in request.form.keys():
                     if key.startswith('items-') and key.endswith('-description'):
                         parts = key.split('-')
@@ -2503,29 +2650,56 @@ def create_invoice():
                                 except ValueError:
                                     vat_rate = 0
                                 try:
+                                    wht_rate = float(request.form.get(f'items-{idx}-wht_rate', 0))
+                                except ValueError:
+                                    wht_rate = 0
+                                try:
+                                    wht_on_vat_rate = float(request.form.get(f'items-{idx}-wht_on_vat_rate', 0))
+                                except ValueError:
+                                    wht_on_vat_rate = 0
+                                try:
                                     levy_rate = float(request.form.get(f'items-{idx}-levy_rate', 0))
                                 except ValueError:
                                     levy_rate = 0
-                                subtotal = quantity * unit_price
-                                vat_amount = (subtotal * vat_rate) / 100 if vat_rate else 0
-                                levy_amount = (subtotal * levy_rate) / 100 if levy_rate else 0
-                                total = subtotal + vat_amount + levy_amount
-                                items_data.append(
-                                    {'description': description, 'quantity': quantity, 'unit_price': unit_price,
-                                     'vat_rate': vat_rate, 'levy_rate': levy_rate, 'subtotal': subtotal,
-                                     'vat_amount': vat_amount, 'levy_amount': levy_amount, 'total': total})
-                                total_subtotal += subtotal
-                                total_vat += vat_amount
-                                total_levy += levy_amount
+
+                                calc = calculate_invoice_item_totals(
+                                    quantity, unit_price, vat_rate, wht_rate, wht_on_vat_rate, levy_rate,
+                                    vat_calculation_method)
+
+                                items_data.append({
+                                    'description': description,
+                                    'quantity': quantity,
+                                    'unit_price': unit_price,
+                                    'vat_rate': vat_rate,
+                                    'wht_rate': wht_rate,
+                                    'wht_on_vat_rate': wht_on_vat_rate,
+                                    'levy_rate': levy_rate,
+                                    'subtotal': calc['subtotal'],
+                                    'vat_amount': calc['vat_amount'],
+                                    'wht_amount': calc['wht_amount'],
+                                    'wht_on_vat_amount': calc['wht_on_vat_amount'],
+                                    'levy_amount': calc['levy_amount'],
+                                    'total': calc['total']
+                                })
+
+                                total_subtotal += calc['subtotal']
+                                total_vat += calc['vat_amount']
+                                total_wht += calc['wht_amount']
+                                total_wht_on_vat += calc['wht_on_vat_amount']
+                                total_levy += calc['levy_amount']
                                 item_count += 1
+
                 if item_count == 0:
                     flash('Please add at least one item with a description.', 'warning')
                     return render_template('create_invoice.html', form=form, company=active_company)
+
                 try:
                     discount = float(request.form.get('discount', 0))
                 except ValueError:
                     discount = 0
-                total = total_subtotal + total_vat + total_levy - discount
+
+                total = total_subtotal + total_vat + total_levy - total_wht - total_wht_on_vat - discount
+
                 invoice_date_str = request.form.get('invoice_date')
                 due_date_str = request.form.get('due_date')
                 from datetime import datetime
@@ -2537,14 +2711,16 @@ def create_invoice():
                     due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
                 except (ValueError, TypeError):
                     due_date = invoice_date + timedelta(days=30)
+
                 invoice_number = generate_invoice_number()
                 base_currency = active_company.base_currency
                 base_subtotal = total_subtotal * exchange_rate if currency != base_currency else total_subtotal
                 base_tax = total_vat * exchange_rate if currency != base_currency else total_vat
                 base_total = total * exchange_rate if currency != base_currency else total
-                # Check if user wants to send
+
                 action = request.form.get('action', 'save')
                 status = 'sent' if action == 'save_send' else 'draft'
+
                 invoice = Invoice(
                     invoice_number=invoice_number,
                     customer_id=int(customer_id),
@@ -2553,10 +2729,12 @@ def create_invoice():
                     due_date=due_date,
                     currency=currency,
                     exchange_rate=exchange_rate,
-                    bank_id=bank_id,
                     subtotal=total_subtotal,
                     tax_rate=0,
                     tax_amount=total_vat,
+                    vat_calculation_method=vat_calculation_method,
+                    wht_total=total_wht,
+                    wht_on_vat_total=total_wht_on_vat,
                     discount=discount,
                     total=total,
                     base_currency_subtotal=base_subtotal,
@@ -2566,8 +2744,10 @@ def create_invoice():
                     terms=request.form.get('terms', ''),
                     status=status
                 )
+
                 db.session.add(invoice)
                 db.session.flush()
+
                 for item_data in items_data:
                     item = InvoiceItem(
                         invoice_id=invoice.id,
@@ -2576,11 +2756,16 @@ def create_invoice():
                         unit_price=item_data['unit_price'],
                         vat_rate=item_data['vat_rate'],
                         vat_amount=item_data['vat_amount'],
+                        wht_rate=item_data['wht_rate'],
+                        wht_amount=item_data['wht_amount'],
+                        wht_on_vat_rate=item_data['wht_on_vat_rate'],
+                        wht_on_vat_amount=item_data['wht_on_vat_amount'],
                         levy_rate=item_data['levy_rate'],
                         levy_amount=item_data['levy_amount'],
                         total=item_data['total']
                     )
                     db.session.add(item)
+
                 db.session.commit()
                 if action == 'save_send':
                     flash(f'Invoice {invoice.invoice_number} created and sent to customer!', 'success')
@@ -2597,13 +2782,20 @@ def create_invoice():
             for field, errors in form.errors.items():
                 for error in errors:
                     flash(f'{field}: {error}', 'danger')
+
+    # GET request - Initialize form with default dates but NO currency auto-population
     if request.method == 'GET' or not form.invoice_date.data:
         today = date.today()
         due_date = today + timedelta(days=30)
         form.invoice_date.data = today
         form.due_date.data = due_date
-        if active_company:
-            form.currency.data = active_company.base_currency
+        # DO NOT auto-populate currency - let user select it
+        # if active_company:
+        #     form.currency.data = active_company.base_currency  <-- REMOVED
+
+        # Set VAT method to empty as well
+        form.vat_calculation_method.data = ''
+
     return render_template('create_invoice.html', form=form, company=active_company)
 
 
@@ -2629,6 +2821,7 @@ def edit_invoice(invoice_id):
         form.exchange_rate.data = float(invoice.exchange_rate) if invoice.exchange_rate else 1.0
         form.bank_id.data = invoice.bank_id or 0
         form.discount.data = float(invoice.discount)
+        form.vat_calculation_method.data = invoice.vat_calculation_method or 'subtotal_only'
         form.notes.data = invoice.notes or ''
         form.terms.data = invoice.terms or ''
         while len(form.items) > 0:
@@ -2639,6 +2832,8 @@ def edit_invoice(invoice_id):
                 'quantity': float(item.quantity),
                 'unit_price': float(item.unit_price),
                 'vat_rate': float(item.vat_rate or 0),
+                'wht_rate': float(item.wht_rate or 0),
+                'wht_on_vat_rate': float(item.wht_on_vat_rate or 0),
                 'levy_rate': float(item.levy_rate or 0)
             })
         if len(form.items) == 0:
@@ -2661,11 +2856,18 @@ def edit_invoice(invoice_id):
                     bank_id = int(bank_id)
                 else:
                     bank_id = None
+
+                # Get VAT calculation method
+                vat_calculation_method = request.form.get('vat_calculation_method', 'subtotal_only')
+
                 total_subtotal = 0
                 total_vat = 0
+                total_wht = 0
+                total_wht_on_vat = 0
                 total_levy = 0
                 items_data = []
                 item_count = 0
+
                 for key in request.form.keys():
                     if key.startswith('items-') and key.endswith('-description'):
                         parts = key.split('-')
@@ -2686,30 +2888,57 @@ def edit_invoice(invoice_id):
                                 except ValueError:
                                     vat_rate = 0
                                 try:
+                                    wht_rate = float(request.form.get(f'items-{idx}-wht_rate', 0))
+                                except ValueError:
+                                    wht_rate = 0
+                                try:
+                                    wht_on_vat_rate = float(request.form.get(f'items-{idx}-wht_on_vat_rate', 0))
+                                except ValueError:
+                                    wht_on_vat_rate = 0
+                                try:
                                     levy_rate = float(request.form.get(f'items-{idx}-levy_rate', 0))
                                 except ValueError:
                                     levy_rate = 0
-                                subtotal = quantity * unit_price
-                                vat_amount = (subtotal * vat_rate) / 100 if vat_rate else 0
-                                levy_amount = (subtotal * levy_rate) / 100 if levy_rate else 0
-                                total = subtotal + vat_amount + levy_amount
-                                items_data.append(
-                                    {'description': description, 'quantity': quantity, 'unit_price': unit_price,
-                                     'vat_rate': vat_rate, 'levy_rate': levy_rate, 'subtotal': subtotal,
-                                     'vat_amount': vat_amount, 'levy_amount': levy_amount, 'total': total})
-                                total_subtotal += subtotal
-                                total_vat += vat_amount
-                                total_levy += levy_amount
+
+                                calc = calculate_invoice_item_totals(
+                                    quantity, unit_price, vat_rate, wht_rate, wht_on_vat_rate, levy_rate,
+                                    vat_calculation_method)
+
+                                items_data.append({
+                                    'description': description,
+                                    'quantity': quantity,
+                                    'unit_price': unit_price,
+                                    'vat_rate': vat_rate,
+                                    'wht_rate': wht_rate,
+                                    'wht_on_vat_rate': wht_on_vat_rate,
+                                    'levy_rate': levy_rate,
+                                    'subtotal': calc['subtotal'],
+                                    'vat_amount': calc['vat_amount'],
+                                    'wht_amount': calc['wht_amount'],
+                                    'wht_on_vat_amount': calc['wht_on_vat_amount'],
+                                    'levy_amount': calc['levy_amount'],
+                                    'total': calc['total']
+                                })
+
+                                total_subtotal += calc['subtotal']
+                                total_vat += calc['vat_amount']
+                                total_wht += calc['wht_amount']
+                                total_wht_on_vat += calc['wht_on_vat_amount']
+                                total_levy += calc['levy_amount']
                                 item_count += 1
+
                 if item_count == 0:
                     flash('Please add at least one item with a description.', 'warning')
                     return render_template('edit_invoice.html', form=form, invoice=invoice, company=active_company,
                                            invoice_items=invoice.items)
+
                 try:
                     discount = float(request.form.get('discount', 0))
                 except ValueError:
                     discount = 0
-                total = total_subtotal + total_vat + total_levy - discount
+
+                total = total_subtotal + total_vat + total_levy - total_wht - total_wht_on_vat - discount
+
                 invoice_date_str = request.form.get('invoice_date')
                 due_date_str = request.form.get('due_date')
                 from datetime import datetime
@@ -2721,12 +2950,15 @@ def edit_invoice(invoice_id):
                     due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
                 except (ValueError, TypeError):
                     due_date = invoice_date + timedelta(days=30)
+
                 base_currency = active_company.base_currency
                 base_subtotal = total_subtotal * exchange_rate if currency != base_currency else total_subtotal
                 base_tax = total_vat * exchange_rate if currency != base_currency else total_vat
                 base_total = total * exchange_rate if currency != base_currency else total
+
                 action = request.form.get('action', 'save')
                 new_status = 'sent' if action == 'save_send' else invoice.status
+
                 invoice.customer_id = int(customer_id)
                 invoice.invoice_date = invoice_date
                 invoice.due_date = due_date
@@ -2735,6 +2967,9 @@ def edit_invoice(invoice_id):
                 invoice.bank_id = bank_id
                 invoice.subtotal = total_subtotal
                 invoice.tax_amount = total_vat
+                invoice.vat_calculation_method = vat_calculation_method
+                invoice.wht_total = total_wht
+                invoice.wht_on_vat_total = total_wht_on_vat
                 invoice.discount = discount
                 invoice.total = total
                 invoice.base_currency_subtotal = base_subtotal
@@ -2743,9 +2978,11 @@ def edit_invoice(invoice_id):
                 invoice.notes = request.form.get('notes', '')
                 invoice.terms = request.form.get('terms', '')
                 invoice.status = new_status
+
                 for item in invoice.items:
                     db.session.delete(item)
                 invoice.items.clear()
+
                 for item_data in items_data:
                     item = InvoiceItem(
                         invoice_id=invoice.id,
@@ -2754,11 +2991,16 @@ def edit_invoice(invoice_id):
                         unit_price=item_data['unit_price'],
                         vat_rate=item_data['vat_rate'],
                         vat_amount=item_data['vat_amount'],
+                        wht_rate=item_data['wht_rate'],
+                        wht_amount=item_data['wht_amount'],
+                        wht_on_vat_rate=item_data['wht_on_vat_rate'],
+                        wht_on_vat_amount=item_data['wht_on_vat_amount'],
                         levy_rate=item_data['levy_rate'],
                         levy_amount=item_data['levy_amount'],
                         total=item_data['total']
                     )
                     db.session.add(item)
+
                 invoice.updated_at = datetime.utcnow()
                 db.session.commit()
                 if action == 'save_send':
@@ -2861,6 +3103,9 @@ def get_invoices_api():
         'exchange_rate': float(inv.exchange_rate) if inv.exchange_rate else 1.0,
         'subtotal': float(inv.subtotal) if inv.subtotal else 0,
         'tax_amount': float(inv.tax_amount) if inv.tax_amount else 0,
+        'vat_calculation_method': inv.vat_calculation_method or 'subtotal_only',
+        'wht_total': float(inv.wht_total) if inv.wht_total else 0,
+        'wht_on_vat_total': float(inv.wht_on_vat_total) if inv.wht_on_vat_total else 0,
         'discount': float(inv.discount) if inv.discount else 0,
         'total': float(inv.total) if inv.total else 0,
         'amount_paid': float(inv.amount_paid) if inv.amount_paid else 0,
@@ -2983,6 +3228,7 @@ def invoice_payment_report():
                            active_company=active_company,
                            now=datetime.now())
 
+
 @app.route('/api/invoices/<int:invoice_id>/status', methods=['PUT'])
 @csrf_exempt_api
 def update_invoice_status(invoice_id):
@@ -2995,6 +3241,45 @@ def update_invoice_status(invoice_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
+
+
+@app.route('/api/invoices/<int:invoice_id>', methods=['DELETE'])
+@csrf_exempt_api
+def delete_invoice_api(invoice_id):
+    """Delete an invoice by ID"""
+    try:
+        invoice = Invoice.query.get(invoice_id)
+        if not invoice:
+            return jsonify({'error': 'Invoice not found'}), 404
+
+        # Check if user has permission (optional - you can remove this check)
+        active_company = get_active_company()
+        if invoice.company_id != active_company.id:
+            return jsonify({'error': 'You do not have permission to delete this invoice'}), 403
+
+        # Check if invoice is already paid - prevent deletion
+        if invoice.payment_status == 'paid':
+            return jsonify({'error': 'Cannot delete a paid invoice'}), 400
+
+        # Delete all invoice items first (cascade should handle this, but explicit for safety)
+        for item in invoice.items:
+            db.session.delete(item)
+
+        # Delete the invoice
+        db.session.delete(invoice)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Invoice {invoice.invoice_number} deleted successfully'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting invoice: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/invoices/<int:invoice_id>/pdf', methods=['GET'])
@@ -3016,7 +3301,11 @@ def companies():
 def add_company():
     form = CompanyForm()
     if form.validate_on_submit():
-        company = Company(name=form.name.data, base_currency=form.base_currency.data)
+        company = Company(
+            name=form.name.data,
+            base_currency=form.base_currency.data,
+            tin=form.tin.data
+        )
         if form.logo.data and allowed_file(form.logo.data.filename):
             filename = secure_filename(form.logo.data.filename)
             name_parts = filename.rsplit('.', 1)
@@ -3059,6 +3348,7 @@ def edit_company(company_id):
     if form.validate_on_submit():
         company.name = form.name.data
         company.base_currency = form.base_currency.data
+        company.tin = form.tin.data
         if form.logo.data and allowed_file(form.logo.data.filename):
             if company.logo_filename:
                 old_path = os.path.join(app.config['UPLOAD_FOLDER'], company.logo_filename)
@@ -3086,12 +3376,10 @@ def edit_invoice_payment(payment_id):
     payment = InvoicePayment.query.get_or_404(payment_id)
     invoice = payment.invoice
 
-    # Check if invoice belongs to active company
     if invoice.company_id != active_company.id:
         flash('You do not have permission to modify this payment.', 'danger')
         return redirect(url_for('invoices_list'))
 
-    # Only allow editing if invoice is not fully paid
     if invoice.payment_status == 'paid':
         flash('Cannot edit payments on a fully paid invoice.', 'warning')
         return redirect(url_for('invoices_list'))
@@ -3112,10 +3400,8 @@ def edit_invoice_payment(payment_id):
                 new_amount = form.amount.data
                 old_amount = float(payment.amount)
 
-                # Calculate the difference
                 amount_diff = new_amount - old_amount
 
-                # Check if new amount would exceed total
                 new_total_paid = float(invoice.amount_paid or 0) + amount_diff
                 if new_total_paid > float(invoice.total):
                     flash(
@@ -3123,17 +3409,14 @@ def edit_invoice_payment(payment_id):
                         'danger')
                     return render_template('edit_invoice_payment.html', form=form, payment=payment, invoice=invoice)
 
-                # Update payment
                 payment.payment_date = form.payment_date.data
                 payment.amount = new_amount
                 payment.payment_method = form.payment_method.data
                 payment.reference = form.reference.data or ''
                 payment.notes = form.notes.data or ''
 
-                # Update invoice amount paid
                 invoice.amount_paid = new_total_paid
 
-                # Update payment status
                 if new_total_paid >= float(invoice.total):
                     invoice.payment_status = 'paid'
                     invoice.status = 'paid'
@@ -3167,6 +3450,7 @@ def edit_invoice_payment(payment_id):
 
 
 @app.route('/invoices/payment/delete/<int:payment_id>', methods=['POST'])
+@csrf_exempt_api
 def delete_invoice_payment(payment_id):
     """Delete an invoice payment"""
     active_company = get_active_company()
@@ -3176,25 +3460,18 @@ def delete_invoice_payment(payment_id):
     payment = InvoicePayment.query.get_or_404(payment_id)
     invoice = payment.invoice
 
-    # Check if invoice belongs to active company
     if invoice.company_id != active_company.id:
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
 
-    # Only allow deletion if invoice is not fully paid
     if invoice.payment_status == 'paid' and float(invoice.amount_paid) >= float(invoice.total):
         return jsonify({'success': False, 'message': 'Cannot delete payment from a fully paid invoice.'}), 400
 
     try:
-        # Get the amount before deletion
         amount_to_remove = float(payment.amount)
-
-        # Update invoice amount paid
         new_amount_paid = float(invoice.amount_paid or 0) - amount_to_remove
 
-        # Delete the payment
         db.session.delete(payment)
 
-        # Update invoice payment status
         if new_amount_paid >= float(invoice.total):
             invoice.payment_status = 'paid'
             invoice.status = 'paid'
@@ -3202,7 +3479,6 @@ def delete_invoice_payment(payment_id):
             invoice.payment_status = 'partial'
         else:
             invoice.payment_status = 'unpaid'
-            # If no payments, revert status to sent if it was paid
             if invoice.status == 'paid':
                 invoice.status = 'sent'
 
@@ -3210,8 +3486,8 @@ def delete_invoice_payment(payment_id):
         invoice.updated_at = datetime.utcnow()
         db.session.commit()
 
-        flash(f'Payment of {invoice.currency} {amount_to_remove:,.2f} deleted successfully!', 'success')
-        return redirect(url_for('record_invoice_payment', invoice_id=invoice.id))
+        return jsonify({'success': True,
+                        'message': f'Payment of {invoice.currency} {amount_to_remove:,.2f} deleted successfully!'})
 
     except Exception as e:
         db.session.rollback()
@@ -3933,8 +4209,12 @@ def calculate_invoice_item():
     quantity = float(data.get('quantity', 1))
     unit_price = float(data.get('unit_price', 0))
     vat_rate = float(data.get('vat_rate', 0))
+    wht_rate = float(data.get('wht_rate', 0))
+    wht_on_vat_rate = float(data.get('wht_on_vat_rate', 0))
     levy_rate = float(data.get('levy_rate', 0))
-    result = calculate_invoice_item_totals(quantity, unit_price, vat_rate, levy_rate)
+    vat_method = data.get('vat_calculation_method', 'subtotal_only')
+    result = calculate_invoice_item_totals(quantity, unit_price, vat_rate, wht_rate, wht_on_vat_rate, levy_rate,
+                                           vat_method)
     return jsonify(result)
 
 
@@ -4107,7 +4387,7 @@ def report_view(report_type):
                     'Total': float(inv.total),
                     'Status': inv.status,
                     'Days Overdue': (
-                                datetime.now().date() - inv.due_date).days if inv.due_date and inv.status != 'paid' else 0
+                            datetime.now().date() - inv.due_date).days if inv.due_date and inv.status != 'paid' else 0
                 })
                 total_amount += float(inv.total)
     if request.method == 'POST' and form.validate_on_submit():
@@ -4142,7 +4422,7 @@ def report_view(report_type):
                     'Total': float(inv.total),
                     'Status': inv.status,
                     'Days Overdue': (
-                                datetime.now().date() - inv.due_date).days if inv.due_date and inv.status != 'paid' else 0
+                            datetime.now().date() - inv.due_date).days if inv.due_date and inv.status != 'paid' else 0
                 })
                 total_amount += float(inv.total)
         if action == 'download':
@@ -4454,7 +4734,7 @@ if __name__ == '__main__':
     print("=" * 60)
     print("🚀 APP4 - Billing and Payment Platform")
     print("=" * 60)
-    print("📊 Features: Payments, Invoices, VAT, Levy, Reports")
+    print("📊 Features: Payments, Invoices, VAT, WHT, WHT on VAT, Levy, Reports")
     print("📁 Base Path: " + (BASE_PATH if BASE_PATH else '/'))
     print("🌐 Running at: http://localhost:5000" + (BASE_PATH if BASE_PATH else ''))
     print("=" * 60)

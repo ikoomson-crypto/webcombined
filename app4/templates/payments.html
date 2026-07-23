@@ -95,14 +95,10 @@
                 <th>Transaction #</th>
                 <th>Invoice #</th>
                 <th>Supplier</th>
-                <th>Source Bank</th>
                 <th>Items</th>
                 <th>Gross Amount</th>
                 <th>Currency</th>
-                <th>WHT Total</th>
-                <th>VAT Total</th>
                 <th>Net Amount</th>
-                <th>Payment Date</th>
                 <th>Attachment</th>
                 <th>Actions</th>
             </tr>
@@ -121,14 +117,10 @@
                 </td>
                 <td>{{ payment.invoice_number or 'N/A' }}</td>
                 <td>{{ payment.supplier.name }}</td>
-                <td>{{ payment.source_bank.name if payment.source_bank else 'N/A' }}</td>
                 <td>{{ payment.line_items|length }}</td>
                 <td>{{ "{:,.2f}".format(payment.total_gross_amount or 0) }}</td>
                 <td>{{ payment.currency }}</td>
-                <td>{{ "{:,.2f}".format(payment.total_wht_amount or 0) }}</td>
-                <td>{{ "{:,.2f}".format(payment.total_vat_amount or 0) }}</td>
                 <td><strong>{{ "{:,.2f}".format(payment.total_net_amount or 0) }}</strong></td>
-                <td>{{ payment.payment_date.strftime('%Y-%m-%d') if payment.payment_date else 'N/A' }}</td>
 
                 <!-- ===== ATTACHMENT COLUMN ===== -->
                 <td>
@@ -171,7 +163,7 @@
             </tr>
             <!-- Collapsible row for line items -->
             <tr>
-                <td colspan="14" class="p-0">
+                <td colspan="10" class="p-0">
                     <div class="collapse" id="paymentItems{{ payment.id }}">
                         <div class="card card-body m-2">
                             <h6 class="mb-3">Line Items for Transaction: {{ payment.transaction_number }}</h6>
@@ -223,8 +215,7 @@
                             <div class="mt-2">
                                 <small class="text-muted">
                                     <strong>Reference:</strong> {{ payment.reference or 'N/A' }} |
-                                    <strong>Description:</strong> {{ payment.description or 'N/A' }} |
-                                    <strong>Source Bank:</strong> {{ payment.source_bank.name if payment.source_bank else 'N/A' }}
+                                    <strong>Description:</strong> {{ payment.description or 'N/A' }}
                                     {% if payment.attachment_filename %}
                                         | <strong>Attachment:</strong> {{ payment.attachment_original_name or payment.attachment_filename }}
                                     {% endif %}
@@ -251,10 +242,10 @@
                     <strong>Total Net Amount:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_net_amount')) }} {{ company.base_currency }}
                 </div>
                 <div class="col-md-3">
-                    <strong>Total WHT:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_wht_amount')) }} {{ company.base_currency }}
+                    <strong>Total Gross Amount:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_gross_amount')) }} {{ company.base_currency }}
                 </div>
                 <div class="col-md-3">
-                    <strong>Total VAT:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_vat_amount')) }} {{ company.base_currency }}
+                    <strong>Total WHT:</strong> {{ "{:,.2f}".format(payments|sum(attribute='total_wht_amount')) }} {{ company.base_currency }}
                 </div>
             </div>
         </div>

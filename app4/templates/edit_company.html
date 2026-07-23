@@ -3,17 +3,18 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">
-        <h2>Edit Company</h2>
+        <h2><i class="bi bi-pencil"></i> Edit Company</h2>
         <hr>
 
-        <div class="card">
+        <div class="card shadow-sm">
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
                     {{ form.hidden_tag() }}
 
                     <div class="mb-3">
                         {{ form.name.label(class="form-label") }}
-                        {{ form.name(class="form-control") }}
+                        {{ form.name(class="form-control", placeholder="Enter company name") }}
+                        <small class="text-muted">Company name as it will appear on invoices</small>
                         {% for error in form.name.errors %}
                             <div class="text-danger">{{ error }}</div>
                         {% endfor %}
@@ -22,7 +23,20 @@
                     <div class="mb-3">
                         {{ form.base_currency.label(class="form-label") }}
                         {{ form.base_currency(class="form-select") }}
+                        <small class="text-muted">Default currency for all transactions</small>
                         {% for error in form.base_currency.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.tin.label(class="form-label") }}
+                        {{ form.tin(class="form-control", placeholder="Enter Tax Identification Number (TIN)") }}
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i>
+                            Tax Identification Number (TIN) - will appear on invoices
+                        </small>
+                        {% for error in form.tin.errors %}
                             <div class="text-danger">{{ error }}</div>
                         {% endfor %}
                     </div>
@@ -33,22 +47,53 @@
                                 <label class="form-label">Current Logo</label>
                                 <br>
                                 <img src="{{ url_for('static', filename='uploads/logos/' + company.logo_filename) }}"
-                                     alt="Company Logo" height="60" class="border p-1">
+                                     alt="Company Logo" height="60" class="border p-1 rounded">
+                                <br>
+                                <small class="text-muted">Current logo: {{ company.logo_filename }}</small>
                             </div>
                         {% endif %}
                         {{ form.logo.label(class="form-label") }}
-                        {{ form.logo(class="form-control") }}
-                        <small class="text-muted">Upload company logo (JPG, PNG, GIF, SVG)</small>
+                        {{ form.logo(class="form-control", accept=".jpg,.jpeg,.png,.gif,.svg") }}
+                        <small class="text-muted">
+                            <i class="bi bi-image"></i>
+                            Upload new logo to replace existing (JPG, PNG, GIF, SVG)
+                        </small>
                         {% for error in form.logo.errors %}
                             <div class="text-danger">{{ error }}</div>
                         {% endfor %}
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Update Company</button>
-                    <a href="{{ url_for('companies') }}" class="btn btn-secondary">Cancel</a>
+                    <hr>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Update Company
+                        </button>
+                        <a href="{{ url_for('companies') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Cancel
+                        </a>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    .card {
+        border-radius: 12px;
+        border: none;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #1e3c72;
+        box-shadow: 0 0 0 0.2rem rgba(30, 60, 114, 0.25);
+    }
+    .text-muted i {
+        margin-right: 4px;
+    }
+    img {
+        max-height: 80px;
+        width: auto;
+    }
+</style>
 {% endblock %}

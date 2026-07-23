@@ -61,24 +61,25 @@
                         <div class="row g-1">
                             <div class="col-4">
                                 <select name="currency" id="currency" class="form-select form-select-sm" required>
-                                    <option value="USD" {% if form.currency.data == 'USD' %}selected{% endif %}>USD</option>
-                                    <option value="EUR" {% if form.currency.data == 'EUR' %}selected{% endif %}>EUR</option>
-                                    <option value="GBP" {% if form.currency.data == 'GBP' %}selected{% endif %}>GBP</option>
-                                    <option value="GHS" {% if form.currency.data == 'GHS' %}selected{% endif %}>GHS</option>
-                                    <option value="JPY" {% if form.currency.data == 'JPY' %}selected{% endif %}>JPY</option>
-                                    <option value="CHF" {% if form.currency.data == 'CHF' %}selected{% endif %}>CHF</option>
-                                    <option value="CAD" {% if form.currency.data == 'CAD' %}selected{% endif %}>CAD</option>
-                                    <option value="AUD" {% if form.currency.data == 'AUD' %}selected{% endif %}>AUD</option>
-                                    <option value="CNY" {% if form.currency.data == 'CNY' %}selected{% endif %}>CNY</option>
-                                    <option value="INR" {% if form.currency.data == 'INR' %}selected{% endif %}>INR</option>
-                                    <option value="BRL" {% if form.currency.data == 'BRL' %}selected{% endif %}>BRL</option>
-                                    <option value="ZAR" {% if form.currency.data == 'ZAR' %}selected{% endif %}>ZAR</option>
-                                    <option value="AED" {% if form.currency.data == 'AED' %}selected{% endif %}>AED</option>
-                                    <option value="NGN" {% if form.currency.data == 'NGN' %}selected{% endif %}>NGN</option>
-                                    <option value="KES" {% if form.currency.data == 'KES' %}selected{% endif %}>KES</option>
-                                    <option value="TZS" {% if form.currency.data == 'TZS' %}selected{% endif %}>TZS</option>
-                                    <option value="UGX" {% if form.currency.data == 'UGX' %}selected{% endif %}>UGX</option>
-                                    <option value="ZMW" {% if form.currency.data == 'ZMW' %}selected{% endif %}>ZMW</option>
+                                    <option value="">-- Select Currency --</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="GBP">GBP</option>
+                                    <option value="GHS">GHS</option>
+                                    <option value="JPY">JPY</option>
+                                    <option value="CHF">CHF</option>
+                                    <option value="CAD">CAD</option>
+                                    <option value="AUD">AUD</option>
+                                    <option value="CNY">CNY</option>
+                                    <option value="INR">INR</option>
+                                    <option value="BRL">BRL</option>
+                                    <option value="ZAR">ZAR</option>
+                                    <option value="AED">AED</option>
+                                    <option value="NGN">NGN</option>
+                                    <option value="KES">KES</option>
+                                    <option value="TZS">TZS</option>
+                                    <option value="UGX">UGX</option>
+                                    <option value="ZMW">ZMW</option>
                                 </select>
                                 {% for error in form.currency.errors %}
                                     <div class="text-danger small">{{ error }}</div>
@@ -86,7 +87,7 @@
                             </div>
                             <div class="col-4">
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text">1 {{ active_company.base_currency if active_company else 'USD' }}</span>
+                                    <span class="input-group-text" id="exchangeRateLabel">1 USD</span>
                                     <input type="number" name="exchange_rate" id="exchange_rate" class="form-control form-control-sm"
                                            value="{{ form.exchange_rate.data or 1.0 }}" step="0.0001" min="0.01">
                                 </div>
@@ -96,7 +97,7 @@
                             </div>
                             <div class="col-4">
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text" id="discountCurrencySymbol">$</span>
+                                    <span class="input-group-text" id="discountCurrencySymbol"></span>
                                     <input type="number" name="discount" id="discount" class="form-control form-control-sm"
                                            value="{{ form.discount.data or 0 }}" step="0.01" min="0" placeholder="Discount">
                                 </div>
@@ -105,10 +106,28 @@
                                 {% endfor %}
                             </div>
                         </div>
+
+                        <!-- VAT Calculation Method Selector - No auto-populate -->
                         <div class="row g-1 mt-1">
+                            <div class="col-6">
+                                <select name="vat_calculation_method" id="vat_calculation_method" class="form-select form-select-sm">
+                                    <option value="">-- Select VAT Method --</option>
+                                    <option value="subtotal_only">VAT on Subtotal Only</option>
+                                    <option value="subtotal_plus_levy">VAT on Subtotal + Levy (Legacy)</option>
+                                </select>
+                                <small class="text-muted" style="font-size: 0.65rem;">
+                                    <i class="bi bi-info-circle"></i>
+                                    Select how VAT should be calculated
+                                </small>
+                                {% for error in form.vat_calculation_method.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
                             <div class="col-6">
                                 <input type="text" name="notes" id="notes" class="form-control form-control-sm" placeholder="Notes" value="{{ form.notes.data or '' }}">
                             </div>
+                        </div>
+                        <div class="row g-1 mt-1">
                             <div class="col-6">
                                 <input type="text" name="terms" id="terms" class="form-control form-control-sm" placeholder="Terms" value="{{ form.terms.data or '' }}">
                             </div>
@@ -137,15 +156,15 @@
             </div>
         </div>
 
-        <!-- Invoice Items - Compact -->
+        <!-- Invoice Items - Compact with WHT on VAT -->
         <div class="card shadow-sm mb-2">
             <div class="card-header py-1 bg-warning text-white d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="bi bi-list"></i> Items <span class="badge bg-light text-dark ms-1" id="currencyDisplay" style="font-size:0.7rem;">USD</span></h6>
+                <h6 class="mb-0"><i class="bi bi-list"></i> Items <span class="badge bg-light text-dark ms-1" id="currencyDisplay" style="font-size:0.7rem;">--</span></h6>
                 <div>
-                    <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItemWithTemplate('Consulting', 1, 100, 0, 0)" style="font-size:0.7rem;">
+                    <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItemWithTemplate('Consulting', 1, 100, 15, 5, 2.5, 0)" style="font-size:0.7rem;">
                         <i class="bi bi-clock"></i>
                     </button>
-                    <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItemWithTemplate('Software', 1, 200, 15, 2.5)" style="font-size:0.7rem;">
+                    <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItemWithTemplate('Software', 1, 200, 15, 0, 2.5, 0)" style="font-size:0.7rem;">
                         <i class="bi bi-software"></i>
                     </button>
                     <button type="button" class="btn btn-light btn-sm py-0 px-2" onclick="addItem()" style="font-size:0.7rem;">
@@ -155,19 +174,24 @@
             </div>
             <div class="card-body p-1">
                 <div class="table-responsive">
-                    <table class="table table-bordered table-hover table-sm mb-0" id="itemsTable" style="font-size:0.8rem;">
+                    <table class="table table-bordered table-hover table-sm mb-0" id="itemsTable" style="font-size:0.7rem;">
                         <thead class="table-light">
                             <tr>
-                                <th style="min-width: 140px;">Description</th>
-                                <th style="width: 60px;">Qty</th>
-                                <th style="width: 90px;">Unit Price</th>
-                                <th style="width: 70px;">VAT %</th>
-                                <th style="width: 70px;">Levy %</th>
-                                <th style="width: 85px;">Subtotal</th>
-                                <th style="width: 85px;">VAT</th>
-                                <th style="width: 85px;">Levy</th>
-                                <th style="width: 90px;">Total</th>
-                                <th style="width: 35px;"></th>
+                                <th style="min-width: 100px;">Description</th>
+                                <th style="width: 45px;">Qty</th>
+                                <th style="width: 70px;">Unit Price</th>
+                                <th style="width: 55px;">VAT %</th>
+                                <th style="width: 55px;">WHT %</th>
+                                <th style="width: 55px;">WHT on VAT %</th>
+                                <th style="width: 55px;">Levy %</th>
+                                <th style="width: 65px;">Subtotal</th>
+                                <th style="width: 65px;">Levy</th>
+                                <th style="width: 65px;">VAT Base</th>
+                                <th style="width: 65px;">VAT</th>
+                                <th style="width: 65px;">WHT</th>
+                                <th style="width: 65px;">WHT on VAT</th>
+                                <th style="width: 70px;">Total</th>
+                                <th style="width: 28px;"></th>
                             </tr>
                         </thead>
                         <tbody id="itemsBody">
@@ -207,15 +231,30 @@
                                            step="0.01" min="0" max="100">
                                 </td>
                                 <td>
+                                    <input type="number" name="items-{{ loop.index0 }}-wht_rate"
+                                           class="form-control form-control-sm wht-rate"
+                                           value="{{ item.wht_rate.data or 0 }}"
+                                           step="0.01" min="0" max="100">
+                                </td>
+                                <td>
+                                    <input type="number" name="items-{{ loop.index0 }}-wht_on_vat_rate"
+                                           class="form-control form-control-sm wht-on-vat-rate"
+                                           value="{{ item.wht_on_vat_rate.data or 0 }}"
+                                           step="0.01" min="0" max="100">
+                                </td>
+                                <td>
                                     <input type="number" name="items-{{ loop.index0 }}-levy_rate"
                                            class="form-control form-control-sm levy-rate"
                                            value="{{ item.levy_rate.data or 0 }}"
                                            step="0.01" min="0" max="100">
                                 </td>
-                                <td class="subtotal-cell text-end fw-semibold">$0.00</td>
-                                <td class="vat-cell text-end fw-semibold">$0.00</td>
-                                <td class="levy-cell text-end fw-semibold">$0.00</td>
-                                <td class="item-total text-end fw-bold text-primary">$0.00</td>
+                                <td class="subtotal-cell text-end fw-semibold">0.00</td>
+                                <td class="levy-cell text-end fw-semibold">0.00</td>
+                                <td class="vat-base-cell text-end fw-semibold">0.00</td>
+                                <td class="vat-cell text-end fw-semibold">0.00</td>
+                                <td class="wht-cell text-end fw-semibold">0.00</td>
+                                <td class="wht-on-vat-cell text-end fw-semibold">0.00</td>
+                                <td class="item-total text-end fw-bold text-primary">0.00</td>
                                 <td>
                                     <button type="button" class="btn btn-danger btn-sm py-0 px-1" onclick="removeItem(this)" style="font-size:0.7rem;">
                                         <i class="bi bi-trash"></i>
@@ -233,23 +272,42 @@
                         <table class="table table-sm table-borderless mb-0" style="font-size:0.8rem;">
                             <tr>
                                 <td><strong>Subtotal:</strong></td>
-                                <td class="text-end" id="subtotalDisplay">$0.00</td>
-                            </tr>
-                            <tr>
-                                <td><strong>VAT:</strong></td>
-                                <td class="text-end" id="totalVatDisplay">$0.00</td>
+                                <td class="text-end" id="subtotalDisplay">0.00</td>
                             </tr>
                             <tr>
                                 <td><strong>Levy:</strong></td>
-                                <td class="text-end" id="totalLevyDisplay">$0.00</td>
+                                <td class="text-end" id="totalLevyDisplay">0.00</td>
+                            </tr>
+                            <tr class="table-primary">
+                                <td><strong>VAT Base:</strong></td>
+                                <td class="text-end fw-bold" id="vatBaseDisplay">0.00</td>
+                            </tr>
+                            <tr>
+                                <td><strong>VAT:</strong></td>
+                                <td class="text-end" id="totalVatDisplay">0.00</td>
+                            </tr>
+                            <tr>
+                                <td><strong>WHT:</strong></td>
+                                <td class="text-end text-danger" id="totalWhtDisplay">0.00</td>
+                            </tr>
+                            <tr>
+                                <td><strong>WHT on VAT:</strong></td>
+                                <td class="text-end text-danger" id="totalWhtOnVatDisplay">0.00</td>
                             </tr>
                             <tr>
                                 <td><strong>Discount:</strong></td>
-                                <td class="text-end text-danger" id="discountDisplay">-$0.00</td>
+                                <td class="text-end text-danger" id="discountDisplay">-0.00</td>
                             </tr>
                             <tr class="table-active">
                                 <td><strong>TOTAL:</strong></td>
-                                <td class="text-end fw-bold text-primary" id="grandTotalDisplay" style="font-size:1rem;">$0.00</td>
+                                <td class="text-end fw-bold text-primary" id="grandTotalDisplay" style="font-size:1rem;">0.00</td>
+                            </tr>
+                            <tr class="table-info">
+                                <td colspan="2" class="text-end" style="font-size:0.7rem; color:#666;">
+                                    <span id="vatMethodDisplay">No VAT method selected</span>
+                                    <br>
+                                    <span id="whtOnVatMethodDisplay" style="font-size:0.65rem; color:#888;">Select VAT method to enable calculations</span>
+                                </td>
                             </tr>
                         </table>
                     </div>
@@ -257,7 +315,7 @@
             </div>
         </div>
 
-        <!-- Action Buttons - Compact -->
+        <!-- Action Buttons -->
         <div class="d-flex gap-1 mb-2">
             <button type="submit" class="btn btn-primary btn-sm">
                 <i class="bi bi-save"></i> Save
@@ -276,33 +334,115 @@
 </div>
 
 <script>
-    // Base path for API calls
     const BASE_PATH = '{{ base_path }}' || '';
 
-    // Currency symbols mapping
-    const currencySymbols = {
-        'USD': '$', 'EUR': '€', 'GBP': '£', 'GHS': '₵',
-        'JPY': '¥', 'CHF': 'Fr', 'CAD': '$', 'AUD': '$',
-        'CNY': '¥', 'INR': '₹', 'BRL': 'R$', 'ZAR': 'R',
-        'AED': 'د.إ', 'NGN': '₦', 'KES': 'KSh', 'TZS': 'TSh',
-        'UGX': 'USh', 'ZMW': 'ZK'
-    };
-
-    let currentCurrency = '{{ form.currency.data or "USD" }}';
-    let currentSymbol = currencySymbols[currentCurrency] || '$';
-
-    // Update currency display
-    function updateCurrencyDisplay() {
-        const currencySelect = document.getElementById('currency');
-        currentCurrency = currencySelect.value;
-        currentSymbol = currencySymbols[currentCurrency] || '$';
-
-        document.getElementById('currencyDisplay').textContent = currentCurrency;
-        document.getElementById('discountCurrencySymbol').textContent = currentSymbol;
-        updateTotals();
+    // Format number with commas - NO currency symbol
+    function formatNumber(value) {
+        if (value === undefined || value === null || isNaN(value)) return '0.00';
+        return Number(value).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
     }
 
-    // Add new item row
+    // Calculate and display values for a single row - NO currency symbol
+    function calculateRow(row) {
+        const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
+        const unitPrice = parseFloat(row.querySelector('.unit-price').value) || 0;
+        const vatRate = parseFloat(row.querySelector('.vat-rate').value) || 0;
+        const whtRate = parseFloat(row.querySelector('.wht-rate').value) || 0;
+        const whtOnVatRate = parseFloat(row.querySelector('.wht-on-vat-rate').value) || 0;
+        const levyRate = parseFloat(row.querySelector('.levy-rate').value) || 0;
+        const vatMethod = document.getElementById('vat_calculation_method').value;
+
+        const itemSubtotal = quantity * unitPrice;
+        const itemLevy = itemSubtotal * (levyRate / 100);
+
+        // VAT Base depends on method
+        let vatBase;
+        if (vatMethod === 'subtotal_plus_levy') {
+            vatBase = itemSubtotal + itemLevy;
+        } else {
+            vatBase = itemSubtotal;
+        }
+
+        const itemVat = vatBase * (vatRate / 100);
+        const itemWht = itemSubtotal * (whtRate / 100);
+        const itemWhtOnVat = vatBase * (whtOnVatRate / 100);
+        const itemTotal = itemSubtotal + itemVat - itemWht - itemWhtOnVat + itemLevy;
+
+        // Update cells with formatted numbers (NO currency symbol)
+        row.querySelector('.subtotal-cell').textContent = formatNumber(itemSubtotal);
+        row.querySelector('.levy-cell').textContent = formatNumber(itemLevy);
+        row.querySelector('.vat-base-cell').textContent = formatNumber(vatBase);
+        row.querySelector('.vat-cell').textContent = formatNumber(itemVat);
+        row.querySelector('.wht-cell').textContent = formatNumber(itemWht);
+        row.querySelector('.wht-on-vat-cell').textContent = formatNumber(itemWhtOnVat);
+        row.querySelector('.item-total').textContent = formatNumber(itemTotal);
+
+        return {
+            subtotal: itemSubtotal,
+            levy: itemLevy,
+            vatBase: vatBase,
+            vat: itemVat,
+            wht: itemWht,
+            whtOnVat: itemWhtOnVat,
+            total: itemTotal
+        };
+    }
+
+    function updateTotals() {
+        const vatMethod = document.getElementById('vat_calculation_method').value;
+        const vatMethodDisplay = document.getElementById('vatMethodDisplay');
+        const whtOnVatMethodDisplay = document.getElementById('whtOnVatMethodDisplay');
+
+        // Update VAT method display
+        if (vatMethod) {
+            const methodLabels = {
+                'subtotal_only': 'VAT on Subtotal Only',
+                'subtotal_plus_levy': 'VAT on Subtotal + Levy (Legacy)'
+            };
+            vatMethodDisplay.textContent = methodLabels[vatMethod] || 'VAT on Subtotal Only';
+            whtOnVatMethodDisplay.textContent = 'WHT on VAT: ' + (methodLabels[vatMethod] || 'VAT on Subtotal Only');
+        } else {
+            vatMethodDisplay.textContent = 'No VAT method selected';
+            whtOnVatMethodDisplay.textContent = 'Select VAT method to enable calculations';
+        }
+
+        let subtotal = 0;
+        let totalLevy = 0;
+        let totalVat = 0;
+        let totalWht = 0;
+        let totalWhtOnVat = 0;
+        let totalVatBase = 0;
+
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach(row => {
+            const result = calculateRow(row);
+            if (result) {
+                subtotal += result.subtotal;
+                totalLevy += result.levy;
+                totalVatBase += result.vatBase;
+                totalVat += result.vat;
+                totalWht += result.wht;
+                totalWhtOnVat += result.whtOnVat;
+            }
+        });
+
+        const discount = parseFloat(document.getElementById('discount').value) || 0;
+        const grandTotal = subtotal + totalVat + totalLevy - totalWht - totalWhtOnVat - discount;
+
+        // Update totals with formatted numbers (NO currency symbol)
+        document.getElementById('subtotalDisplay').textContent = formatNumber(subtotal);
+        document.getElementById('totalLevyDisplay').textContent = formatNumber(totalLevy);
+        document.getElementById('vatBaseDisplay').textContent = formatNumber(totalVatBase);
+        document.getElementById('totalVatDisplay').textContent = formatNumber(totalVat);
+        document.getElementById('totalWhtDisplay').textContent = formatNumber(totalWht);
+        document.getElementById('totalWhtOnVatDisplay').textContent = formatNumber(totalWhtOnVat);
+        document.getElementById('discountDisplay').textContent = '-' + formatNumber(discount);
+        document.getElementById('grandTotalDisplay').textContent = formatNumber(grandTotal);
+    }
+
     function addItem() {
         const tbody = document.getElementById('itemsBody');
         const rowCount = tbody.children.length;
@@ -329,13 +469,24 @@
                        name="items-${rowCount}-vat_rate" value="0" step="0.01" min="0" max="100">
             </td>
             <td>
+                <input type="number" class="form-control form-control-sm wht-rate"
+                       name="items-${rowCount}-wht_rate" value="0" step="0.01" min="0" max="100">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm wht-on-vat-rate"
+                       name="items-${rowCount}-wht_on_vat_rate" value="0" step="0.01" min="0" max="100">
+            </td>
+            <td>
                 <input type="number" class="form-control form-control-sm levy-rate"
                        name="items-${rowCount}-levy_rate" value="0" step="0.01" min="0" max="100">
             </td>
-            <td class="subtotal-cell text-end fw-semibold">${currentSymbol}0.00</td>
-            <td class="vat-cell text-end fw-semibold">${currentSymbol}0.00</td>
-            <td class="levy-cell text-end fw-semibold">${currentSymbol}0.00</td>
-            <td class="item-total text-end fw-bold text-primary">${currentSymbol}0.00</td>
+            <td class="subtotal-cell text-end fw-semibold">0.00</td>
+            <td class="levy-cell text-end fw-semibold">0.00</td>
+            <td class="vat-base-cell text-end fw-semibold">0.00</td>
+            <td class="vat-cell text-end fw-semibold">0.00</td>
+            <td class="wht-cell text-end fw-semibold">0.00</td>
+            <td class="wht-on-vat-cell text-end fw-semibold">0.00</td>
+            <td class="item-total text-end fw-bold text-primary">0.00</td>
             <td>
                 <button type="button" class="btn btn-danger btn-sm py-0 px-1" onclick="removeItem(this)" style="font-size:0.7rem;">
                     <i class="bi bi-trash"></i>
@@ -348,8 +499,7 @@
         tr.querySelector('input[name$="-description"]').focus();
     }
 
-    // Add item with template values
-    function addItemWithTemplate(description, quantity, unitPrice, vatRate, levyRate) {
+    function addItemWithTemplate(description, quantity, unitPrice, vatRate, whtRate, levyRate, whtOnVatRate) {
         const tbody = document.getElementById('itemsBody');
         const rowCount = tbody.children.length;
 
@@ -376,13 +526,24 @@
                        name="items-${rowCount}-vat_rate" value="${vatRate}" step="0.01" min="0" max="100">
             </td>
             <td>
+                <input type="number" class="form-control form-control-sm wht-rate"
+                       name="items-${rowCount}-wht_rate" value="${whtRate}" step="0.01" min="0" max="100">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm wht-on-vat-rate"
+                       name="items-${rowCount}-wht_on_vat_rate" value="${whtOnVatRate}" step="0.01" min="0" max="100">
+            </td>
+            <td>
                 <input type="number" class="form-control form-control-sm levy-rate"
                        name="items-${rowCount}-levy_rate" value="${levyRate}" step="0.01" min="0" max="100">
             </td>
-            <td class="subtotal-cell text-end fw-semibold">${currentSymbol}0.00</td>
-            <td class="vat-cell text-end fw-semibold">${currentSymbol}0.00</td>
-            <td class="levy-cell text-end fw-semibold">${currentSymbol}0.00</td>
-            <td class="item-total text-end fw-bold text-primary">${currentSymbol}0.00</td>
+            <td class="subtotal-cell text-end fw-semibold">0.00</td>
+            <td class="levy-cell text-end fw-semibold">0.00</td>
+            <td class="vat-base-cell text-end fw-semibold">0.00</td>
+            <td class="vat-cell text-end fw-semibold">0.00</td>
+            <td class="wht-cell text-end fw-semibold">0.00</td>
+            <td class="wht-on-vat-cell text-end fw-semibold">0.00</td>
+            <td class="item-total text-end fw-bold text-primary">0.00</td>
             <td>
                 <button type="button" class="btn btn-danger btn-sm py-0 px-1" onclick="removeItem(this)" style="font-size:0.7rem;">
                     <i class="bi bi-trash"></i>
@@ -394,7 +555,6 @@
         updateTotals();
     }
 
-    // Remove item row
     function removeItem(button) {
         const row = button.closest('tr');
         if (document.querySelectorAll('.item-row').length > 1) {
@@ -409,7 +569,6 @@
         }
     }
 
-    // Add event listeners to a row
     function addRowEventListeners(row) {
         const inputs = row.querySelectorAll('input');
         inputs.forEach(input => {
@@ -428,45 +587,6 @@
         });
     }
 
-    // Update all totals with current currency symbol
-    function updateTotals() {
-        let subtotal = 0;
-        let totalVat = 0;
-        let totalLevy = 0;
-
-        const rows = document.querySelectorAll('.item-row');
-        rows.forEach(row => {
-            const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
-            const unitPrice = parseFloat(row.querySelector('.unit-price').value) || 0;
-            const vatRate = parseFloat(row.querySelector('.vat-rate').value) || 0;
-            const levyRate = parseFloat(row.querySelector('.levy-rate').value) || 0;
-
-            const itemSubtotal = quantity * unitPrice;
-            const itemVat = itemSubtotal * (vatRate / 100);
-            const itemLevy = itemSubtotal * (levyRate / 100);
-            const itemTotal = itemSubtotal + itemVat + itemLevy;
-
-            row.querySelector('.subtotal-cell').textContent = currentSymbol + itemSubtotal.toFixed(2);
-            row.querySelector('.vat-cell').textContent = currentSymbol + itemVat.toFixed(2);
-            row.querySelector('.levy-cell').textContent = currentSymbol + itemLevy.toFixed(2);
-            row.querySelector('.item-total').textContent = currentSymbol + itemTotal.toFixed(2);
-
-            subtotal += itemSubtotal;
-            totalVat += itemVat;
-            totalLevy += itemLevy;
-        });
-
-        const discount = parseFloat(document.getElementById('discount').value) || 0;
-        const grandTotal = subtotal + totalVat + totalLevy - discount;
-
-        document.getElementById('subtotalDisplay').textContent = currentSymbol + subtotal.toFixed(2);
-        document.getElementById('totalVatDisplay').textContent = currentSymbol + totalVat.toFixed(2);
-        document.getElementById('totalLevyDisplay').textContent = currentSymbol + totalLevy.toFixed(2);
-        document.getElementById('discountDisplay').textContent = '-' + currentSymbol + discount.toFixed(2);
-        document.getElementById('grandTotalDisplay').textContent = currentSymbol + grandTotal.toFixed(2);
-    }
-
-    // Preview invoice
     function previewInvoice() {
         const customerSelect = document.getElementById('customer_id');
         if (!customerSelect.value) {
@@ -478,19 +598,82 @@
             customerSelect.focus();
             return;
         }
+
+        const currencySelect = document.getElementById('currency');
+        if (!currencySelect.value) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Error', 'Please select a currency.', 'error');
+            } else {
+                alert('Please select a currency.');
+            }
+            currencySelect.focus();
+            return;
+        }
+
+        const vatMethod = document.getElementById('vat_calculation_method').value;
+        if (!vatMethod) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Warning', 'Please select a VAT calculation method.', 'warning');
+            } else {
+                alert('Please select a VAT calculation method.');
+            }
+            document.getElementById('vat_calculation_method').focus();
+            return;
+        }
+
         window.print();
     }
 
-    // Form validation
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('invoiceForm');
         const currencySelect = document.getElementById('currency');
+        const vatMethodSelect = document.getElementById('vat_calculation_method');
 
+        // Update currency display badge only (no symbols on values)
+        const initialCurrency = currencySelect.value;
+        if (initialCurrency && initialCurrency !== '') {
+            document.getElementById('currencyDisplay').textContent = initialCurrency;
+            document.getElementById('exchangeRateLabel').textContent = '1 ' + initialCurrency;
+        } else {
+            document.getElementById('currencyDisplay').textContent = '--';
+            document.getElementById('exchangeRateLabel').textContent = '1 USD';
+        }
+
+        // Clear discount symbol
+        document.getElementById('discountCurrencySymbol').textContent = '';
+
+        // Event listeners
         currencySelect.addEventListener('change', function() {
-            updateCurrencyDisplay();
+            const val = this.value;
+            document.getElementById('currencyDisplay').textContent = val || '--';
+            document.getElementById('exchangeRateLabel').textContent = val ? '1 ' + val : '1 USD';
+            // No currency symbol update needed - we removed symbols entirely
         });
 
-        updateCurrencyDisplay();
+        vatMethodSelect.addEventListener('change', function() {
+            updateTotals();
+        });
+
+        // Initial calculation
+        updateTotals();
+
+        // Override any remaining $ signs
+        const rows = document.querySelectorAll('.item-row');
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('.subtotal-cell, .levy-cell, .vat-base-cell, .vat-cell, .wht-cell, .wht-on-vat-cell, .item-total');
+            cells.forEach(cell => {
+                // If cell contains $, replace with just the number
+                const content = cell.textContent;
+                if (content.includes('$')) {
+                    const num = parseFloat(content.replace(/[^0-9.-]/g, '')) || 0;
+                    cell.textContent = formatNumber(num);
+                }
+            });
+        });
+
+        // Update totals again
+        updateTotals();
 
         form.addEventListener('submit', function(e) {
             const rows = document.querySelectorAll('.item-row');
@@ -524,6 +707,30 @@
                 return false;
             }
 
+            const currencySelect = document.getElementById('currency');
+            if (!currencySelect.value) {
+                e.preventDefault();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Please select a currency.', 'error');
+                } else {
+                    alert('Please select a currency.');
+                }
+                currencySelect.focus();
+                return false;
+            }
+
+            const vatMethod = document.getElementById('vat_calculation_method').value;
+            if (!vatMethod) {
+                e.preventDefault();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Please select a VAT calculation method.', 'error');
+                } else {
+                    alert('Please select a VAT calculation method.');
+                }
+                document.getElementById('vat_calculation_method').focus();
+                return false;
+            }
+
             const invoiceDate = document.getElementById('invoice_date');
             const dueDate = document.getElementById('due_date');
             if (!invoiceDate.value || !dueDate.value) {
@@ -537,8 +744,8 @@
             }
         });
 
-        const rows = document.querySelectorAll('.item-row');
-        rows.forEach(row => addRowEventListeners(row));
+        const rows2 = document.querySelectorAll('.item-row');
+        rows2.forEach(row => addRowEventListeners(row));
 
         document.getElementById('discount').addEventListener('input', updateTotals);
 
@@ -550,17 +757,19 @@
                 dueDateInput.value = date.toISOString().split('T')[0];
             }
         });
-
-        updateTotals();
     });
 </script>
 
 <style>
     .item-row td { vertical-align: middle; }
-    .item-row input { min-width: 50px; }
+    .item-row input { min-width: 40px; }
     .item-row input[type="number"] { text-align: right; }
-    #itemsTable th { white-space: nowrap; font-size: 0.7rem; }
-    .subtotal-cell, .vat-cell, .levy-cell, .item-total { font-family: 'Courier New', monospace; font-size: 0.8rem; }
+    #itemsTable th { white-space: nowrap; font-size: 0.55rem; }
+    .subtotal-cell, .levy-cell, .vat-base-cell, .vat-cell, .wht-cell, .wht-on-vat-cell, .item-total {
+        font-family: 'Courier New', monospace;
+        font-size: 0.65rem;
+    }
+    .vat-base-cell { color: #0d6efd !important; font-weight: 600; }
     .item-total { color: #1e3c72 !important; }
     #grandTotalDisplay { color: #1e3c72 !important; }
     .item-row input.is-invalid { border-color: #dc3545; }
@@ -569,19 +778,34 @@
     .card-header { padding: 0.25rem 0.5rem; }
     .card-body { padding: 0.35rem 0.5rem; }
     .card-footer { padding: 0.25rem 0.5rem; }
-    .form-control-sm { font-size: 0.75rem; padding: 0.15rem 0.3rem; }
-    .form-select-sm { font-size: 0.75rem; padding: 0.15rem 0.3rem; }
-    .input-group-sm > .form-control, .input-group-sm > .input-group-text { font-size: 0.75rem; padding: 0.15rem 0.3rem; }
-    .btn-sm { font-size: 0.75rem; padding: 0.15rem 0.4rem; }
-    .table-sm > :not(caption) > * > * { padding: 0.2rem 0.3rem; }
-    .gap-1 { gap: 0.2rem !important; }
-    .g-1 { --bs-gutter-y: 0.15rem; --bs-gutter-x: 0.15rem; }
-    #bank_id { margin-top: 0.15rem; }
+    .form-control-sm { font-size: 0.65rem; padding: 0.12rem 0.2rem; }
+    .form-select-sm { font-size: 0.65rem; padding: 0.12rem 0.2rem; }
+    .input-group-sm > .form-control, .input-group-sm > .input-group-text {
+        font-size: 0.65rem;
+        padding: 0.12rem 0.2rem;
+    }
+    .btn-sm { font-size: 0.65rem; padding: 0.12rem 0.3rem; }
+    .table-sm > :not(caption) > * > * { padding: 0.12rem 0.15rem; }
+    .gap-1 { gap: 0.15rem !important; }
+    .g-1 { --bs-gutter-y: 0.12rem; --bs-gutter-x: 0.12rem; }
+    #bank_id { margin-top: 0.12rem; }
     .text-muted i { margin-right: 3px; }
+    .wht-cell, .wht-on-vat-cell { color: #dc3545 !important; }
+    #totalWhtDisplay, #totalWhtOnVatDisplay { color: #dc3545 !important; }
+    #vatBaseDisplay { color: #0d6efd !important; font-weight: 600; }
+    .table-primary { background-color: #cfe2ff !important; }
+    .table-info { background-color: #f8f9fa !important; }
+    #vatMethodDisplay { font-weight: 500; }
+    #whtOnVatMethodDisplay { font-weight: 400; }
     @media print {
         .btn, .no-print, .card-footer .btn, .card-header .btn { display: none !important; }
         .card { border: 1px solid #ddd !important; box-shadow: none !important; }
         .card-header { background-color: #f8f9fa !important; color: #000 !important; }
+    }
+    @media (max-width: 768px) {
+        #itemsTable th { font-size: 0.45rem; }
+        .item-row input { font-size: 0.5rem; min-width: 20px; }
+        .subtotal-cell, .levy-cell, .vat-base-cell, .vat-cell, .wht-cell, .wht-on-vat-cell, .item-total { font-size: 0.5rem; }
     }
 </style>
 {% endblock %}
