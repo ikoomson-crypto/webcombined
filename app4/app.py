@@ -271,6 +271,20 @@ def migrate_database():
                     except Exception as e:
                         print(f"⚠️ Could not add wht_amount column: {e}")
 
+                    # In the bank section of migrate_database()
+                if 'bank' in inspector.get_table_names():
+                    columns = [col['name'] for col in inspector.get_columns('bank')]
+                    with db.engine.connect() as conn:
+                        if 'iban' not in columns:
+                            print("🔧 Adding iban column to bank table...")
+                            try:
+                                conn.execute(text("ALTER TABLE bank ADD COLUMN iban VARCHAR(50)"))
+                                conn.commit()
+                                print("✅ Added iban column to bank table")
+                            except Exception as e:
+                                print(f"⚠️ Could not add iban column: {e}")
+
+
                 # ============ ADD WHT ON VAT COLUMNS TO INVOICE_ITEMS ============
                 if 'wht_on_vat_rate' not in columns:
                     print("🔧 Adding wht_on_vat_rate column to invoice_items...")
@@ -580,6 +594,7 @@ class Bank(db.Model):
     branch = db.Column(db.String(100))
     address = db.Column(db.Text)
     swift_code = db.Column(db.String(20))
+    iban = db.Column(db.String(50))
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
@@ -967,8 +982,8 @@ class BankForm(FlaskForm):
     branch = StringField('Branch', validators=[Optional(), Length(max=100)])
     address = TextAreaField('Bank Address', validators=[Optional()])
     swift_code = StringField('SWIFT Code', validators=[Optional(), Length(max=20)])
+    iban = StringField('IBAN', validators=[Optional(), Length(max=50)])  # <-- ADD THIS LINE
     is_active = SelectField('Status', choices=[('True', 'Active'), ('False', 'Inactive')], default='True')
-
 
 class ReportForm(FlaskForm):
     date_from = DateField('Date From', format='%Y-%m-%d', validators=[DataRequired()])
@@ -3813,7 +3828,6 @@ def banks():
     banks = Bank.query.filter_by(company_id=active_company.id).all()
     return render_template('banks.html', banks=banks, company=active_company)
 
-
 @app.route('/add_bank', methods=['GET', 'POST'])
 def add_bank():
     active_company = get_active_company()
@@ -3830,6 +3844,7 @@ def add_bank():
             branch=form.branch.data,
             address=form.address.data,
             swift_code=form.swift_code.data,
+            iban=form.iban.data,  # <-- ADD THIS LINE
             is_active=form.is_active.data == 'True',
             company_id=active_company.id
         )
@@ -3853,12 +3868,12 @@ def edit_bank(bank_id):
         bank.branch = form.branch.data
         bank.address = form.address.data
         bank.swift_code = form.swift_code.data
+        bank.iban = form.iban.data  # <-- ADD THIS LINE
         bank.is_active = form.is_active.data == 'True'
         db.session.commit()
         flash('Bank updated successfully!', 'success')
         return redirect(url_for('banks'))
     return render_template('edit_bank.html', form=form, bank=bank)
-
 
 @app.route('/delete_bank/<int:bank_id>')
 def delete_bank(bank_id):

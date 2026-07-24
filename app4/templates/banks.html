@@ -16,7 +16,7 @@
                 <th>Bank Name</th>
                 <th>Account Number</th>
                 <th>Account Name</th>
-                <th>Branch</th>
+                <th>IBAN</th>
                 <th>SWIFT Code</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -28,7 +28,7 @@
                 <td><strong>{{ bank.name }}</strong></td>
                 <td>{{ bank.account_number or 'N/A' }}</td>
                 <td>{{ bank.account_name or 'N/A' }}</td>
-                <td>{{ bank.branch or 'N/A' }}</td>
+                <td>{{ bank.iban or 'N/A' }}</td>
                 <td>{{ bank.swift_code or 'N/A' }}</td>
                 <td>
                     <span class="badge bg-{{ 'success' if bank.is_active else 'secondary' }}">

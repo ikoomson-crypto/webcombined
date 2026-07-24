@@ -74,6 +74,16 @@
                 {% endfor %}
             </div>
 
+            <!-- ADD IBAN FIELD HERE -->
+            <div class="mb-3">
+                {{ form.iban.label(class="form-label") }}
+                {{ form.iban(class="form-control") }}
+                <small class="text-muted">IBAN (International Bank Account Number)</small>
+                {% for error in form.iban.errors %}
+                    <div class="text-danger">{{ error }}</div>
+                {% endfor %}
+            </div>
+
             <div class="mb-3">
                 {{ form.is_active.label(class="form-label") }}
                 {{ form.is_active(class="form-select") }}
