@@ -37,6 +37,22 @@
                                    value="{{ company.email if company else '' }}">
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="currency_symbol" class="form-label">Currency Symbol <span class="text-danger">*</span></label>
+                            <input type="text" name="currency_symbol" id="currency_symbol" class="form-control"
+                                   placeholder="e.g., $, €, £, ¥"
+                                   value="{{ company.currency_symbol if company and company.currency_symbol else '$' }}" required>
+                            <small class="text-muted">Symbol used for currency values (e.g., $, €, £)</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="currency_code" class="form-label">Currency Code</label>
+                            <input type="text" name="currency_code" id="currency_code" class="form-control"
+                                   placeholder="e.g., USD, EUR, GBP"
+                                   value="{{ company.currency_code if company and company.currency_code else 'USD' }}">
+                            <small class="text-muted">ISO currency code (e.g., USD, EUR, GBP)</small>
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label for="logo" class="form-label">Company Logo</label>
                         {% if company and company.logo %}

@@ -31,7 +31,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="card-title">Total Cost</h5>
-                        <h2 class="display-5">${{ format_number(total_cost) }}</h2>
+                        <h2 class="display-5">{{ currency_symbol }}{{ format_number(total_cost) }}</h2>
                     </div>
                     <i class="fas fa-dollar-sign fa-3x opacity-50"></i>
                 </div>
@@ -44,7 +44,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h5 class="card-title">Remaining Balance</h5>
-                        <h2 class="display-5">${{ format_number(remaining_balance) }}</h2>
+                        <h2 class="display-5">{{ currency_symbol }}{{ format_number(remaining_balance) }}</h2>
                     </div>
                     <i class="fas fa-clock fa-3x opacity-50"></i>
                 </div>
@@ -80,7 +80,7 @@
                                 <div class="fw-bold">{{ s.description[:50] }}</div>
                                 <small class="text-muted">{{ s.transaction_date.strftime('%Y-%m-%d') }}</small>
                             </div>
-                            <span class="badge bg-primary rounded-pill">${{ format_number(s.total_cost) }}</span>
+                            <span class="badge bg-primary rounded-pill">{{ currency_symbol }}{{ format_number(s.total_cost) }}</span>
                         </a>
                     {% else %}
                         <div class="list-group-item text-center text-muted py-4">
@@ -105,7 +105,7 @@
                                 <div class="fw-bold">{{ entry.schedule.description[:40] }}</div>
                                 <small class="text-muted">Due: {{ entry.due_date.strftime('%Y-%m-%d') }}</small>
                             </div>
-                            <span class="badge bg-success rounded-pill">${{ format_number(entry.amount) }}</span>
+                            <span class="badge bg-success rounded-pill">{{ currency_symbol }}{{ format_number(entry.amount) }}</span>
                         </div>
                     {% else %}
                         <div class="list-group-item text-center text-muted py-4">

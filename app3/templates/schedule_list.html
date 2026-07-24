@@ -54,7 +54,7 @@
                     <td>{{ s.credit_account }}</td>
                     <td>{{ s.transaction_date.strftime('%Y-%m-%d') }}</td>
                     <td>{{ s.description[:30] }}</td>
-                    <td>${{ "%.2f"|format(s.total_cost) }}</td>
+                    <td>{{ currency_symbol }}{{ "%.2f"|format(s.total_cost) }}</td>
                     <td>
                         <a href="{{ url_for('schedule_detail', pk=s.id) }}" class="btn btn-sm btn-info"><i class="fas fa-eye"></i></a>
                         <a href="{{ url_for('schedule_update', pk=s.id) }}" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></a>

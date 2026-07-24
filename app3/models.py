@@ -30,6 +30,10 @@ class Company(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Currency settings - ADD THESE TWO LINES
+    currency_symbol = db.Column(db.String(10), default='$')
+    currency_code = db.Column(db.String(10), default='USD')
+
     def __repr__(self):
         return f'<Company {self.name}>'
 
@@ -39,7 +43,6 @@ class PrepaymentSchedule(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    # REMOVED: user_id - not needed for this application
 
     # Account fields
     debit_account = db.Column(db.String(200), nullable=False)

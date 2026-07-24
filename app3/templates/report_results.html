@@ -64,38 +64,38 @@
                                 <td class="text-center">{{ loop.index }}</td>
                                 <td>{{ schedule.transaction_date }}</td>
                                 <td>{{ schedule.description }}</td>
-                                <td class="text-end">{{ format_number(schedule.opening) }}</td>
-                                <td class="text-end">{{ format_number(schedule.additions) }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ format_number(schedule.opening) }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ format_number(schedule.additions) }}</td>
                                 {% for amount in schedule.monthly_amounts %}
                                 <td class="text-end {% if amount > 0 %}text-primary{% else %}text-muted{% endif %}">
-                                    {{ format_number(amount) }}
+                                    {{ currency_symbol }}{{ format_number(amount) }}
                                 </td>
                                 {% endfor %}
-                                <td class="text-end fw-bold">{{ format_number(schedule.closing) }}</td>
+                                <td class="text-end fw-bold">{{ currency_symbol }}{{ format_number(schedule.closing) }}</td>
                             </tr>
                             {% endfor %}
 
                             <!-- Subtotal for this debit account -->
                             <tr class="table-info">
                                 <td colspan="3" class="text-end fw-bold">Subtotal</td>
-                                <td class="text-end fw-bold">{{ format_number(group.totals.opening) }}</td>
-                                <td class="text-end fw-bold">{{ format_number(group.totals.additions) }}</td>
+                                <td class="text-end fw-bold">{{ currency_symbol }}{{ format_number(group.totals.opening) }}</td>
+                                <td class="text-end fw-bold">{{ currency_symbol }}{{ format_number(group.totals.additions) }}</td>
                                 {% for month in months %}
-                                <td class="text-end fw-bold">{{ format_number(group.monthly_totals[month]) }}</td>
+                                <td class="text-end fw-bold">{{ currency_symbol }}{{ format_number(group.monthly_totals[month]) }}</td>
                                 {% endfor %}
-                                <td class="text-end fw-bold">{{ format_number(group.totals.closing) }}</td>
+                                <td class="text-end fw-bold">{{ currency_symbol }}{{ format_number(group.totals.closing) }}</td>
                             </tr>
                             {% endfor %}
 
                             <!-- Grand Total -->
                             <tr class="table-warning fw-bold">
                                 <td colspan="3" class="text-center">GRAND TOTAL</td>
-                                <td class="text-end">{{ format_number(grand_totals.opening) }}</td>
-                                <td class="text-end">{{ format_number(grand_totals.additions) }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ format_number(grand_totals.opening) }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ format_number(grand_totals.additions) }}</td>
                                 {% for month in months %}
-                                <td class="text-end">{{ format_number(grand_monthly_totals[month]) }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ format_number(grand_monthly_totals[month]) }}</td>
                                 {% endfor %}
-                                <td class="text-end">{{ format_number(grand_totals.closing) }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ format_number(grand_totals.closing) }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -140,8 +140,8 @@ function sortTable(table, column) {
     });
 
     dataRows.sort((a, b) => {
-        const aVal = a.cells[column].textContent.trim().replace(/,/g, '');
-        const bVal = b.cells[column].textContent.trim().replace(/,/g, '');
+        const aVal = a.cells[column].textContent.trim().replace(/,/g, '').replace(/[^0-9.\-]/g, '');
+        const bVal = b.cells[column].textContent.trim().replace(/,/g, '').replace(/[^0-9.\-]/g, '');
 
         if (isNumeric && !isNaN(parseFloat(aVal)) && !isNaN(parseFloat(bVal))) {
             return parseFloat(aVal) - parseFloat(bVal);
@@ -152,10 +152,6 @@ function sortTable(table, column) {
 
     // Rebuild tbody with sorted rows
     const newTbody = document.createElement('tbody');
-    let currentGroup = '';
-    let subtotalRow = null;
-    let groupRows = [];
-
     dataRows.forEach(row => {
         newTbody.appendChild(row);
     });
@@ -165,50 +161,13 @@ function sortTable(table, column) {
 
 // Highlight positive amounts
 document.querySelectorAll('td.text-end').forEach(cell => {
-    const value = parseFloat(cell.textContent.replace(/,/g, ''));
+    const value = parseFloat(cell.textContent.replace(/,/g, '').replace(/[^0-9.\-]/g, ''));
     if (!isNaN(value) && value > 0) {
         cell.style.color = '#0d6efd';
     } else if (!isNaN(value) && value < 0) {
         cell.style.color = '#dc3545';
     }
 });
-
-// Add export functionality for the table
-function exportTableToExcel() {
-    const table = document.getElementById('reportTable');
-    const rows = table.querySelectorAll('tr');
-    let csv = [];
-
-    // Add headers
-    let headerRow = [];
-    const headers = table.querySelectorAll('thead th');
-    headers.forEach(header => {
-        if (header.rowSpan === 1 || (header.rowSpan === 2 && header.colSpan > 1)) {
-            headerRow.push(header.textContent.trim());
-        }
-    });
-    csv.push(headerRow.join(','));
-
-    // Add data rows
-    rows.forEach(row => {
-        const rowData = [];
-        row.querySelectorAll('td').forEach(cell => {
-            rowData.push('"' + cell.textContent.trim() + '"');
-        });
-        if (rowData.length > 0) {
-            csv.push(rowData.join(','));
-        }
-    });
-
-    const csvContent = csv.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'report.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-}
 </script>
 
 <style>

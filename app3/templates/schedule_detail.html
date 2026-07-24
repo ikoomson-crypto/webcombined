@@ -13,12 +13,12 @@
                     <div class="col-md-4"><strong>Transaction Date:</strong> {{ schedule.transaction_date.strftime('%Y-%m-%d') }}</div>
                 </div>
                 <div class="row mt-3">
-                    <div class="col-md-4"><strong>Total Cost:</strong> ${{ "%.2f"|format(schedule.total_cost) }}</div>
+                    <div class="col-md-4"><strong>Total Cost:</strong> {{ currency_symbol }}{{ "%.2f"|format(schedule.total_cost) }}</div>
                     <div class="col-md-4"><strong>Periods:</strong> {{ schedule.period_to_amortize }}</div>
                     <div class="col-md-4"><strong>Start Period:</strong> {{ schedule.amortize_start_period.strftime('%Y-%m-%d') }}</div>
                 </div>
                 <div class="row mt-3">
-                    <div class="col-md-4"><strong>Remaining:</strong> ${{ "%.2f"|format(schedule.remaining_balance) }}</div>
+                    <div class="col-md-4"><strong>Remaining:</strong> {{ currency_symbol }}{{ "%.2f"|format(schedule.remaining_balance) }}</div>
                     <div class="col-md-4"><strong>Created:</strong> {{ schedule.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
                 </div>
             </div>
@@ -38,8 +38,8 @@
                             <tr class="{% if entry.status == 'Completed' %}table-success{% else %}table-warning{% endif %}">
                                 <td>{{ entry.period }}</td>
                                 <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
-                                <td>${{ "%.2f"|format(entry.amount) }}</td>
-                                <td>${{ "%.2f"|format(entry.remaining_balance) }}</td>
+                                <td>{{ currency_symbol }}{{ "%.2f"|format(entry.amount) }}</td>
+                                <td>{{ currency_symbol }}{{ "%.2f"|format(entry.remaining_balance) }}</td>
                                 <td>{{ entry.status }}</td>
                             </tr>
                             {% endfor %}

@@ -49,7 +49,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize extensions
-from .models import  db, Company, PrepaymentSchedule, AmortizationEntry
+from .models import db, Company, PrepaymentSchedule, AmortizationEntry
 db.init_app(app)
 
 # ============ SAFE DATABASE INITIALIZATION ============
@@ -72,7 +72,9 @@ def init_database():
                 address='123 Business St',
                 phone='555-0000',
                 email='default@company.com',
-                is_active=True
+                is_active=True,
+                currency_symbol='$',
+                currency_code='USD'
             )
             db.session.add(company)
             db.session.commit()
@@ -163,22 +165,52 @@ def validate_date(value, field_name):
     except ValueError:
         return False, f"{field_name} must be in YYYY-MM-DD format"
 
+def validate_currency_symbol(value):
+    """Validate currency symbol"""
+    if not value:
+        return False, "Currency symbol is required"
+    if len(value) > 10:
+        return False, "Currency symbol must be less than 10 characters"
+    return True, ""
+
 def format_number(num):
     """Format number with comma separators and 2 decimal places"""
     if num is None:
         return "0.00"
     return f"{num:,.2f}"
 
+def format_currency(num, symbol):
+    """Format number with currency symbol"""
+    if num is None:
+        return f"{symbol}0.00"
+    return f"{symbol}{num:,.2f}"
+
 # ============ CONTEXT PROCESSOR ============
 @app.context_processor
 def inject_company():
     company_name = None
     company_id = session.get('current_company')
+    currency_symbol = '$'  # default fallback
+    currency_code = 'USD'  # default fallback
+
     if company_id:
         company = Company.query.get(company_id)
         if company:
             company_name = company.name
-    return dict(current_company_name=company_name, format_number=format_number)
+            currency_symbol = company.currency_symbol or '$'
+            currency_code = company.currency_code or 'USD'
+
+    # Create a currency formatter function for templates
+    def format_currency_template(num):
+        return format_currency(num, currency_symbol)
+
+    return dict(
+        current_company_name=company_name,
+        format_number=format_number,
+        format_currency=format_currency_template,
+        currency_symbol=currency_symbol,
+        currency_code=currency_code
+    )
 
 # ============ SETUP DEFAULT COMPANY ============
 def setup_default_company():
@@ -191,7 +223,9 @@ def setup_default_company():
                 address='123 Business St',
                 phone='555-0000',
                 email='default@company.com',
-                is_active=True
+                is_active=True,
+                currency_symbol='$',
+                currency_code='USD'
             )
             db.session.add(company)
             db.session.commit()
@@ -860,13 +894,17 @@ def dashboard():
 
     company = Company.query.get(company_id)
 
+    # Get currency symbol for the company
+    currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
     return render_template('dashboard.html',
                            total_schedules=len(schedules),
                            total_cost=total_cost,
                            remaining_balance=remaining,
                            upcoming_entries=upcoming,
                            recent_schedules=recent,
-                           company_name=company.name if company else 'No Company')
+                           company_name=company.name if company else 'No Company',
+                           currency_symbol=currency_symbol)
 
 @app.route('/schedules')
 def schedule_list():
@@ -895,11 +933,16 @@ def schedule_list():
     end = start + per_page
     page_obj = schedules[start:end]
 
+    # Get currency symbol
+    company = Company.query.get(company_id)
+    currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
     return render_template('schedule_list.html',
                            page_obj=page_obj,
                            search_query=search,
                            page=page,
-                           total_pages=(total + per_page - 1) // per_page)
+                           total_pages=(total + per_page - 1) // per_page,
+                           currency_symbol=currency_symbol)
 
 @app.route('/schedule/create', methods=['GET', 'POST'])
 def schedule_create():
@@ -912,11 +955,58 @@ def schedule_create():
 
     if request.method == 'POST':
         try:
-            # ... validation code ...
+            debit_account = request.form.get('debit_account', '').strip()
+            credit_account = request.form.get('credit_account', '').strip()
+            transaction_date = request.form.get('transaction_date', '').strip()
+            description = request.form.get('description', '').strip()
+            total_cost = request.form.get('total_cost', '').strip()
+            period_to_amortize = request.form.get('period_to_amortize', '').strip()
+            amortize_start_period = request.form.get('amortize_start_period', '').strip()
+
+            errors = []
+
+            valid, msg = validate_account_number(debit_account, 'Debit Account')
+            if not valid:
+                errors.append(msg)
+
+            valid, msg = validate_account_number(credit_account, 'Credit Account')
+            if not valid:
+                errors.append(msg)
+
+            if not transaction_date:
+                errors.append('Transaction Date is required')
+            else:
+                valid, msg = validate_date(transaction_date, 'Transaction Date')
+                if not valid:
+                    errors.append(msg)
+
+            if not description:
+                errors.append('Description is required')
+            elif len(description) < 3:
+                errors.append('Description must be at least 3 characters long')
+
+            valid, msg = validate_positive_number(total_cost, 'Total Cost')
+            if not valid:
+                errors.append(msg)
+
+            valid, msg = validate_positive_integer(period_to_amortize, 'Period to Amortize')
+            if not valid:
+                errors.append(msg)
+
+            if not amortize_start_period:
+                errors.append('Amortize Start Period is required')
+            else:
+                valid, msg = validate_date(amortize_start_period, 'Amortize Start Period')
+                if not valid:
+                    errors.append(msg)
+
+            if errors:
+                for error in errors:
+                    flash(f'❌ {error}', 'danger')
+                return render_template('schedule_form.html', action='Create')
 
             schedule = PrepaymentSchedule(
                 company_id=company_id,
-                # REMOVED: user_id
                 debit_account=debit_account,
                 credit_account=credit_account,
                 transaction_date=datetime.strptime(transaction_date, '%Y-%m-%d').date(),
@@ -929,7 +1019,20 @@ def schedule_create():
             db.session.add(schedule)
             db.session.flush()
 
-            # ... rest of the code ...
+            for entry_data in schedule.get_amortization_schedule():
+                entry = AmortizationEntry(
+                    schedule_id=schedule.id,
+                    period=entry_data['period'],
+                    due_date=entry_data['date'],
+                    amount=entry_data['amount'],
+                    remaining_balance=entry_data['remaining_balance'],
+                    status='PENDING'
+                )
+                db.session.add(entry)
+
+            db.session.commit()
+            flash('✅ Schedule created successfully!', 'success')
+            return redirect(url_for('schedule_detail', pk=schedule.id))
 
         except Exception as e:
             flash(f'❌ Error: {str(e)}', 'danger')
@@ -948,7 +1051,14 @@ def schedule_detail(pk):
 
     schedule = PrepaymentSchedule.query.filter_by(id=pk, company_id=company_id).first_or_404()
     amortization = schedule.get_amortization_schedule()
-    return render_template('schedule_detail.html', schedule=schedule, amortization_schedule=amortization)
+
+    company = Company.query.get(company_id)
+    currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
+    return render_template('schedule_detail.html',
+                           schedule=schedule,
+                           amortization_schedule=amortization,
+                           currency_symbol=currency_symbol)
 
 @app.route('/schedule/<int:pk>/update', methods=['GET', 'POST'])
 def schedule_update(pk):
@@ -1299,6 +1409,10 @@ def view_report():
                 'monthly_totals': account_monthly_totals
             })
 
+        # Get currency symbol
+        company = Company.query.get(company_id)
+        currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
         return render_template('report_results.html',
                                report_groups=report_groups,
                                months=months,
@@ -1307,7 +1421,8 @@ def view_report():
                                start_date=start_date,
                                end_date=end_date,
                                generated_on=datetime.now(),
-                               format_number=format_number)
+                               format_number=format_number,
+                               currency_symbol=currency_symbol)
 
     except Exception as e:
         flash(f'❌ Error generating report: {str(e)}', 'danger')
@@ -1785,6 +1900,10 @@ def credit_report_view():
                 'monthly_totals': account_monthly_totals
             })
 
+        # Get currency symbol
+        company = Company.query.get(company_id)
+        currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
         return render_template('credit_report_results.html',
                                report_groups=report_groups,
                                months=months,
@@ -1793,7 +1912,8 @@ def credit_report_view():
                                start_date=start_date,
                                end_date=end_date,
                                generated_on=datetime.now(),
-                               format_number=format_number)
+                               format_number=format_number,
+                               currency_symbol=currency_symbol)
 
     except Exception as e:
         flash(f'❌ Error generating report: {str(e)}', 'danger')
@@ -1878,6 +1998,8 @@ def company_create():
             address = request.form.get('address', '').strip()
             phone = request.form.get('phone', '').strip()
             email = request.form.get('email', '').strip()
+            currency_symbol = request.form.get('currency_symbol', '$').strip()
+            currency_code = request.form.get('currency_code', 'USD').strip()
 
             # Validate
             if not name:
@@ -1886,6 +2008,11 @@ def company_create():
 
             if not code:
                 flash('Company code is required.', 'danger')
+                return render_template('company_form.html', action='Create')
+
+            valid, msg = validate_currency_symbol(currency_symbol)
+            if not valid:
+                flash(msg, 'danger')
                 return render_template('company_form.html', action='Create')
 
             # Check for duplicate code
@@ -1913,7 +2040,9 @@ def company_create():
                 phone=phone,
                 email=email,
                 logo=logo_filename,
-                is_active=True
+                is_active=True,
+                currency_symbol=currency_symbol,
+                currency_code=currency_code
             )
             db.session.add(company)
             db.session.commit()
@@ -1940,6 +2069,8 @@ def company_edit(pk):
             company.phone = request.form.get('phone', '').strip()
             company.email = request.form.get('email', '').strip()
             company.is_active = request.form.get('is_active') == 'on'
+            company.currency_symbol = request.form.get('currency_symbol', '$').strip()
+            company.currency_code = request.form.get('currency_code', 'USD').strip()
 
             # Validate
             if not company.name:
@@ -1948,6 +2079,11 @@ def company_edit(pk):
 
             if not company.code:
                 flash('Company code is required.', 'danger')
+                return render_template('company_form.html', action='Edit', company=company)
+
+            valid, msg = validate_currency_symbol(company.currency_symbol)
+            if not valid:
+                flash(msg, 'danger')
                 return render_template('company_form.html', action='Edit', company=company)
 
             # Check for duplicate code (excluding current company)
@@ -2437,6 +2573,10 @@ def combined_report_view():
                 'monthly_totals': account_monthly_totals
             })
 
+        # Get currency symbol
+        company = Company.query.get(company_id)
+        currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
         return render_template('combined_report_results.html',
                                report_groups=report_groups,
                                months=months,
@@ -2445,7 +2585,8 @@ def combined_report_view():
                                start_date=start_date,
                                end_date=end_date,
                                generated_on=datetime.now(),
-                               format_number=format_number)
+                               format_number=format_number,
+                               currency_symbol=currency_symbol)
 
     except Exception as e:
         flash(f'❌ Error generating report: {str(e)}', 'danger')
