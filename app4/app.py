@@ -1623,6 +1623,301 @@ def generate_invoice_pdf(invoice):
     buffer.close()
     return pdf_data
 
+
+def generate_simple_invoice_pdf(invoice):
+    """Generate a simple PDF invoice showing ONLY the net total amount (no tax breakdowns, no unit price)."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=0.5 * inch, leftMargin=0.5 * inch,
+                            topMargin=0.5 * inch, bottomMargin=0.5 * inch)
+    styles = getSampleStyleSheet()
+
+    # Custom styles
+    title_style = ParagraphStyle(
+        'TitleStyle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        alignment=TA_CENTER,
+        spaceAfter=8,
+        textColor=colors.black,
+        fontName='Helvetica-Bold'
+    )
+    heading_style = ParagraphStyle(
+        'HeadingStyle',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceAfter=4,
+        textColor=colors.black,
+        fontName='Helvetica-Bold'
+    )
+    normal_style = ParagraphStyle(
+        'NormalStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        spaceAfter=2,
+        textColor=colors.black,
+        fontName='Helvetica'
+    )
+    value_style = ParagraphStyle(
+        'ValueStyle',
+        parent=styles['Normal'],
+        fontSize=9,
+        fontName='Helvetica-Bold',
+        spaceAfter=2,
+        textColor=colors.black
+    )
+
+    currency_code = invoice.currency or 'USD'
+    elements = []
+    company = invoice.company
+
+    # Company Header
+    if company and company.logo_filename:
+        try:
+            logo_path = os.path.join(app.config['UPLOAD_FOLDER'], company.logo_filename)
+            if os.path.exists(logo_path):
+                img = Image(logo_path, width=1.5 * inch, height=0.75 * inch)
+                elements.append(img)
+                elements.append(Spacer(1, 4))
+        except:
+            pass
+
+    if company:
+        elements.append(Paragraph(company.name, title_style))
+        if company.tin:
+            elements.append(Paragraph(f"TIN: {company.tin}", normal_style))
+        elements.append(Paragraph("INVOICE", heading_style))
+    elements.append(Spacer(1, 10))
+
+    # Invoice Info (Left & Right Columns)
+    col_widths = [3 * inch, 3 * inch]
+    info_data = []
+    left_info = [
+        f"<b>Invoice Number:</b> {invoice.invoice_number}",
+        f"<b>Date:</b> {invoice.invoice_date.strftime('%B %d, %Y') if invoice.invoice_date else 'N/A'}",
+        f"<b>Due Date:</b> {invoice.due_date.strftime('%B %d, %Y') if invoice.due_date else 'N/A'}",
+        f"<b>Currency:</b> {currency_code}"
+    ]
+
+    right_info = []
+    if invoice.customer:
+        right_info = [
+            f"<b>Bill To:</b>",
+            f"{invoice.customer.name}",
+            f"{invoice.customer.address}" if invoice.customer.address else "",
+            f"Tel: {invoice.customer.phone}" if invoice.customer.phone else "",
+            f"Email: {invoice.customer.email}" if invoice.customer.email else "",
+            f"Tax ID: {invoice.customer.tax_id}" if invoice.customer.tax_id else ""
+        ]
+
+    max_rows = max(len(left_info), len(right_info))
+    while len(left_info) < max_rows:
+        left_info.append('')
+    while len(right_info) < max_rows:
+        right_info.append('')
+
+    for i in range(max_rows):
+        info_data.append([Paragraph(left_info[i], normal_style), Paragraph(right_info[i], normal_style)])
+
+    info_table = Table(info_data, colWidths=col_widths)
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 12))
+
+    # Simple Line Items Table (Only Description, Qty, and Total - NO Unit Price)
+    if invoice.items:
+        elements.append(Paragraph("Line Items", heading_style))
+        elements.append(Spacer(1, 4))
+        line_data = []
+
+        # Headers: #, Description, Qty, Total (Net) - Unit Price REMOVED
+        headers = [
+            '#',
+            'Description',
+            'Qty',
+            f'Total\n({currency_code})'
+        ]
+        line_data.append([Paragraph(h, normal_style) for h in headers])
+
+        total_net = 0
+        max_lengths = [1, 10, 3, 8]  # Min widths for #, Desc, Qty, Total
+
+        for idx, item in enumerate(invoice.items, 1):
+            # Calculate net total for this line
+            subtotal = float(item.quantity) * float(item.unit_price)
+            vat = float(item.vat_amount or 0)
+            wht = float(item.wht_amount or 0)
+            wht_on_vat = float(item.wht_on_vat_amount or 0)
+            levy = float(item.levy_amount or 0)
+
+            line_net = subtotal + vat + levy - wht - wht_on_vat
+            total_net += line_net
+
+            # Track lengths for column sizing
+            desc_len = len(item.description)
+            if desc_len > max_lengths[1]:
+                max_lengths[1] = desc_len
+
+            qty = float(item.quantity)
+            qty_str = f"{int(qty)}" if qty.is_integer() else f"{qty:,.2f}"
+            if len(qty_str) > max_lengths[2]:
+                max_lengths[2] = len(qty_str)
+
+            total_str = f"{line_net:,.2f}"
+            if len(total_str) > max_lengths[3]:
+                max_lengths[3] = len(total_str)
+
+            line_data.append([
+                Paragraph(str(idx), normal_style),
+                Paragraph(item.description, normal_style),
+                Paragraph(qty_str, normal_style),
+                Paragraph(f"{line_net:,.2f}", normal_style)
+            ])
+
+        # Totals row (Only the Total column has a value)
+        line_data.append([
+            Paragraph('', normal_style),
+            Paragraph('', normal_style),
+            Paragraph('', normal_style),
+            Paragraph(f"{total_net:,.2f}", value_style)
+        ])
+
+        # Dynamic column widths (4 columns now instead of 5)
+        total_available_width = 7.0 * inch
+        min_column_width = 0.25 * inch
+        max_column_width = 3.0 * inch
+        char_width = 0.065 * inch
+
+        initial_widths = []
+        for i in range(4):  # Changed from 5 to 4 columns
+            content_width = (max_lengths[i] + 3) * char_width
+            clamped_width = max(min_column_width, min(content_width, max_column_width))
+            initial_widths.append(clamped_width)
+
+        total_initial = sum(initial_widths)
+        if total_initial > total_available_width:
+            scale_factor = total_available_width / total_initial
+            col_widths = [w * scale_factor for w in initial_widths]
+        else:
+            extra_space = total_available_width - total_initial
+            col_widths = initial_widths.copy()
+            # Give extra space to Description (index 1)
+            col_widths[1] = min(col_widths[1] + extra_space, max_column_width * 1.8)
+
+            remaining_extra = total_available_width - sum(col_widths)
+            if remaining_extra > 0:
+                # Distribute remaining to Qty (index 2) and Total (index 3)
+                distribute_cols = [2, 3]
+                weights = [1.5, 1.0]
+                total_weight = sum(weights)
+                for i, col_idx in enumerate(distribute_cols):
+                    if col_widths[col_idx] < max_column_width:
+                        extra = remaining_extra * (weights[i] / total_weight)
+                        col_widths[col_idx] = min(col_widths[col_idx] + extra, max_column_width)
+
+            remaining_extra = total_available_width - sum(col_widths)
+            if remaining_extra > 0 and col_widths[0] < max_column_width:
+                col_widths[0] = min(col_widths[0] + remaining_extra, max_column_width * 0.8)
+
+        col_widths = [max(min_column_width, w) for w in col_widths]
+        total_width = sum(col_widths)
+        if total_width > total_available_width:
+            scale = total_available_width / total_width
+            col_widths = [w * scale for w in col_widths]
+
+        total_width = sum(col_widths)
+        if total_width < total_available_width:
+            diff = total_available_width - total_width
+            col_widths[1] = min(col_widths[1] + diff, max_column_width * 1.8)
+
+        col_widths[2] = max(col_widths[2], 0.5 * inch)
+
+        # Create the table
+        line_table = Table(line_data, colWidths=col_widths)
+        line_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f0f0')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+            ('ALIGN', (2, 1), (2, -1), 'CENTER'),
+            ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+            ('ALIGN', (3, 1), (3, -1), 'RIGHT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#cccccc')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8f4f8')),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.black),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, -1), (-1, -1), 9),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.HexColor('#cccccc')),
+            ('WORDWRAP', (0, 0), (-1, -1), True),
+        ]))
+        elements.append(line_table)
+        elements.append(Spacer(1, 12))
+
+    # Notes and Terms
+    if invoice.notes:
+        elements.append(Paragraph(f"<b>Notes:</b> {invoice.notes}", normal_style))
+    if invoice.terms:
+        elements.append(Paragraph(f"<b>Terms:</b> {invoice.terms}", normal_style))
+
+    # Payment Details (Bank Info)
+    if invoice.bank_id:
+        bank = invoice.bank
+        if bank:
+            elements.append(Spacer(1, 12))
+            elements.append(Paragraph("PAYMENT DETAILS", heading_style))
+            elements.append(Spacer(1, 4))
+
+            bank_info = []
+            bank_info.append(f"<b>Bank:</b> {bank.name}")
+            if bank.account_name:
+                bank_info.append(f"<b>Account Name:</b> {bank.account_name}")
+            if bank.account_number:
+                bank_info.append(f"<b>Account Number:</b> {bank.account_number}")
+            if bank.branch:
+                bank_info.append(f"<b>Branch:</b> {bank.branch}")
+            if bank.swift_code:
+                bank_info.append(f"<b>SWIFT Code:</b> {bank.swift_code}")
+            if bank.address:
+                bank_info.append(f"<b>Address:</b> {bank.address}")
+
+            bank_data = []
+            for info in bank_info:
+                bank_data.append([Paragraph(info, normal_style)])
+
+            bank_table = Table(bank_data, colWidths=[5.5 * inch])
+            bank_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8f9fa')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#cccccc')),
+            ]))
+            elements.append(bank_table)
+
+    # Footer
+    elements.append(Spacer(1, 20))
+    footer_text = f"Generated on: {datetime.now().strftime('%d-%m-%Y %H:%M')} | This is a computer-generated invoice"
+    elements.append(Paragraph(footer_text, normal_style))
+
+    doc.build(elements)
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    return pdf_data
+
 # ==================== IMPORT FUNCTIONS ====================
 def generate_invoice_import_template():
     """Generate Excel template for importing invoices with WHT and WHT on VAT"""
@@ -4740,6 +5035,13 @@ def download_pdf_voucher(payment_id):
     buffer.close()
     return send_file(BytesIO(pdf_data), mimetype='application/pdf', as_attachment=True,
                      download_name=f'Payment_Voucher_{payment.transaction_number}.pdf')
+
+@app.route('/api/invoices/<int:invoice_id>/simple_pdf', methods=['GET'])
+def generate_simple_invoice_pdf_route(invoice_id):
+    invoice = Invoice.query.get_or_404(invoice_id)
+    pdf_data = generate_simple_invoice_pdf(invoice)
+    return send_file(BytesIO(pdf_data), mimetype='application/pdf', as_attachment=True,
+                     download_name=f'invoice_{invoice.invoice_number}_net_only.pdf')
 
 
 # ==================== INITIALIZE DATABASE ====================
