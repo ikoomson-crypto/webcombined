@@ -31,8 +31,13 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # ============================================
-# DATABASE SETUP - Supports SQLite & PostgreSQL
+# DATABASE SETUP
 # ============================================
+
+import os
+import sqlite3
+import psycopg2
+import psycopg2.extras
 
 # Determine database type from environment
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
@@ -40,11 +45,10 @@ IS_PRODUCTION = bool(DATABASE_URL)
 
 if IS_PRODUCTION:
     # PostgreSQL (Render.com)
-    # Fix for Render's postgres:// vs postgresql://
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-
-    print(f"✅ Using PostgreSQL database")
+    print(f"✅ Using PostgreSQL database on Render")
+    DATABASE = None
 else:
     # SQLite (Local development)
     DATABASE = 'payroll.db'
@@ -56,30 +60,20 @@ def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         if IS_PRODUCTION:
-            # PostgreSQL connection
             db = psycopg2.connect(DATABASE_URL)
             db.autocommit = False
         else:
-            # SQLite connection
             db = sqlite3.connect(DATABASE)
             db.row_factory = sqlite3.Row
         g._database = db
     return db
+
 
 def get_cursor(db=None):
     """Get a cursor from the database connection"""
     if db is None:
         db = get_db()
 
-    if IS_PRODUCTION:
-        # PostgreSQL cursor with RealDictCursor
-        return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    else:
-        # SQLite cursor
-        return db.cursor()
-
-def get_cursor(db):
-    """Get a cursor from the database connection"""
     if IS_PRODUCTION:
         return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     else:
@@ -91,7 +85,10 @@ def close_connection(exception):
     """Close database connection"""
     db = getattr(g, '_database', None)
     if db is not None:
-        db.close()
+        try:
+            db.close()
+        except:
+            pass
 
 def execute_query(db, query, params=None):
     """Execute a query with proper parameter handling for both SQLite and PostgreSQL"""
@@ -118,9 +115,7 @@ def init_db():
     # Check if we're using PostgreSQL
     is_postgres = IS_PRODUCTION
 
-    # ============================================================
-    # COMPANIES TABLE
-    # ============================================================
+    # Companies table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS companies (
@@ -148,9 +143,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # EMPLOYEES TABLE
-    # ============================================================
+    # Employees table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employees (
@@ -187,9 +180,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # MONTHLY SALARIES TABLE
-    # ============================================================
+    # Monthly Salaries table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS monthly_salaries (
@@ -214,9 +205,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # TAX CONFIGS TABLE
-    # ============================================================
+    # Tax Configs table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS tax_configs (
@@ -249,9 +238,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # SOCIAL SECURITY THRESHOLDS TABLE
-    # ============================================================
+    # Social Security Threshold History
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS social_security_thresholds (
@@ -278,9 +265,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # BONUS RECORDS TABLE
-    # ============================================================
+    # Bonus Records table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS bonus_records (
@@ -312,9 +297,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # BONUS TAX CONFIGS TABLE
-    # ============================================================
+    # Bonus Tax Config table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS bonus_tax_configs (
@@ -341,9 +324,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # BIK DEFINITIONS TABLE
-    # ============================================================
+    # Benefit-in-Kind Definitions table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS bik_definitions (
@@ -372,9 +353,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # EMPLOYEE BIK TABLE
-    # ============================================================
+    # Employee Benefit-in-Kind table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employee_bik (
@@ -400,9 +379,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # ALLOWANCE DEFINITIONS TABLE
-    # ============================================================
+    # Allowance Definitions table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS allowance_definitions (
@@ -431,9 +408,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # EMPLOYEE ALLOWANCES TABLE
-    # ============================================================
+    # Employee Allowances table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employee_allowances (
@@ -455,9 +430,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # MONTHLY ALLOWANCES TABLE
-    # ============================================================
+    # Monthly Allowance History table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS monthly_allowances (
@@ -487,9 +460,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # DEDUCTION DEFINITIONS TABLE
-    # ============================================================
+    # Deduction Definitions table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS deduction_definitions (
@@ -518,9 +489,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # EMPLOYEE DEDUCTIONS TABLE
-    # ============================================================
+    # Employee Deductions table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employee_deductions (
@@ -546,9 +515,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # PAYROLL RECORDS TABLE
-    # ============================================================
+    # Payroll Records table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS payroll_records (
@@ -626,9 +593,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # CONSULTANT INVOICES TABLE
-    # ============================================================
+    # Consultant Invoices table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS consultant_invoices (
@@ -680,9 +645,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # INVOICE ITEMS TABLE
-    # ============================================================
+    # Invoice Items table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS invoice_items (
@@ -707,9 +670,7 @@ def init_db():
             )
         ''')
 
-    # ============================================================
-    # INVOICE PAYMENTS TABLE
-    # ============================================================
+    # Invoice Payments table
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS invoice_payments (
@@ -739,128 +700,13 @@ def init_db():
     db.commit()
     print("✅ Database initialized successfully")
 
-def migrate_to_date_ranges():
-    """Migrate employee_deductions, employee_bik, and bonus_records to use start_date and end_date"""
-    db = get_db()
-    cursor = db.cursor()
+    def migrate_database():
+        """Check and migrate database schema if needed"""
+        db = get_db()
+        cursor = get_cursor(db)
 
-    # --- Migrate employee_deductions ---
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='employee_deductions'")
-    if cursor.fetchone():
-        cursor.execute("PRAGMA table_info(employee_deductions)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if 'start_date' not in columns:
-            print("🔄 Migrating employee_deductions to use start_date and end_date...")
-            cursor.execute('''
-                CREATE TABLE employee_deductions_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    employee_id INTEGER NOT NULL,
-                    deduction_id INTEGER NOT NULL,
-                    start_date TEXT NOT NULL,
-                    end_date TEXT,
-                    value REAL NOT NULL,
-                    FOREIGN KEY (employee_id) REFERENCES employees(id),
-                    FOREIGN KEY (deduction_id) REFERENCES deduction_definitions(id)
-                )
-            ''')
-            cursor.execute('''
-                INSERT INTO employee_deductions_new (employee_id, deduction_id, start_date, end_date, value)
-                SELECT 
-                    employee_id, 
-                    deduction_id, 
-                    printf('%04d-%02d-01', year, month) as start_date,
-                    printf('%04d-%02d-01', year, month) as end_date,
-                    value
-                FROM employee_deductions
-            ''')
-            cursor.execute("DROP TABLE employee_deductions")
-            cursor.execute("ALTER TABLE employee_deductions_new RENAME TO employee_deductions")
-            print("✅ employee_deductions migrated successfully!")
-
-    # --- Migrate employee_bik ---
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='employee_bik'")
-    if cursor.fetchone():
-        cursor.execute("PRAGMA table_info(employee_bik)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if 'start_date' not in columns:
-            print("🔄 Migrating employee_bik to use start_date and end_date...")
-            cursor.execute('''
-                CREATE TABLE employee_bik_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    employee_id INTEGER NOT NULL,
-                    bik_id INTEGER NOT NULL,
-                    start_date TEXT NOT NULL,
-                    end_date TEXT,
-                    value REAL NOT NULL,
-                    FOREIGN KEY (employee_id) REFERENCES employees(id),
-                    FOREIGN KEY (bik_id) REFERENCES bik_definitions(id)
-                )
-            ''')
-            cursor.execute('''
-                INSERT INTO employee_bik_new (employee_id, bik_id, start_date, end_date, value)
-                SELECT 
-                    employee_id, 
-                    bik_id, 
-                    printf('%04d-%02d-01', year, month) as start_date,
-                    printf('%04d-%02d-01', year, month) as end_date,
-                    value
-                FROM employee_bik
-            ''')
-            cursor.execute("DROP TABLE employee_bik")
-            cursor.execute("ALTER TABLE employee_bik_new RENAME TO employee_bik")
-            print("✅ employee_bik migrated successfully!")
-
-    # --- Migrate bonus_records ---
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='bonus_records'")
-    if cursor.fetchone():
-        cursor.execute("PRAGMA table_info(bonus_records)")
-        columns = [col[1] for col in cursor.fetchall()]
-
-        if 'start_date' not in columns:
-            print("🔄 Migrating bonus_records to use start_date and end_date...")
-            cursor.execute('''
-                CREATE TABLE bonus_records_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    employee_id INTEGER NOT NULL,
-                    company_id INTEGER NOT NULL,
-                    start_date TEXT NOT NULL,
-                    end_date TEXT,
-                    bonus_amount REAL NOT NULL,
-                    bonus_type TEXT NOT NULL,
-                    description TEXT,
-                    created_date TEXT,
-                    FOREIGN KEY (employee_id) REFERENCES employees(id),
-                    FOREIGN KEY (company_id) REFERENCES companies(id)
-                )
-            ''')
-            cursor.execute('''
-                INSERT INTO bonus_records_new (employee_id, company_id, start_date, end_date, bonus_amount, bonus_type, description, created_date)
-                SELECT 
-                    employee_id, 
-                    company_id, 
-                    printf('%04d-%02d-01', year, month) as start_date,
-                    printf('%04d-%02d-01', year, month) as end_date,
-                    bonus_amount, 
-                    bonus_type, 
-                    description, 
-                    created_date
-                FROM bonus_records
-            ''')
-            cursor.execute("DROP TABLE bonus_records")
-            cursor.execute("ALTER TABLE bonus_records_new RENAME TO bonus_records")
-            print("✅ bonus_records migrated successfully!")
-
-    db.commit()
-    print("✅ All date range migrations completed successfully!")
-
-
-def migrate_database():
-    """Check and migrate database schema if needed"""
-    db = get_db()
-    cursor = db.cursor()
-
+        # Check if we're using PostgreSQL
+        is_postgres = IS_PRODUCTION
     try:
         # Check if monthly_allowances table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='monthly_allowances'")
