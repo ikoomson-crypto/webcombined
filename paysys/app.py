@@ -118,18 +118,9 @@ def init_db():
     # Check if we're using PostgreSQL
     is_postgres = IS_PRODUCTION
 
-    # Helper function to get the correct ID type
-    def id_type():
-        return "SERIAL" if is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
-
-    # Helper function to get the correct foreign key syntax
-    def fk_ref(table, column="id"):
-        if is_postgres:
-            return f"REFERENCES {table}({column})"
-        else:
-            return f"FOREIGN KEY ({column}) REFERENCES {table}({column})"
-
-    # Companies table
+    # ============================================================
+    # COMPANIES TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS companies (
@@ -157,7 +148,9 @@ def init_db():
             )
         ''')
 
-    # Employees table with is_tax_exempt and exempt_from_social_security columns
+    # ============================================================
+    # EMPLOYEES TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employees (
@@ -194,7 +187,9 @@ def init_db():
             )
         ''')
 
-    # Monthly Salaries table
+    # ============================================================
+    # MONTHLY SALARIES TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS monthly_salaries (
@@ -219,7 +214,9 @@ def init_db():
             )
         ''')
 
-    # Tax Configs table
+    # ============================================================
+    # TAX CONFIGS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS tax_configs (
@@ -252,7 +249,9 @@ def init_db():
             )
         ''')
 
-    # Social Security Threshold History
+    # ============================================================
+    # SOCIAL SECURITY THRESHOLDS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS social_security_thresholds (
@@ -279,7 +278,9 @@ def init_db():
             )
         ''')
 
-    # Bonus Records table
+    # ============================================================
+    # BONUS RECORDS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS bonus_records (
@@ -311,7 +312,9 @@ def init_db():
             )
         ''')
 
-    # Bonus Tax Config table
+    # ============================================================
+    # BONUS TAX CONFIGS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS bonus_tax_configs (
@@ -338,7 +341,9 @@ def init_db():
             )
         ''')
 
-    # Benefit-in-Kind Definitions table
+    # ============================================================
+    # BIK DEFINITIONS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS bik_definitions (
@@ -367,7 +372,9 @@ def init_db():
             )
         ''')
 
-    # Employee Benefit-in-Kind table
+    # ============================================================
+    # EMPLOYEE BIK TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employee_bik (
@@ -393,7 +400,9 @@ def init_db():
             )
         ''')
 
-    # Allowance Definitions table
+    # ============================================================
+    # ALLOWANCE DEFINITIONS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS allowance_definitions (
@@ -422,7 +431,9 @@ def init_db():
             )
         ''')
 
-    # Employee Allowances table
+    # ============================================================
+    # EMPLOYEE ALLOWANCES TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employee_allowances (
@@ -444,7 +455,9 @@ def init_db():
             )
         ''')
 
-    # Monthly Allowance History table
+    # ============================================================
+    # MONTHLY ALLOWANCES TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS monthly_allowances (
@@ -474,7 +487,9 @@ def init_db():
             )
         ''')
 
-    # Deduction Definitions table
+    # ============================================================
+    # DEDUCTION DEFINITIONS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS deduction_definitions (
@@ -503,7 +518,9 @@ def init_db():
             )
         ''')
 
-    # Employee Deductions table
+    # ============================================================
+    # EMPLOYEE DEDUCTIONS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS employee_deductions (
@@ -529,7 +546,9 @@ def init_db():
             )
         ''')
 
-    # Payroll Records table
+    # ============================================================
+    # PAYROLL RECORDS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS payroll_records (
@@ -607,7 +626,9 @@ def init_db():
             )
         ''')
 
-    # Consultant Invoices table
+    # ============================================================
+    # CONSULTANT INVOICES TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS consultant_invoices (
@@ -659,7 +680,9 @@ def init_db():
             )
         ''')
 
-    # Invoice Items table
+    # ============================================================
+    # INVOICE ITEMS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS invoice_items (
@@ -684,7 +707,9 @@ def init_db():
             )
         ''')
 
-    # Invoice Payments table
+    # ============================================================
+    # INVOICE PAYMENTS TABLE
+    # ============================================================
     if is_postgres:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS invoice_payments (
