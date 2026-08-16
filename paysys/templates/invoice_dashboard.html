@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice Dashboard - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="header" style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: #2c3e50;">📄 Invoice Dashboard</h1>
+                <div style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">
+                    {{ company.name }} | Currency: {{ company.base_currency }} | Consultants: {{ consultants|length }}
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('generate_invoices', company_id=company.id) }}" class="btn btn-primary" style="display: inline-block; padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                    📄 Generate Invoices
+                </a>
+                <a href="{{ url_for('payroll_dashboard', company_id=company.id) }}" class="btn btn-info" style="display: inline-block; padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                    💰 Payroll Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Total Invoices</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #2c3e50; margin: 5px 0;">{{ total_invoices }}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Total Amount</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #2c3e50; margin: 5px 0;">{{ company.base_currency }} {{ format_currency(total_amount) }}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Total Paid</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #27ae60; margin: 5px 0;">{{ company.base_currency }} {{ format_currency(total_paid) }}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Total Due</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #e74c3c; margin: 5px 0;">{{ company.base_currency }} {{ format_currency(total_due) }}</div>
+        </div>
+    </div>
+
+    <!-- Status Filter -->
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <span style="font-weight: bold; color: #2c3e50;">📊 Status:</span>
+            <a href="{{ url_for('invoice_dashboard', company_id=company.id) }}" class="btn btn-sm" style="display: inline-block; padding: 5px 12px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">All ({{ total_invoices }})</a>
+            <a href="{{ url_for('invoice_dashboard', company_id=company.id, status='Draft') }}" class="btn btn-sm" style="display: inline-block; padding: 5px 12px; background: #95a5a6; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">📝 Draft ({{ status_counts.Draft }})</a>
+            <a href="{{ url_for('invoice_dashboard', company_id=company.id, status='Sent') }}" class="btn btn-sm" style="display: inline-block; padding: 5px 12px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">📤 Sent ({{ status_counts.Sent }})</a>
+            <a href="{{ url_for('invoice_dashboard', company_id=company.id, status='Paid') }}" class="btn btn-sm" style="display: inline-block; padding: 5px 12px; background: #27ae60; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">✅ Paid ({{ status_counts.Paid }})</a>
+            <a href="{{ url_for('invoice_dashboard', company_id=company.id, status='Overdue') }}" class="btn btn-sm" style="display: inline-block; padding: 5px 12px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">⚠️ Overdue ({{ status_counts.Overdue }})</a>
+        </div>
+        <div>
+            <span style="font-size: 13px; color: #7f8c8d;">👥 {{ consultants|length }} Consultants</span>
+        </div>
+    </div>
+
+    <!-- Invoices Table -->
+    {% if invoices %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: left; font-size: 11px;">Invoice #</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: left; font-size: 11px;">Consultant</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: left; font-size: 11px;">Period</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: center; font-size: 11px;">Date</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: center; font-size: 11px;">Due Date</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: right; font-size: 11px;">Amount</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: right; font-size: 11px;">Paid</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: right; font-size: 11px;">Balance</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: center; font-size: 11px;">Status</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: center; font-size: 11px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invoice in invoices %}
+                    <tr style="border-bottom: 1px solid #ecf0f1;
+                        {% if invoice.status == 'Overdue' %}background: #fef9e7;{% endif %}
+                        {% if invoice.status == 'Paid' %}background: #f0fdf4;{% endif %}">
+                        <td style="padding: 10px 8px; font-size: 12px;">
+                            <strong>{{ invoice.invoice_number }}</strong>
+                        </td>
+                        <td style="padding: 10px 8px; font-size: 12px;">
+                            {{ invoice.first_name }} {{ invoice.last_name }}
+                            <br><span style="font-size: 10px; color: #7f8c8d;">{{ invoice.position }}</span>
+                        </td>
+                        <td style="padding: 10px 8px; font-size: 12px;">
+                            <span style="font-size: 11px;">
+                                {{ invoice.period_start[:10] }} → {{ invoice.period_end[:10] }}
+                            </span>
+                        </td>
+                        <td style="padding: 10px 8px; text-align: center; font-size: 12px;">
+                            {{ invoice.invoice_date[:10] }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: center; font-size: 12px;
+                            {% if invoice.status == 'Overdue' %}color: #e74c3c; font-weight: bold;{% endif %}">
+                            {{ invoice.due_date[:10] }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px; font-weight: bold;">
+                            {{ invoice.base_currency }} {{ format_currency(invoice.final_amount) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px; color: #27ae60;">
+                            {{ invoice.base_currency }} {{ format_currency(invoice.amount_paid or 0) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px;
+                            {% if invoice.balance_due > 0 %}color: #e74c3c; font-weight: bold;{% else %}color: #27ae60;{% endif %}">
+                            {{ invoice.base_currency }} {{ format_currency(invoice.balance_due or 0) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: center; font-size: 12px;">
+                            <span style="display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px;
+                                {% if invoice.status == 'Draft' %}background: #95a5a6; color: white;
+                                {% elif invoice.status == 'Sent' %}background: #3498db; color: white;
+                                {% elif invoice.status == 'Paid' %}background: #27ae60; color: white;
+                                {% elif invoice.status == 'Overdue' %}background: #e74c3c; color: white;
+                                {% endif %}">
+                                {{ invoice.status }}
+                            </span>
+                        </td>
+                        <td style="padding: 10px 8px; text-align: center; font-size: 12px;">
+                            <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+                                <a href="{{ url_for('view_invoice', invoice_id=invoice.id) }}"
+                                   class="btn btn-sm"
+                                   style="display: inline-block; padding: 4px 8px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 10px;"
+                                   title="View Invoice">👁️</a>
+                                <a href="{{ url_for('download_invoice', invoice_id=invoice.id) }}"
+                                   class="btn btn-sm"
+                                   style="display: inline-block; padding: 4px 8px; background: #27ae60; color: white; text-decoration: none; border-radius: 3px; font-size: 10px;"
+                                   title="Download PDF">📥</a>
+                                {% if invoice.status != 'Paid' %}
+                                <form method="POST" action="{{ url_for('update_invoice_status_route', invoice_id=invoice.id) }}" style="display: inline;">
+                                    <input type="hidden" name="status" value="Paid">
+                                    <button type="submit" class="btn btn-sm" style="display: inline-block; padding: 4px 8px; background: #27ae60; color: white; border: none; border-radius: 3px; font-size: 10px; cursor: pointer;" title="Mark as Paid">✅</button>
+                                </form>
+                                {% endif %}
+                                <a href="{{ url_for('delete_invoice', invoice_id=invoice.id) }}"
+                                   class="btn btn-sm"
+                                   style="display: inline-block; padding: 4px 8px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 10px;"
+                                   onclick="return confirm('Delete this invoice?')"
+                                   title="Delete">🗑️</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8f9fa; font-weight: bold;">
+                        <td colspan="5" style="padding: 10px 8px; text-align: right; font-size: 12px;">TOTALS:</td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px;">
+                            {{ company.base_currency }} {{ format_currency(total_amount) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px; color: #27ae60;">
+                            {{ company.base_currency }} {{ format_currency(total_paid) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px; color: #e74c3c;">
+                            {{ company.base_currency }} {{ format_currency(total_due) }}
+                        </td>
+                        <td colspan="2" style="padding: 10px 8px; text-align: center; font-size: 12px; color: #7f8c8d;">
+                            {{ invoices|length }} Invoices
+                            {% set paid_count = 0 %}
+                            {% for inv in invoices %}
+                                {% if inv.status == 'Paid' %}
+                                    {% set paid_count = paid_count + 1 %}
+                                {% endif %}
+                            {% endfor %}
+                            | ✅ {{ paid_count }} Paid
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Quick Actions -->
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <span style="color: #7f8c8d; font-size: 13px;">
+                    💡 {{ invoices|length }} invoice(s) found |
+                    {% set paid_count = 0 %}
+                    {% for inv in invoices %}
+                        {% if inv.status == 'Paid' %}
+                            {% set paid_count = paid_count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ paid_count }} paid, {{ status_counts.Overdue }} overdue
+                </span>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('generate_invoices', company_id=company.id) }}" class="btn btn-primary" style="display: inline-block; padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                    📄 Generate Invoices
+                </a>
+                <a href="{{ url_for('payroll_dashboard', company_id=company.id) }}" class="btn btn-secondary" style="display: inline-block; padding: 8px 16px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">
+                    ← Back to Payroll
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 50px; background: white; border-radius: 10px;">
+            <p style="font-size: 18px; color: #7f8c8d;">No invoices found.</p>
+            <p style="color: #95a5a6; margin: 10px 0;">Generate invoices for consultants from their payroll records.</p>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px;">
+                <a href="{{ url_for('generate_invoices', company_id=company.id) }}" class="btn btn-primary" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                    📄 Generate Invoices
+                </a>
+                <a href="{{ url_for('list_employees', company_id=company.id) }}" class="btn btn-info" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                    👥 Manage Consultants
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Legend -->
+<div style="margin-top: 20px; padding: 12px 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ecf0f1; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+    <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">📌 Legend:</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #95a5a6; color: white; border-radius: 8px; font-size: 10px;">📝 Draft</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #3498db; color: white; border-radius: 8px; font-size: 10px;">📤 Sent</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #27ae60; color: white; border-radius: 8px; font-size: 10px;">✅ Paid</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #e74c3c; color: white; border-radius: 8px; font-size: 10px;">⚠️ Overdue</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #fef9e7; border-radius: 3px; font-size: 10px; border: 1px solid #f9e79f;">Highlighted = Overdue</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #f0fdf4; border-radius: 3px; font-size: 10px; border: 1px solid #bbf7d0;">Highlighted = Paid</span>
+</div>
+
+<script>
+    // Auto-refresh status counts
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add any JavaScript functionality here
+        console.log('Invoice Dashboard loaded');
+    });
+</script>
+{% endblock %}

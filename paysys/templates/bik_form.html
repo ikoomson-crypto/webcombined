@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} Benefit-in-Kind - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('manage_bik', company_id=company.id) }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to BIK Management</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">{{ action }} Benefit-in-Kind - {{ company.name }}</h1>
+            <p style="color: #7f8c8d; font-size: 14px;">Define a non-cash benefit (Company Car, Housing, Medical, etc.)</p>
+        </div>
+
+        <form method="POST">
+            <div style="margin-bottom: 20px;">
+                <label for="name" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">BIK Name *</label>
+                <input type="text" id="name" name="name" required value="{{ bik.name if bik else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <small style="color: #7f8c8d;">E.g., Company Car, Housing, Medical Insurance, Fuel</small>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="type" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Type *</label>
+                <select id="type" name="type" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <option value="fixed" {% if bik and bik.type == 'fixed' %}selected{% endif %}>Fixed Amount</option>
+                    <option value="percentage" {% if bik and bik.type == 'percentage' %}selected{% endif %}>Percentage of Salary</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="default_value" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Default Value *</label>
+                <input type="number" step="0.01" id="default_value" name="default_value" required value="{{ bik.default_value if bik else 0 }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <small style="color: #7f8c8d;">In {{ company.base_currency }} (for fixed) or percentage (for percentage type)</small>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="is_taxable" name="is_taxable" {% if bik and bik.is_taxable %}checked{% endif %}>
+                    <label for="is_taxable" style="font-weight: 500; color: #34495e;">This benefit is taxable</label>
+                </div>
+                <small style="color: #7f8c8d; display: block; margin-left: 25px;">If taxable, the value will be added to taxable income.</small>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="description" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Description</label>
+                <textarea id="description" name="description" placeholder="Optional description of this benefit" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; height: 80px; resize: vertical;">{{ bik.description if bik else '' }}</textarea>
+            </div>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f39c12;">
+                <h4 style="color: #856404; margin-bottom: 5px;">📌 Benefit-in-Kind Information</h4>
+                <p style="color: #856404; font-size: 14px; margin: 0;">
+                    Benefit-in-Kind (BIK) refers to non-cash benefits provided to employees.
+                    Taxable BIK is added to the employee's taxable income and subject to income tax.
+                    <br><strong>Examples:</strong> Company cars, housing, medical insurance, fuel, etc.
+                </p>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">{{ action }} BIK</button>
+                <a href="{{ url_for('manage_bik', company_id=company.id) }}" class="btn btn-secondary" style="padding: 10px 30px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

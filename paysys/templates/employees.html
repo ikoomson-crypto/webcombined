@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Employees - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_companies') }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Companies</a>
+
+    <div class="header" style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: #2c3e50;">👥 Employees - {{ company.name }}</h1>
+                <div style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">
+                    {{ company.base_currency }} | {{ company.address }}
+                    <span style="margin-left: 15px; background: #e8f4fd; padding: 2px 12px; border-radius: 12px; font-size: 12px;">
+                        👤 {{ employees|length }} Employees
+                    </span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('add_employee', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">+ Add Employee</a>
+                <a href="{{ url_for('import_employees', company_id=company.id) }}" class="btn btn-warning" style="display: inline-block; padding: 8px 16px; background: #f39c12; color: white; text-decoration: none; border-radius: 5px;">📥 Import</a>
+                <a href="{{ url_for('export_employees', company_id=company.id) }}" class="btn" style="display: inline-block; padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">📤 Export</a>
+                <a href="{{ url_for('download_employee_template', company_id=company.id) }}" class="btn" style="display: inline-block; padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">📄 Template</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+        <div style="background: white; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="font-size: 11px; color: #7f8c8d;">Total Employees</div>
+            <div style="font-size: 22px; font-weight: bold; color: #2c3e50;">{{ employees|length }}</div>
+        </div>
+        <div style="background: white; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="font-size: 11px; color: #7f8c8d;">Tax Exempt</div>
+            <div style="font-size: 22px; font-weight: bold; color: #e67e22;">
+                {% set exempt_count = 0 %}
+                {% for emp in employees %}
+                    {% if emp.is_tax_exempt %}
+                        {% set exempt_count = exempt_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {{ exempt_count }}
+            </div>
+        </div>
+        <div style="background: white; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="font-size: 11px; color: #7f8c8d;">SS Exempt</div>
+            <div style="font-size: 22px; font-weight: bold; color: #e67e22;">
+                {% set ss_exempt_count = 0 %}
+                {% for emp in employees %}
+                    {% if emp.exempt_from_social_security %}
+                        {% set ss_exempt_count = ss_exempt_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {{ ss_exempt_count }}
+            </div>
+        </div>
+        <div style="background: white; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="font-size: 11px; color: #7f8c8d;">Consultants</div>
+            <div style="font-size: 22px; font-weight: bold; color: #f39c12;">
+                {% set consultant_count = 0 %}
+                {% for emp in employees %}
+                    {% if emp.status == 'Consultant' %}
+                        {% set consultant_count = consultant_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {{ consultant_count }}
+            </div>
+        </div>
+        <div style="background: white; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="font-size: 11px; color: #7f8c8d;">With Bank Details</div>
+            <div style="font-size: 22px; font-weight: bold; color: #3498db;">
+                {% set bank_count = 0 %}
+                {% for emp in employees %}
+                    {% if emp.bank_name or emp.bank_account_number %}
+                        {% set bank_count = bank_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {{ bank_count }}
+            </div>
+        </div>
+    </div>
+
+    {% if employees %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: left; font-size: 10px;">ID</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: left; font-size: 10px;">Name</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: left; font-size: 10px;">Email</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: left; font-size: 10px;">Position</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: left; font-size: 10px;">Department</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: right; font-size: 10px;">Monthly Salary</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: right; font-size: 10px;">Annual Salary</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: center; font-size: 10px;">Exemptions</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: left; font-size: 10px;">Bank Details</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: left; font-size: 10px;">ID Details</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: center; font-size: 10px;">Status</th>
+                        <th style="background: #34495e; color: white; padding: 10px 6px; text-align: center; font-size: 10px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees %}
+                    <tr style="border-bottom: 1px solid #ecf0f1;
+                        {% if emp.is_tax_exempt or emp.exempt_from_social_security %}background: #fef9e7;{% endif %}">
+                        <td style="padding: 10px 6px; font-size: 11px;">{{ emp.id }}</td>
+                        <td style="padding: 10px 6px; font-size: 11px;">
+                            <strong>{{ emp.first_name }} {{ emp.last_name }}</strong>
+                            {% if emp.is_tax_exempt or emp.exempt_from_social_security %}
+                                <span style="display: inline-block; padding: 1px 6px; background: #f39c12; color: white; border-radius: 8px; font-size: 8px; margin-left: 3px;">Consultant</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 6px; font-size: 11px;">{{ emp.email }}</td>
+                        <td style="padding: 10px 6px; font-size: 11px;">{{ emp.position }}</td>
+                        <td style="padding: 10px 6px; font-size: 11px;">{{ emp.department }}</td>
+                        <td style="padding: 10px 6px; text-align: right; font-size: 11px;">
+                            <span style="font-weight: bold; color: #2c3e50;">{{ company.base_currency }}</span> {{ format_currency(emp.base_salary) }}
+                        </td>
+                        <td style="padding: 10px 6px; text-align: right; font-size: 11px; color: #7f8c8d;">
+                            {{ company.base_currency }} {{ format_currency(emp.base_salary * 12) }}
+                        </td>
+                        <td style="padding: 10px 6px; text-align: center; font-size: 10px;">
+                            <div style="display: flex; gap: 3px; justify-content: center; flex-wrap: wrap;">
+                                <!-- Tax Exempt Badge -->
+                                {% if emp.is_tax_exempt %}
+                                    <span style="display: inline-block; padding: 2px 6px; background: #fff3cd; color: #856404; border-radius: 8px; font-size: 8px; border: 1px solid #ffeeba;" title="Tax Exempt">
+                                        🏷️
+                                    </span>
+                                {% else %}
+                                    <span style="display: inline-block; padding: 2px 6px; background: #d4edda; color: #155724; border-radius: 8px; font-size: 8px;" title="Taxable">
+                                        Tax
+                                    </span>
+                                {% endif %}
+                                <!-- Social Security Exempt Badge -->
+                                {% if emp.exempt_from_social_security %}
+                                    <span style="display: inline-block; padding: 2px 6px; background: #fdebd0; color: #6c3a0a; border-radius: 8px; font-size: 8px; border: 1px solid #f5cba7;" title="SS Exempt">
+                                        🔒
+                                    </span>
+                                {% else %}
+                                    <span style="display: inline-block; padding: 2px 6px; background: #d4edda; color: #155724; border-radius: 8px; font-size: 8px;" title="SS Applied">
+                                        SS
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td style="padding: 10px 6px; font-size: 10px;">
+                            {% if emp.bank_name or emp.bank_account_number %}
+                                <div>
+                                    <span style="font-weight: 500;">{{ emp.bank_name or 'N/A' }}</span>
+                                    <br>
+                                    <span style="color: #7f8c8d; font-size: 9px;">
+                                        {{ emp.bank_account_number or '' }}
+                                        {% if emp.bank_currency %}
+                                            ({{ emp.bank_currency }})
+                                        {% endif %}
+                                    </span>
+                                    <br>
+                                    <span style="color: #95a5a6; font-size: 8px;">
+                                        {{ emp.bank_account_name or '' }}
+                                    </span>
+                                </div>
+                            {% else %}
+                                <span style="color: #95a5a6; font-size: 10px;">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 6px; font-size: 10px;">
+                            {% if emp.id_type or emp.id_number %}
+                                <div>
+                                    <span style="font-weight: 500;">{{ emp.id_type or 'N/A' }}</span>
+                                    <br>
+                                    <span style="color: #7f8c8d; font-size: 9px;">{{ emp.id_number or '' }}</span>
+                                    <br>
+                                    <span style="color: #95a5a6; font-size: 8px;">{{ emp.street_location or '' }}</span>
+                                </div>
+                            {% else %}
+                                <span style="color: #95a5a6; font-size: 10px;">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 6px; text-align: center; font-size: 11px;">
+                            <span style="display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 10px;
+                                {% if emp.status == 'Active' %}background: #d4edda; color: #155724;
+                                {% elif emp.status == 'Inactive' %}background: #f8d7da; color: #721c24;
+                                {% elif emp.status == 'On Leave' %}background: #fff3cd; color: #856404;
+                                {% elif emp.status == 'Consultant' %}background: #fdebd0; color: #6c3a0a;
+                                {% else %}background: #f8d7da; color: #721c24;{% endif %}">
+                                {{ emp.status }}
+                            </span>
+                        </td>
+                        <td style="padding: 10px 6px; text-align: center; font-size: 10px;">
+                            <div style="display: flex; gap: 3px; flex-wrap: wrap; justify-content: center;">
+                                <a href="{{ url_for('manage_monthly_salary', employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #f39c12; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Monthly Salary">📅</a>
+                                <a href="{{ url_for('manage_employee_monthly_allowances', employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #8e44ad; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Monthly Allowances">📋</a>
+                                <a href="{{ url_for('manage_employee_bik', employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #f39c12; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Benefit-in-Kind">🎁</a>
+                                <a href="{{ url_for('manage_employee_deductions', employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Deductions">📊</a>
+                                <a href="{{ url_for('manage_employee_allowances', employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #9b59b6; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Allowances">💰</a>
+                                <a href="{{ url_for('add_bonus', company_id=company.id, employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #e67e22; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Add Bonus">🎯</a>
+                                <a href="{{ url_for('view_payslip', employee_id=emp.id, year=current_year, month=datetime.now().month) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #1abc9c; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Payslip">📄</a>
+                                <a href="{{ url_for('edit_employee', employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 3px 6px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" title="Edit">✏️</a>
+                                <a href="{{ url_for('delete_employee', employee_id=emp.id) }}" class="btn btn-sm btn-danger" style="display: inline-block; padding: 3px 6px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 9px;" onclick="return confirm('Delete this employee?')" title="Delete">🗑️</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot style="background: #f8f9fa; font-weight: bold;">
+                    <tr>
+                        <td colspan="5" style="padding: 10px 6px; text-align: right; font-size: 11px;">TOTALS:</td>
+                        <td style="padding: 10px 6px; text-align: right; font-size: 11px;">
+                            {{ company.base_currency }} {{ format_currency(employees|sum(attribute='base_salary')) }}
+                        </td>
+                        <td style="padding: 10px 6px; text-align: right; font-size: 11px; color: #7f8c8d;">
+                            {{ company.base_currency }} {{ format_currency(employees|sum(attribute='base_salary') * 12) }}
+                        </td>
+                        <td colspan="5" style="padding: 10px 6px; text-align: center; font-size: 11px; color: #7f8c8d;">
+                            {{ employees|length }} Employees
+                            {% set exempt_count = 0 %}
+                            {% for emp in employees %}
+                                {% if emp.is_tax_exempt %}
+                                    {% set exempt_count = exempt_count + 1 %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if exempt_count > 0 %}
+                                | 🏷️ {{ exempt_count }} Tax Exempt
+                            {% endif %}
+                            {% set ss_exempt_count = 0 %}
+                            {% for emp in employees %}
+                                {% if emp.exempt_from_social_security %}
+                                    {% set ss_exempt_count = ss_exempt_count + 1 %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if ss_exempt_count > 0 %}
+                                | 🔒 {{ ss_exempt_count }} SS Exempt
+                            {% endif %}
+                            {% set bank_count = 0 %}
+                            {% for emp in employees %}
+                                {% if emp.bank_name or emp.bank_account_number %}
+                                    {% set bank_count = bank_count + 1 %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if bank_count > 0 %}
+                                | 🏦 {{ bank_count }} With Bank Details
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Legend -->
+        <div style="margin-top: 15px; padding: 12px 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ecf0f1; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">📌 Legend:</span>
+            <span style="display: inline-block; padding: 2px 10px; background: #fef9e7; border-radius: 3px; font-size: 11px; border: 1px solid #f9e79f;">Highlighted rows = Exempt Employees</span>
+            <span style="display: inline-block; padding: 2px 10px; background: #fff3cd; color: #856404; border-radius: 8px; font-size: 9px; border: 1px solid #ffeeba;">🏷️ Tax Exempt</span>
+            <span style="display: inline-block; padding: 2px 10px; background: #fdebd0; color: #6c3a0a; border-radius: 8px; font-size: 9px; border: 1px solid #f5cba7;">🔒 SS Exempt</span>
+            <span style="display: inline-block; padding: 2px 10px; background: #d4edda; color: #155724; border-radius: 8px; font-size: 9px;">Taxable / SS Applied</span>
+            <span style="display: inline-block; padding: 2px 10px; background: #fdebd0; color: #6c3a0a; border-radius: 8px; font-size: 9px;">Consultant Status</span>
+            <span style="display: inline-block; padding: 2px 10px; background: #3498db; color: white; border-radius: 8px; font-size: 9px;">🏦 Has Bank Details</span>
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 50px; background: white; border-radius: 10px;">
+            <p style="font-size: 18px; color: #7f8c8d;">No employees found for this company.</p>
+            <a href="{{ url_for('add_employee', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px;">+ Add First Employee</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

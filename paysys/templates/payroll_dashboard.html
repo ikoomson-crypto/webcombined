@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+
+{% block title %}Payroll Dashboard - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="header" style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: #2c3e50;">💰 Payroll Dashboard</h1>
+                <div style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">
+                    {{ company.name }} | Currency: {{ company.base_currency }} | Employees: {{ employee_count }}
+                </div>
+            </div>
+            <!-- REMOVED: Bonuses, BIK, Bulk Delete, Bulk Payslips buttons -->
+        </div>
+    </div>
+
+    <!-- Month and Year Selector with Process Payroll Button -->
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-weight: bold; color: #2c3e50;">📅 Period:</label>
+                    <form method="GET" action="{{ url_for('payroll_dashboard', company_id=company.id) }}" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <select name="month" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                            {% for m in range(1, 13) %}
+                                <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>
+                                    {{ get_month_name(m) }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <select name="year" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                            {% for year in available_years %}
+                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>Year {{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                </div>
+
+                <!-- Process Payroll Button -->
+                <form method="POST" action="{{ url_for('process_payroll', company_id=company.id) }}" style="display: inline;">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <button type="submit" class="btn btn-success" style="padding: 10px 25px; background: #27ae60; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;">
+                        ⚡ Process {{ get_month_name(selected_month) }} {{ selected_year }}
+                    </button>
+                </form>
+
+                <!-- REMOVED: PDF Report button -->
+            </div>
+
+            <div style="font-size: 14px; color: #7f8c8d;">
+                {% if existing_records %}
+                    <span style="background: #27ae60; color: white; padding: 3px 12px; border-radius: 12px;">✓ Processed</span>
+                {% else %}
+                    <span style="background: #f39c12; color: white; padding: 3px 12px; border-radius: 12px;">⏳ Not Processed</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Processed Months History -->
+    {% if processed_months %}
+    <div style="margin: 15px 0; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <h4 style="color: #2c3e50; margin-bottom: 10px;">📋 Processed Payroll History</h4>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            {% for record in processed_months %}
+                <span style="background: #3498db; color: white; padding: 5px 15px; border-radius: 15px; font-size: 13px;">
+                    {{ get_month_name(record.month) }} {{ record.year }}
+                </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Year Comparison -->
+    {% if year_comparison|length > 1 %}
+    <div style="margin: 15px 0;">
+        <h4 style="color: #2c3e50; margin-bottom: 10px;">📊 Year-over-Year Comparison ({{ get_month_name(selected_month) }})</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 15px 0;">
+            {% for comp in year_comparison %}
+            <div style="background: white; padding: 15px; border-radius: 5px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); {% if comp.year == selected_year %}border: 2px solid #3498db;{% endif %}">
+                <div style="font-weight: bold; color: #2c3e50;">{{ comp.year }}</div>
+                <div style="font-size: 18px; color: #27ae60; margin-top: 5px;">{{ company.base_currency }} {{ format_currency(comp.total_net) }}</div>
+                <small style="color: #7f8c8d;">Net Pay</small>
+                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                    Tax: {{ company.base_currency }} {{ format_currency(comp.total_tax) }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Statistics -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0;">
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Employees</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #2c3e50; margin: 10px 0;">{{ employee_count }}</div>
+            <div style="font-size: 12px; color: #95a5a6;">{{ get_month_name(selected_month) }} {{ selected_year }}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Gross Pay</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #2c3e50; margin: 10px 0;">{{ company.base_currency }} {{ format_currency(total_gross) }}</div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Tax</h4>
+            <div style="font-size: 28px; font-weight: bold; color: {% if total_tax == 0 %}#27ae60{% else %}#2c3e50{% endif %}; margin: 10px 0;">
+                {% if total_tax == 0 %}
+                    ✓ Zero
+                {% else %}
+                    {{ company.base_currency }} {{ format_currency(total_tax) }}
+                {% endif %}
+            </div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Net Pay</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #2c3e50; margin: 10px 0;">{{ company.base_currency }} {{ format_currency(total_net) }}</div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        {% if total_allowances %}
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Allowances</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #2c3e50; margin: 10px 0;">{{ company.base_currency }} {{ format_currency(total_allowances) }}</div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        {% endif %}
+        {% if total_deductions %}
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Deductions</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #e74c3c; margin: 10px 0;">{{ company.base_currency }} {{ format_currency(total_deductions) }}</div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        {% endif %}
+        {% if total_social_security %}
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Social Security</h4>
+            <div style="font-size: 28px; font-weight: bold; color: {% if total_social_security == 0 %}#27ae60{% else %}#3498db{% endif %}; margin: 10px 0;">
+                {% if total_social_security == 0 %}
+                    ✓ Zero
+                {% else %}
+                    {{ company.base_currency }} {{ format_currency(total_social_security) }}
+                {% endif %}
+            </div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        {% endif %}
+        {% if total_bonus %}
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total Bonus</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #f39c12; margin: 10px 0;">{{ company.base_currency }} {{ format_currency(total_bonus) }}</div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        {% endif %}
+        {% if total_bik %}
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Total BIK</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #e67e22; margin: 10px 0;">{{ company.base_currency }} {{ format_currency(total_bik) }}</div>
+            <div style="font-size: 12px; color: #95a5a6;">Monthly</div>
+        </div>
+        {% endif %}
+        <!-- Exempt Employees Summary -->
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">Tax Exempt</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #e67e22; margin: 10px 0;">
+                {% set exempt_count = 0 %}
+                {% for emp in employees %}
+                    {% if emp.is_tax_exempt %}
+                        {% set exempt_count = exempt_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {{ exempt_count }}
+            </div>
+            <div style="font-size: 12px; color: #95a5a6;">Employees</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 14px; text-transform: uppercase;">SS Exempt</h4>
+            <div style="font-size: 28px; font-weight: bold; color: #e67e22; margin: 10px 0;">
+                {% set ss_exempt_count = 0 %}
+                {% for emp in employees %}
+                    {% if emp.exempt_from_social_security %}
+                        {% set ss_exempt_count = ss_exempt_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {{ ss_exempt_count }}
+            </div>
+            <div style="font-size: 12px; color: #95a5a6;">Employees</div>
+        </div>
+    </div>
+
+    <!-- Social Security, Bonus, and BIK Info -->
+    {% if payroll_data and payroll_data|length > 0 %}
+    <div style="background: #e8f4fd; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <span style="font-weight: bold; color: #2c3e50;">🔒 Social Security:</span>
+                <span style="color: #7f8c8d; margin-left: 10px;">
+                    SS = MIN(Basic Salary, Monthly Cap) × Rate |
+                    Monthly Cap: <strong>{{ company.base_currency }} {{ format_currency(payroll_data[0].social_security_threshold_applied) }}</strong>
+                </span>
+                <span style="margin-left: 15px; font-weight: bold; color: #f39c12;">🎯 Bonus Tax:</span>
+                <span style="color: #7f8c8d;">
+                    Up to 15% of Annual Basic @ 5% flat | Excess added to salary
+                </span>
+                <span style="margin-left: 15px; font-weight: bold; color: #e67e22;">🎁 BIK:</span>
+                <span style="color: #7f8c8d;">
+                    Taxable BIK added to taxable income
+                </span>
+            </div>
+            <div style="font-size: 12px; color: #7f8c8d;">
+                <span style="background: #f39c12; color: white; padding: 2px 10px; border-radius: 12px;">SS Rate: {{ tax_config.social_security_rate if tax_config else '5.5' }}%</span>
+                {% set exempt_count = 0 %}
+                {% for emp in employees %}
+                    {% if emp.is_tax_exempt or emp.exempt_from_social_security %}
+                        {% set exempt_count = exempt_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {% if exempt_count > 0 %}
+                    <span style="background: #e67e22; color: white; padding: 2px 10px; border-radius: 12px; margin-left: 5px;">🏷️ {{ exempt_count }} Exempt</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Payroll Data Table -->
+    {% if payroll_data %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: left; font-size: 10px; white-space: nowrap;">Employee</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: left; font-size: 10px; white-space: nowrap;">Position</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: center; font-size: 9px; white-space: nowrap;">Exempt</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Base Salary</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Allowances</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap; color: #f39c12;">Bonus</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap; color: #e67e22;">BIK</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Deductions</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Gross Salary</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Tax</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Social Security</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Total Deductions</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: right; font-size: 10px; white-space: nowrap;">Net Pay</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: center; font-size: 10px; white-space: nowrap;">Payslip</th>
+                        <th style="background: #34495e; color: white; padding: 8px 5px; text-align: center; font-size: 10px; white-space: nowrap;">Period</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in payroll_data %}
+                    {% set emp = employees|selectattr('id', 'equalto', record.employee_id)|first %}
+                    {% if emp %}
+                    <tr style="border-bottom: 1px solid #ecf0f1;
+                        {% if emp.is_tax_exempt or emp.exempt_from_social_security %}background: #fef9e7;{% endif %}">
+                        <td style="padding: 8px 5px; font-size: 12px;">
+                            <strong>{{ emp.first_name }} {{ emp.last_name }}</strong>
+                            {% if emp.is_tax_exempt or emp.exempt_from_social_security %}
+                                <span style="display: inline-block; padding: 1px 6px; background: #f39c12; color: white; border-radius: 8px; font-size: 8px; margin-left: 3px;">Consultant</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 5px; font-size: 12px;">{{ emp.position }}</td>
+                        <td style="padding: 8px 5px; text-align: center; font-size: 10px;">
+                            <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
+                                {% if emp.is_tax_exempt %}
+                                    <span style="display: inline-block; padding: 1px 6px; background: #fff3cd; color: #856404; border-radius: 8px; font-size: 8px; border: 1px solid #ffeeba;" title="Tax Exempt">🏷️</span>
+                                {% endif %}
+                                {% if emp.exempt_from_social_security %}
+                                    <span style="display: inline-block; padding: 1px 6px; background: #fdebd0; color: #6c3a0a; border-radius: 8px; font-size: 8px; border: 1px solid #f5cba7;" title="SS Exempt">🔒</span>
+                                {% endif %}
+                                {% if not emp.is_tax_exempt and not emp.exempt_from_social_security %}
+                                    <span style="color: #7f8c8d; font-size: 8px;">—</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px;">{{ record.currency }} {{ format_currency(record.base_salary) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px;">{{ record.currency }} {{ format_currency(record.allowances_total) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; {% if record.bonus_amount > 0 %}color: #f39c12; font-weight: bold;{% endif %}">
+                            {{ record.currency }} {{ format_currency(record.bonus_amount) }}
+                            {% if record.bonus_amount > 0 %}
+                            <span style="font-size: 9px; color: #7f8c8d; display: block;">
+                                (Flat Tax: {{ record.currency }} {{ format_currency(record.bonus_tax_flat) }})
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; {% if record.bik_total > 0 %}color: #e67e22; font-weight: bold;{% endif %}">
+                            {{ record.currency }} {{ format_currency(record.bik_total) }}
+                        </td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; color: #e74c3c;">{{ record.currency }} {{ format_currency(record.deductions_total) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; font-weight: bold;">{{ record.currency }} {{ format_currency(record.gross_salary) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; {% if record.total_tax == 0 %}color: #27ae60; font-weight: bold;{% endif %}">
+                            {% if record.total_tax == 0 %}
+                                ✓ Zero
+                            {% else %}
+                                {{ record.currency }} {{ format_currency(record.total_tax) }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; {% if record.social_security == 0 %}color: #27ae60; font-weight: bold;{% elif record.base_salary > record.social_security_threshold_applied %}color: #e67e22;{% else %}color: #2980b9;{% endif %}">
+                            {% if record.social_security == 0 %}
+                                ✓ Zero
+                            {% else %}
+                                {{ record.currency }} {{ format_currency(record.social_security) }}
+                                {% if record.base_salary > record.social_security_threshold_applied %}
+                                    <span style="font-size: 9px; color: #e67e22; display: block;">(Capped)</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; color: #e74c3c;">{{ record.currency }} {{ format_currency(record.total_deductions) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 12px; font-weight: bold; color: #27ae60;">{{ record.currency }} {{ format_currency(record.net_pay) }}</td>
+                        <td style="padding: 8px 5px; text-align: center; font-size: 12px;">
+                            <a href="{{ url_for('view_payslip', employee_id=emp.id, year=selected_year, month=selected_month) }}"
+                               style="display: inline-block; padding: 4px 8px; background: #1abc9c; color: white; text-decoration: none; border-radius: 3px; font-size: 10px;"
+                               title="View Payslip">📄</a>
+                        </td>
+                        <td style="padding: 8px 5px; text-align: center; font-size: 12px;">
+                            <span style="background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 10px;">{{ record.period }}</span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8f9fa; font-weight: bold;">
+                        <td colspan="3" style="padding: 8px 5px; text-align: right; font-size: 11px;">TOTALS:</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='base_salary')) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='allowances_total')) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px; color: #f39c12;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='bonus_amount')) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px; color: #e67e22;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='bik_total')) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px; color: #e74c3c;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='deductions_total')) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='gross_salary')) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px; {% if payroll_data|sum(attribute='total_tax') == 0 %}color: #27ae60;{% endif %}">
+                            {% if payroll_data|sum(attribute='total_tax') == 0 %}
+                                ✓ Zero
+                            {% else %}
+                                {{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='total_tax')) }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px; {% if payroll_data|sum(attribute='social_security') == 0 %}color: #27ae60;{% else %}color: #2980b9;{% endif %}">
+                            {% if payroll_data|sum(attribute='social_security') == 0 %}
+                                ✓ Zero
+                            {% else %}
+                                {{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='social_security')) }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px; color: #e74c3c;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='total_deductions')) }}</td>
+                        <td style="padding: 8px 5px; text-align: right; font-size: 11px; color: #27ae60;">{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='net_pay')) }}</td>
+                        <td colspan="2" style="padding: 8px 5px; text-align: center; font-size: 11px;">-</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Exempt Employees Summary -->
+        {% set exempt_employees = [] %}
+        {% for emp in employees %}
+            {% if emp.is_tax_exempt or emp.exempt_from_social_security %}
+                {% set exempt_employees = exempt_employees + [emp] %}
+            {% endif %}
+        {% endfor %}
+        {% if exempt_employees|length > 0 %}
+        <div style="margin-top: 15px; padding: 12px 15px; background: #fef9e7; border-radius: 5px; border-left: 4px solid #f39c12; font-size: 13px; color: #856404;">
+            <strong>🏷️ Exempt Employees Summary:</strong>
+            <span style="margin-left: 10px;">
+                {{ exempt_employees|length }} employee(s) with exemptions:
+                {% for emp in exempt_employees %}
+                    <span style="display: inline-block; padding: 2px 10px; background: white; border-radius: 12px; font-size: 11px; margin: 2px 5px; border: 1px solid #f9e79f;">
+                        {{ emp.first_name }} {{ emp.last_name }}
+                        {% if emp.is_tax_exempt %}🏷️{% endif %}
+                        {% if emp.exempt_from_social_security %}🔒{% endif %}
+                    </span>
+                {% endfor %}
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Bonus Summary -->
+        {% if payroll_data|sum(attribute='bonus_amount') > 0 %}
+        <div style="margin-top: 10px; padding: 12px 15px; background: #fff3cd; border-radius: 5px; border-left: 4px solid #f39c12; font-size: 13px; color: #856404;">
+            <strong>🎯 Bonus Summary:</strong>
+            Total Bonus: <strong>{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='bonus_amount')) }}</strong> |
+            Total Flat Tax: <strong>{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='bonus_tax_flat')) }}</strong>
+            <span style="margin-left: 15px; font-size: 12px;">
+                (Bonuses up to 15% of Annual Basic Salary taxed at 5% flat rate. Excess added to salary for graduated tax.)
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- BIK Summary -->
+        {% if payroll_data|sum(attribute='bik_total') > 0 %}
+        <div style="margin-top: 10px; padding: 12px 15px; background: #fdebd0; border-radius: 5px; border-left: 4px solid #e67e22; font-size: 13px; color: #6c3a0a;">
+            <strong>🎁 Benefit-in-Kind Summary:</strong>
+            Total BIK: <strong>{{ company.base_currency }} {{ format_currency(payroll_data|sum(attribute='bik_total')) }}</strong>
+            <span style="margin-left: 15px; font-size: 12px;">
+                (Taxable BIK added to taxable income. Non-taxable BIK added to gross salary only.)
+            </span>
+        </div>
+        {% endif %}
+
+        <!-- Social Security Note -->
+        <div style="margin-top: 10px; padding: 10px 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db; font-size: 13px; color: #7f8c8d;">
+            <strong>💡 Note:</strong> Social Security is calculated on <strong>Basic Salary only</strong> up to the monthly cap of
+            <strong>{{ company.base_currency }} {{ format_currency(payroll_data[0].social_security_threshold_applied) if payroll_data else '0.00' }}</strong>.
+            SS = MIN(Monthly Salary, Monthly Cap) × Rate. Deducted <strong>BEFORE</strong> tax.
+            {% if payroll_data|selectattr('base_salary', 'gt', payroll_data[0].social_security_threshold_applied)|list|length > 0 %}
+            <span style="color: #e67e22;">⚠️ Some employees have salaries above the monthly cap. SS is calculated on the cap amount only.</span>
+            {% endif %}
+            {% set exempt_ss_count = 0 %}
+            {% for emp in employees %}
+                {% if emp.exempt_from_social_security %}
+                    {% set exempt_ss_count = exempt_ss_count + 1 %}
+                {% endif %}
+            {% endfor %}
+            {% if exempt_ss_count > 0 %}
+            <span style="color: #e67e22; display: block; margin-top: 5px;">🔒 {{ exempt_ss_count }} employee(s) are exempt from Social Security deductions.</span>
+            {% endif %}
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 50px; background: white; border-radius: 10px;">
+            <p style="font-size: 18px; color: #7f8c8d;">No payroll records found for {{ get_month_name(selected_month) }} {{ selected_year }}.</p>
+            <p style="color: #95a5a6; margin: 10px 0;">Process payroll to generate records.</p>
+            <form method="POST" action="{{ url_for('process_payroll', company_id=company.id) }}" style="margin-top: 20px;">
+                <input type="hidden" name="year" value="{{ selected_year }}">
+                <input type="hidden" name="month" value="{{ selected_month }}">
+                <button type="submit" class="btn btn-success" style="font-size: 18px; padding: 12px 30px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    ⚡ Process {{ get_month_name(selected_month) }} {{ selected_year }}
+                </button>
+            </form>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Legend -->
+<div style="margin-top: 20px; padding: 12px 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ecf0f1; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+    <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">📌 Legend:</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #fef9e7; border-radius: 3px; font-size: 11px; border: 1px solid #f9e79f;">Highlighted rows = Exempt Employees</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #fff3cd; color: #856404; border-radius: 8px; font-size: 10px; border: 1px solid #ffeeba;">🏷️ Tax Exempt</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #fdebd0; color: #6c3a0a; border-radius: 8px; font-size: 10px; border: 1px solid #f5cba7;">🔒 SS Exempt</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #f39c12; color: white; border-radius: 8px; font-size: 10px;">Consultant</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #27ae60; color: white; border-radius: 8px; font-size: 10px;">✓ Zero Tax/SS</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #1abc9c; color: white; border-radius: 8px; font-size: 10px;">📄 Payslip</span>
+</div>
+{% endblock %}

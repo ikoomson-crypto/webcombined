@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Import Employees - Payroll System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_employees', company_id=company.id) }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Employees</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div class="header" style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">📥 Import Employees - {{ company.name }}</h1>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">Required Excel Columns:</h4>
+            <ul style="margin-left: 20px; color: #34495e;">
+                <li><strong>first_name</strong> - Employee first name</li>
+                <li><strong>last_name</strong> - Employee last name</li>
+                <li><strong>email</strong> - Employee email address</li>
+                <li><strong>position</strong> - Job position</li>
+                <li><strong>department</strong> - Department name</li>
+                <li><strong>base_salary</strong> - Monthly salary in {{ company.base_currency }} (e.g., 5000.00)</li>
+                <li><strong>hire_date</strong> - Hire date (YYYY-MM-DD format)</li>
+            </ul>
+            <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px; border-left: 4px solid #f39c12;">
+                <small style="color: #856404;">💡 <strong>Note:</strong> The base_salary column should contain <strong>monthly</strong> salary values.</small>
+            </div>
+            <a href="{{ url_for('download_employee_template', company_id=company.id) }}" class="btn" style="display: inline-block; padding: 8px 16px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">📄 Download Template</a>
+        </div>
+
+        <form method="POST" enctype="multipart/form-data">
+            <div style="margin-bottom: 20px;">
+                <label for="file" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Select Excel File (.xlsx or .xls)</label>
+                <input type="file" id="file" name="file" accept=".xlsx,.xls" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Import Employees</button>
+                <a href="{{ url_for('list_employees', company_id=company.id) }}" class="btn btn-secondary" style="padding: 10px 30px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

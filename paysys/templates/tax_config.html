@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Tax Configuration - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_companies') }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Companies</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">⚙️ Tax Configuration - {{ company.name }}</h1>
+            <p style="color: #7f8c8d;">Configure progressive tax system, Social Security rate, and monthly threshold</p>
+        </div>
+
+        <!-- Social Security Quick Info -->
+        <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <span style="font-weight: bold; color: #2c3e50;">🔒 Social Security:</span>
+                    <span style="color: #7f8c8d; margin-left: 10px; font-size: 14px;">
+                        Calculated on <strong>Basic Salary only</strong> |
+                        Rate: <strong>{{ tax_config.social_security_rate if tax_config else '5.5' }}%</strong> |
+                        Monthly Threshold: <strong>{{ company.base_currency }} {{ format_currency(tax_config.social_security_threshold if tax_config else 15000) }}</strong>
+                    </span>
+                </div>
+                <a href="{{ url_for('manage_social_security', company_id=company.id) }}" class="btn btn-sm" style="display: inline-block; padding: 5px 15px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">
+                    📊 Manage Monthly Overrides
+                </a>
+            </div>
+            <div style="margin-top: 5px; font-size: 12px; color: #7f8c8d;">
+                💡 SS = MIN(Monthly Salary, Monthly Threshold) × Rate | Deducted <strong>BEFORE</strong> tax
+            </div>
+        </div>
+
+        <!-- Existing Configs -->
+        {% if all_configs %}
+        <div style="margin-bottom: 20px;">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">Configured Years</h4>
+            <div style="margin: 15px 0;">
+                {% for cfg in all_configs|sort(attribute='year') %}
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 5px; {% if cfg.is_active %}border-left: 4px solid #27ae60;{% endif %}">
+                    <div>
+                        <span style="display: inline-block; padding: 2px 10px; background: #3498db; color: white; border-radius: 3px; font-size: 12px;">Year {{ cfg.year }}</span>
+                        <span style="display: inline-block; padding: 2px 10px; background: {% if cfg.is_active %}#27ae60{% else %}#95a5a6{% endif %}; color: white; border-radius: 3px; font-size: 12px;">
+                            {% if cfg.is_active %}✅ ACTIVE{% else %}INACTIVE{% endif %}
+                        </span>
+                        <span style="margin-left: 10px; color: #7f8c8d; font-size: 13px;">
+                            Deduction: {{ company.base_currency }} {{ "%.2f"|format(cfg.standard_deduction) }}
+                            | SS Rate: {{ cfg.social_security_rate }}%
+                            | SS Monthly Cap: {{ company.base_currency }} {{ "%.2f"|format(cfg.social_security_threshold) }}
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 5px;">
+                        <a href="{{ url_for('manage_tax_config', company_id=company.id, year=cfg.year) }}" class="btn btn-sm" style="display: inline-block; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">✏️ Edit</a>
+                        <a href="{{ url_for('delete_tax_config', company_id=company.id, year=cfg.year) }}" class="btn btn-sm btn-danger" style="display: inline-block; padding: 5px 10px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;" onclick="return confirm('Delete tax config for {{ cfg.year }}?')">🗑️</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <hr style="margin: 20px 0; border-color: #ecf0f1;">
+
+        <form method="POST">
+            <div style="margin-bottom: 20px;">
+                <label for="year" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Tax Year *</label>
+                <input type="number" id="year" name="year" value="{{ selected_year or 2024 }}" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <small style="color: #7f8c8d;">Enter the tax year (e.g., 2024, 2025, etc.)</small>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="country" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Country</label>
+                <input type="text" id="country" name="country" value="{{ tax_config.country if tax_config else 'Ghana' }}" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <small style="color: #7f8c8d;">Country name for this tax configuration</small>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="standard_deduction" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Standard Deduction (Annual)</label>
+                <input type="number" step="0.01" id="standard_deduction" name="standard_deduction"
+                       value="{{ tax_config.standard_deduction if tax_config else 0 }}"
+                       required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <small style="color: #7f8c8d;">
+                    {% if company.base_currency == 'GHS' or (tax_config and tax_config.country == 'Ghana') %}
+                        ℹ️ <strong>Ghana does not use a standard deduction.</strong> Set to 0.
+                    {% else %}
+                        Annual standard deduction in {{ company.base_currency }}
+                    {% endif %}
+                </small>
+                {% if company.base_currency == 'GHS' or (tax_config and tax_config.country == 'Ghana') %}
+                <div style="margin-top: 5px; padding: 8px 12px; background: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404; border-left: 3px solid #f39c12;">
+                    ⚠️ <strong>Important:</strong> Ghana's tax system does not have a standard deduction.
+                    Tax is calculated on the full chargeable income after Social Security deduction.
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="social_security_rate" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Social Security Rate (%)</label>
+                <input type="number" step="0.01" id="social_security_rate" name="social_security_rate" value="{{ tax_config.social_security_rate if tax_config else 5.5 }}" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <small style="color: #7f8c8d;">Employee contribution rate (applied to Basic Salary up to monthly cap)</small>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="social_security_threshold" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Social Security Monthly Threshold ({{ company.base_currency }})</label>
+                <input type="number" step="0.01" id="social_security_threshold" name="social_security_threshold" value="{{ tax_config.social_security_threshold if tax_config else 15000 }}" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <small style="color: #7f8c8d;">Monthly cap on earnings subject to Social Security. SS = MIN(Salary, Threshold) × Rate</small>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="is_active" name="is_active" {% if tax_config and tax_config.is_active %}checked{% endif %}>
+                    <label for="is_active" style="font-weight: 500; color: #34495e;">Set as Active Configuration for this company</label>
+                </div>
+                <small style="color: #7f8c8d; display: block; margin-left: 25px;">The active configuration will be used by default for payroll processing</small>
+            </div>
+
+            <h3 style="margin: 20px 0 15px 0; color: #2c3e50;">Tax Brackets</h3>
+            <p style="color: #7f8c8d; margin-bottom: 15px;">Progressive tax brackets (Annual Income in {{ company.base_currency }})</p>
+
+            <div id="brackets-container">
+                {% if tax_config and tax_config.brackets %}
+                    {% for bracket in tax_config.brackets %}
+                    <div class="bracket-item" style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="font-size: 13px; color: #34495e;">Min Income</label>
+                                <input type="number" step="0.01" name="bracket_min_{{ loop.index0 }}" value="{{ bracket.min }}" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="font-size: 13px; color: #34495e;">Max Income</label>
+                                <input type="text" name="bracket_max_{{ loop.index0 }}" value="{{ bracket.max_display or bracket.max }}" placeholder="∞ or number" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="font-size: 13px; color: #34495e;">Rate (%)</label>
+                                <input type="number" step="0.01" name="bracket_rate_{{ loop.index0 }}" value="{{ bracket.rate }}" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.bracket-item').remove()" style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; margin-top: 10px;">✕</button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    {% for bracket in default_brackets %}
+                    <div class="bracket-item" style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                            <div>
+                                <label style="font-size: 13px; color: #34495e;">Min Income</label>
+                                <input type="number" step="0.01" name="bracket_min_{{ loop.index0 }}" value="{{ bracket.min }}" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="font-size: 13px; color: #34495e;">Max Income</label>
+                                <input type="text" name="bracket_max_{{ loop.index0 }}" value="{{ bracket.max_display or bracket.max }}" placeholder="∞ or number" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            </div>
+                            <div>
+                                <label style="font-size: 13px; color: #34495e;">Rate (%)</label>
+                                <input type="number" step="0.01" name="bracket_rate_{{ loop.index0 }}" value="{{ bracket.rate }}" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.bracket-item').remove()" style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; margin-top: 10px;">✕</button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <input type="hidden" id="bracket_count" name="bracket_count" value="{{ tax_config.brackets|length if tax_config and tax_config.brackets else default_brackets|length }}">
+
+            <button type="button" class="btn btn-success" onclick="addBracket()" style="padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;">+ Add Bracket</button>
+
+            <!-- Social Security Threshold Info Box -->
+            <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #f39c12;">
+                <h4 style="color: #856404; margin-bottom: 5px;">📌 Social Security Monthly Cap Note</h4>
+                <p style="color: #856404; font-size: 14px; margin: 0;">
+                    The <strong>Monthly Threshold</strong> is the maximum amount of earnings subject to Social Security tax per month.
+                    Social Security = <strong>MIN(Monthly Salary, Monthly Threshold) × Rate</strong>.
+                    You can set <strong>monthly overrides</strong> for specific months if the cap changes.
+                    <a href="{{ url_for('manage_social_security', company_id=company.id) }}" style="color: #3498db; text-decoration: none;">Manage Monthly Overrides →</a>
+                </p>
+            </div>
+
+            <!-- Ghana Tax System Info -->
+            {% if company.base_currency == 'GHS' or (tax_config and tax_config.country == 'Ghana') %}
+            <div style="margin-top: 15px; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #27ae60;">
+                <h4 style="color: #155724; margin-bottom: 5px;">🇬🇭 Ghana Tax System</h4>
+                <p style="color: #155724; font-size: 14px; margin: 0;">
+                    Ghana's tax system uses a <strong>progressive tax rate</strong> with <strong>no standard deduction</strong>.
+                    Tax is calculated on the full chargeable income after Social Security deduction.
+                    The tax brackets above represent the annual income tax rates for Ghana.
+                </p>
+            </div>
+            {% endif %}
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Save Configuration</button>
+                <a href="{{ url_for('list_companies') }}" class="btn btn-secondary" style="padding: 10px 30px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let bracketCounter = {{ tax_config.brackets|length if tax_config and tax_config.brackets else default_brackets|length }};
+
+    function addBracket() {
+        const container = document.getElementById('brackets-container');
+        const newBracket = document.createElement('div');
+        newBracket.className = 'bracket-item';
+        newBracket.style.cssText = 'background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;';
+        newBracket.innerHTML = `
+            <div style="flex: 1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                <div>
+                    <label style="font-size: 13px; color: #34495e;">Min Income</label>
+                    <input type="number" step="0.01" name="bracket_min_${bracketCounter}" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+                <div>
+                    <label style="font-size: 13px; color: #34495e;">Max Income</label>
+                    <input type="text" name="bracket_max_${bracketCounter}" placeholder="∞ or number" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+                <div>
+                    <label style="font-size: 13px; color: #34495e;">Rate (%)</label>
+                    <input type="number" step="0.01" name="bracket_rate_${bracketCounter}" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+            </div>
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.bracket-item').remove()" style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; margin-top: 10px;">✕</button>
+        `;
+        container.appendChild(newBracket);
+        bracketCounter++;
+        document.getElementById('bracket_count').value = bracketCounter;
+    }
+
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-bracket')) {
+            setTimeout(() => {
+                const items = document.querySelectorAll('.bracket-item');
+                document.getElementById('bracket_count').value = items.length;
+            }, 100);
+        }
+    });
+</script>
+{% endblock %}

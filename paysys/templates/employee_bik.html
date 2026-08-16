@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Benefit-in-Kind - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_employees', company_id=company.id) }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Employees</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">🎁 Employee Benefit-in-Kind</h1>
+            <div style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">
+                {{ employee.first_name }} {{ employee.last_name }} - {{ company.name }}
+            </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                <div><strong>Position:</strong> {{ employee.position }}</div>
+                <div><strong>Department:</strong> {{ employee.department }}</div>
+                <div><strong>Monthly Salary:</strong> {{ company.base_currency }} {{ format_currency(employee.base_salary) }}</div>
+            </div>
+        </div>
+
+        <!-- Period Selector for Viewing -->
+        <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #bee5eb;">
+            <form method="GET" action="{{ url_for('manage_employee_bik', employee_id=employee.id) }}" style="display: flex; gap: 15px; align-items: end; flex-wrap: wrap;">
+                <div>
+                    <label for="year" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">View Year</label>
+                    <select id="year" name="year" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                        {% for y in range(2020, 2027) %}
+                            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="month" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">View Month</label>
+                    <select id="month" name="month" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                        {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ get_month_name(m) }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="font-size: 14px; color: #7f8c8d; padding-bottom: 5px;">
+                    <span style="background: #3498db; color: white; padding: 3px 12px; border-radius: 12px;">{{ get_month_name(month) }} {{ year }}</span>
+                </div>
+                <div style="font-size: 13px; color: #7f8c8d; padding-bottom: 5px; margin-left: auto;">
+                    {% set active_bik_count = 0 %}
+                    {% for defn in definitions %}
+                        {% if current_bik.get(defn.id) is not none %}
+                            {% set active_bik_count = active_bik_count + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    <span style="background: #27ae60; color: white; padding: 3px 12px; border-radius: 12px;">
+                        {{ active_bik_count }} Active BIK Items
+                    </span>
+                </div>
+            </form>
+        </div>
+
+        <form method="POST">
+            <!-- Date Range Selection for BIK Period -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd;">
+                <h4 style="color: #2c3e50; margin-bottom: 10px;">📅 Effective Period for Benefit-in-Kind</h4>
+                <p style="color: #7f8c8d; font-size: 13px; margin-bottom: 15px;">
+                    Set the start and end dates for when these BIK items should be active.
+                    Leave <strong>End Date</strong> blank for ongoing benefits.
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <label for="start_date" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Start Date *</label>
+                        <input type="date" id="start_date" name="start_date" required
+                               value="{{ request.form.get('start_date', start_date_default or '%04d-%02d-01'|format(year, month)) }}"
+                               style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        <small style="color: #7f8c8d; display: block; margin-top: 3px;">
+                            💡 When these BIK benefits become active
+                        </small>
+                    </div>
+                    <div>
+                        <label for="end_date" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">End Date</label>
+                        <input type="date" id="end_date" name="end_date"
+                               value="{{ request.form.get('end_date', end_date_default or '') }}"
+                               style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        <small style="color: #7f8c8d; display: block; margin-top: 3px;">
+                            💡 Leave blank for ongoing/indefinite benefits
+                        </small>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; padding: 8px 12px; background: #fff3cd; border-radius: 4px; font-size: 12px; color: #856404; border-left: 3px solid #f39c12;">
+                    ⚠️ <strong>Note:</strong> This will apply to ALL BIK values below. To set different dates for different BIK items, you need to create separate entries.
+                </div>
+            </div>
+
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">Benefit-in-Kind Details</h3>
+            <p style="color: #7f8c8d; margin-bottom: 15px;">
+                Set BIK values for the period starting from <strong id="displayStartDate">{{ request.form.get('start_date', '%04d-%02d-01'|format(year, month)) }}</strong>
+                {% if request.form.get('end_date') %}
+                    to <strong id="displayEndDate">{{ request.form.get('end_date') }}</strong>
+                {% else %}
+                    <span style="color: #27ae60;">(ongoing)</span>
+                {% endif %}
+            </p>
+
+            <!-- BIK Tax Info -->
+            <div style="background: #fdebd0; padding: 12px 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #e67e22;">
+                <span style="font-size: 13px; color: #6c3a0a;">
+                    📌 <strong>Taxable BIK</strong> is added to taxable income.
+                    <strong>Non-taxable BIK</strong> is added to gross salary only.
+                </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                {% for defn in definitions %}
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ecf0f1;
+                    {% if current_bik.get(defn.id) and current_bik.get(defn.id) > 0 %}border-left: 4px solid #f39c12;{% endif %}">
+                    <label for="bik_{{ defn.id }}" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">
+                        {{ defn.name }}
+                        <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px;
+                            {% if defn.is_taxable %}background: #f8d7da; color: #721c24;{% else %}background: #d4edda; color: #155724;{% endif %}">
+                            {% if defn.is_taxable %}Taxable{% else %}Non-Taxable{% endif %}
+                        </span>
+                        {% if defn.type == 'percentage' %}
+                            <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; background: #fff3cd; color: #856404;">
+                                {{ defn.type|capitalize }}
+                            </span>
+                        {% endif %}
+                    </label>
+                    <input type="number" step="0.01" id="bik_{{ defn.id }}"
+                           name="bik_{{ defn.id }}"
+                           value="{{ current_bik.get(defn.id, defn.default_value) }}"
+                           style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                        Default: {{ company.base_currency }} {{ format_currency(defn.default_value) }}
+                        {% if defn.type == 'percentage' %}
+                            <span style="color: #95a5a6; margin-left: 10px;">(Percentage of salary)</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size: 11px; color: #95a5a6; margin-top: 3px;">
+                        🔄 Current active value: <strong>{{ company.base_currency }} {{ format_currency(current_bik.get(defn.id, defn.default_value)) }}</strong>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if definitions %}
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #f39c12;">
+                <strong>💡 Benefit-in-Kind Summary:</strong><br>
+                <span style="color: #7f8c8d;">BIK values are added to the employee's taxable income if marked as taxable.</span>
+                <br><span style="color: #7f8c8d; font-size: 12px;">Taxable BIK increases the employee's tax liability.</span>
+                <br><span style="color: #7f8c8d; font-size: 12px; display: block; margin-top: 5px;">
+                    📅 BIK will be active from <strong>{{ request.form.get('start_date', '%04d-%02d-01'|format(year, month)) }}</strong>
+                    {% if request.form.get('end_date') %}
+                        to <strong>{{ request.form.get('end_date') }}</strong>
+                    {% else %}
+                        <span style="color: #27ae60;">indefinitely</span>
+                    {% endif %}
+                </span>
+                <br>
+                {% set total_bik = 0 %}
+                {% for defn in definitions %}
+                    {% set total_bik = total_bik + (current_bik.get(defn.id, defn.default_value)|float) %}
+                {% endfor %}
+                <span style="color: #2c3e50; font-weight: bold;">
+                    💰 Total Monthly BIK: {{ company.base_currency }} {{ format_currency(total_bik) }}
+                </span>
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 5px;">
+                <p style="color: #7f8c8d;">No Benefit-in-Kind defined for this company.</p>
+                <a href="{{ url_for('manage_bik', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">+ Add BIK</a>
+            </div>
+            {% endif %}
+
+            <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                    💾 Save BIK for Period
+                </button>
+                <a href="{{ url_for('list_employees', company_id=company.id) }}" class="btn btn-secondary" style="padding: 10px 30px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Cancel</a>
+            </div>
+        </form>
+
+        <!-- Active BIK History Section -->
+        <div style="margin-top: 40px; border-top: 2px solid #ecf0f1; padding-top: 20px;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">📋 Benefit-in-Kind History</h3>
+            <p style="color: #7f8c8d; font-size: 13px; margin-bottom: 15px;">
+                View all active BIK periods for this employee. Green indicates currently active for the selected month.
+            </p>
+
+            {% set has_bik_history = false %}
+            {% for defn in definitions %}
+                {% set all_bik = get_employee_bik_history(employee.id, defn.id) if get_employee_bik_history is defined else [] %}
+                {% if all_bik %}
+                    {% set has_bik_history = true %}
+                {% endif %}
+            {% endfor %}
+
+            {% if has_bik_history %}
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <thead>
+                            <tr>
+                                <th style="background: #34495e; color: white; padding: 12px; text-align: left;">BIK Item</th>
+                                <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Start Date</th>
+                                <th style="background: #34495e; color: white; padding: 12px; text-align: left;">End Date</th>
+                                <th style="background: #34495e; color: white; padding: 12px; text-align: right;">Value</th>
+                                <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Taxable</th>
+                                <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Status</th>
+                                <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for defn in definitions %}
+                                {% set all_bik = get_employee_bik_history(employee.id, defn.id) if get_employee_bik_history is defined else [] %}
+                                {% for bik in all_bik %}
+                                <tr style="border-bottom: 1px solid #ecf0f1;
+                                    {% if is_date_active(bik.start_date, bik.end_date, year, month) %}background: #d4edda;{% endif %}">
+                                    <td style="padding: 12px;">
+                                        <strong>{{ defn.name }}</strong>
+                                        <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 10px; margin-left: 5px;
+                                            {% if defn.is_taxable %}background: #f8d7da; color: #721c24;{% else %}background: #d4edda; color: #155724;{% endif %}">
+                                            {% if defn.is_taxable %}Taxable{% else %}Non-Taxable{% endif %}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 12px;">{{ bik.start_date }}</td>
+                                    <td style="padding: 12px;">{{ bik.end_date or '∞' }}</td>
+                                    <td style="padding: 12px; text-align: right;">
+                                        <strong>{{ company.base_currency }} {{ format_currency(bik.value) }}</strong>
+                                    </td>
+                                    <td style="padding: 12px; text-align: center;">
+                                        {% if defn.is_taxable %}
+                                            <span style="color: #e74c3c;">✓</span>
+                                        {% else %}
+                                            <span style="color: #27ae60;">✗</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding: 12px; text-align: center;">
+                                        {% if is_date_active(bik.start_date, bik.end_date, year, month) %}
+                                            <span style="display: inline-block; padding: 3px 10px; background: #27ae60; color: white; border-radius: 12px; font-size: 11px;">✓ Active</span>
+                                        {% elif bik.end_date and bik.end_date < '%04d-%02d-01'|format(year, month) %}
+                                            <span style="display: inline-block; padding: 3px 10px; background: #95a5a6; color: white; border-radius: 12px; font-size: 11px;">Expired</span>
+                                        {% else %}
+                                            <span style="display: inline-block; padding: 3px 10px; background: #f39c12; color: white; border-radius: 12px; font-size: 11px;">Upcoming</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding: 12px; text-align: center;">
+                                        <a href="{{ url_for('delete_employee_bik_record', employee_id=employee.id, bik_id=bik.bik_id, start_date=bik.start_date) }}"
+                                           class="btn btn-sm btn-danger"
+                                           style="display: inline-block; padding: 5px 10px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;"
+                                           onclick="return confirm('Delete this BIK entry?')">🗑️</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 5px;">
+                    <p style="color: #7f8c8d;">No Benefit-in-Kind history found for this employee.</p>
+                    <small style="color: #95a5a6;">Set BIK values above to create history.</small>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- BIK Tax Impact Summary -->
+        {% if definitions %}
+        <div style="margin-top: 20px; padding: 15px; background: #e8f4fd; border-radius: 8px; border-left: 4px solid #3498db;">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">📊 BIK Tax Impact</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                <div style="background: white; padding: 10px; border-radius: 5px; text-align: center;">
+                    <div style="font-size: 12px; color: #7f8c8d;">Total BIK</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">
+                        {{ company.base_currency }}
+                        {% set total_bik = 0 %}
+                        {% for defn in definitions %}
+                            {% set total_bik = total_bik + (current_bik.get(defn.id, defn.default_value)|float) %}
+                        {% endfor %}
+                        {{ format_currency(total_bik) }}
+                    </div>
+                </div>
+                <div style="background: white; padding: 10px; border-radius: 5px; text-align: center;">
+                    <div style="font-size: 12px; color: #7f8c8d;">Taxable BIK</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #e74c3c;">
+                        {{ company.base_currency }}
+                        {% set taxable_bik = 0 %}
+                        {% for defn in definitions %}
+                            {% if defn.is_taxable %}
+                                {% set taxable_bik = taxable_bik + (current_bik.get(defn.id, defn.default_value)|float) %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ format_currency(taxable_bik) }}
+                    </div>
+                </div>
+                <div style="background: white; padding: 10px; border-radius: 5px; text-align: center;">
+                    <div style="font-size: 12px; color: #7f8c8d;">Non-Taxable BIK</div>
+                    <div style="font-size: 18px; font-weight: bold; color: #27ae60;">
+                        {{ company.base_currency }}
+                        {% set non_taxable_bik = 0 %}
+                        {% for defn in definitions %}
+                            {% if not defn.is_taxable %}
+                                {% set non_taxable_bik = non_taxable_bik + (current_bik.get(defn.id, defn.default_value)|float) %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ format_currency(non_taxable_bik) }}
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: #7f8c8d; text-align: center;">
+                💡 Taxable BIK is added to taxable income. Non-taxable BIK is added to gross salary only.
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Update the display text when date inputs change
+    document.addEventListener('DOMContentLoaded', function() {
+        const startDateInput = document.getElementById('start_date');
+        const endDateInput = document.getElementById('end_date');
+        const displayStartDate = document.getElementById('displayStartDate');
+        const displayEndDate = document.getElementById('displayEndDate');
+
+        function updateDisplay() {
+            if (startDateInput.value) {
+                displayStartDate.textContent = startDateInput.value;
+            }
+            if (endDateInput.value) {
+                displayEndDate.textContent = endDateInput.value;
+                displayEndDate.style.color = '#2c3e50';
+            } else {
+                displayEndDate.textContent = '(ongoing)';
+                displayEndDate.style.color = '#27ae60';
+            }
+        }
+
+        startDateInput.addEventListener('change', updateDisplay);
+        endDateInput.addEventListener('change', updateDisplay);
+
+        // Set default start date if not set
+        if (!startDateInput.value) {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            startDateInput.value = `${year}-${month}-01`;
+            updateDisplay();
+        }
+    });
+</script>
+{% endblock %}

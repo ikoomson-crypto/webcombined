@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} Employee - Payroll System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_employees', company_id=company.id) }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Employees</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div class="header" style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">{{ action }} Employee</h1>
+            <div style="background: #f8f9fa; padding: 10px 15px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #3498db;">
+                <strong>Company:</strong> {{ company.name }} ({{ company.base_currency }})
+            </div>
+        </div>
+
+        <form method="POST">
+            <!-- Personal Information -->
+            <h3 style="color: #2c3e50; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 8px;">👤 Personal Information</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <label for="first_name" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">First Name *</label>
+                    <input type="text" id="first_name" name="first_name" required value="{{ employee.first_name if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="last_name" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Last Name *</label>
+                    <input type="text" id="last_name" name="last_name" required value="{{ employee.last_name if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="email" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Email *</label>
+                    <input type="email" id="email" name="email" required value="{{ employee.email if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="position" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Position *</label>
+                    <input type="text" id="position" name="position" required value="{{ employee.position if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="department" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Department *</label>
+                    <input type="text" id="department" name="department" required value="{{ employee.department if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="base_salary" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Monthly Salary *</label>
+                    <input type="number" step="0.01" id="base_salary" name="base_salary" required value="{{ employee.base_salary if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <small style="color: #7f8c8d; display: block; margin-top: 5px;">Monthly salary in {{ company.base_currency }} (e.g., 5000.00)</small>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="hire_date" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Hire Date *</label>
+                    <input type="date" id="hire_date" name="hire_date" required value="{{ employee.hire_date if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="status" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Status *</label>
+                    <select id="status" name="status" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        <option value="Active" {% if employee and employee.status == 'Active' %}selected{% endif %}>Active</option>
+                        <option value="Inactive" {% if employee and employee.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                        <option value="On Leave" {% if employee and employee.status == 'On Leave' %}selected{% endif %}>On Leave</option>
+                        <option value="Terminated" {% if employee and employee.status == 'Terminated' %}selected{% endif %}>Terminated</option>
+                        <option value="Consultant" {% if employee and employee.status == 'Consultant' %}selected{% endif %}>Consultant</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tax & SS Exemptions -->
+            <h3 style="color: #2c3e50; margin-top: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px;">🏷️ Tax & Exemptions</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ecf0f1;">
+                        <input type="checkbox" id="is_tax_exempt" name="is_tax_exempt" {% if employee and employee.is_tax_exempt %}checked{% endif %} style="width: 18px; height: 18px; cursor: pointer;">
+                        <div>
+                            <label for="is_tax_exempt" style="font-weight: 500; color: #34495e; cursor: pointer;">
+                                🏷️ This employee is tax exempt (Consultant / Contractor)
+                            </label>
+                            <div style="font-size: 12px; color: #7f8c8d; margin-top: 3px;">
+                                When checked, no income tax will be deducted from this employee's salary.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ecf0f1; border-left: 4px solid #e67e22;">
+                        <input type="checkbox" id="exempt_from_social_security" name="exempt_from_social_security" {% if employee and employee.exempt_from_social_security %}checked{% endif %} style="width: 18px; height: 18px; cursor: pointer;">
+                        <div>
+                            <label for="exempt_from_social_security" style="font-weight: 500; color: #34495e; cursor: pointer;">
+                                🔒 Exempt from Social Security (Consultant / Contractor)
+                            </label>
+                            <div style="font-size: 12px; color: #7f8c8d; margin-top: 3px;">
+                                When checked, no Social Security (SSNIT) deductions will be taken from this employee's salary.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bank Details -->
+            <h3 style="color: #2c3e50; margin-top: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px;">🏦 Bank Details</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <label for="bank_name" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Bank Name</label>
+                    <input type="text" id="bank_name" name="bank_name" value="{{ employee.bank_name if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="bank_currency" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Bank Currency</label>
+                    <select id="bank_currency" name="bank_currency" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        <option value="">Select Currency</option>
+                        <option value="USD" {% if employee and employee.bank_currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
+                        <option value="EUR" {% if employee and employee.bank_currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+                        <option value="GBP" {% if employee and employee.bank_currency == 'GBP' %}selected{% endif %}>GBP - British Pound</option>
+                        <option value="GHS" {% if employee and employee.bank_currency == 'GHS' %}selected{% endif %}>GHS - Ghana Cedis</option>
+                        <option value="NGN" {% if employee and employee.bank_currency == 'NGN' %}selected{% endif %}>NGN - Nigerian Naira</option>
+                        <option value="ZAR" {% if employee and employee.bank_currency == 'ZAR' %}selected{% endif %}>ZAR - South African Rand</option>
+                        <option value="KES" {% if employee and employee.bank_currency == 'KES' %}selected{% endif %}>KES - Kenyan Shilling</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="bank_account_number" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Account Number</label>
+                    <input type="text" id="bank_account_number" name="bank_account_number" value="{{ employee.bank_account_number if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="bank_iban" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">IBAN Number</label>
+                    <input type="text" id="bank_iban" name="bank_iban" value="{{ employee.bank_iban if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="bank_account_name" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Account Name</label>
+                    <input type="text" id="bank_account_name" name="bank_account_name" value="{{ employee.bank_account_name if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="bank_swift_code" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Swift Code</label>
+                    <input type="text" id="bank_swift_code" name="bank_swift_code" value="{{ employee.bank_swift_code if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px; grid-column: span 2;">
+                    <label for="bank_address" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Bank Address</label>
+                    <input type="text" id="bank_address" name="bank_address" value="{{ employee.bank_address if employee else '' }}" placeholder="e.g., 123 Main Street, Accra, Ghana" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+            </div>
+
+            <!-- Other Details -->
+            <h3 style="color: #2c3e50; margin-top: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px;">📋 Other Details</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="margin-bottom: 15px;">
+                    <label for="id_type" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">ID Type</label>
+                    <select id="id_type" name="id_type" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        <option value="">Select ID Type</option>
+                        <option value="National ID" {% if employee and employee.id_type == 'National ID' %}selected{% endif %}>National ID</option>
+                        <option value="Passport" {% if employee and employee.id_type == 'Passport' %}selected{% endif %}>Passport</option>
+                        <option value="Driver's License" {% if employee and employee.id_type == "Driver's License" %}selected{% endif %}>Driver's License</option>
+                        <option value="Voter ID" {% if employee and employee.id_type == 'Voter ID' %}selected{% endif %}>Voter ID</option>
+                        <option value="SSNIT Number" {% if employee and employee.id_type == 'SSNIT Number' %}selected{% endif %}>SSNIT Number</option>
+                        <option value="Tax ID" {% if employee and employee.id_type == 'Tax ID' %}selected{% endif %}>Tax ID</option>
+                        <option value="Other" {% if employee and employee.id_type == 'Other' %}selected{% endif %}>Other</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label for="id_number" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">ID Number</label>
+                    <input type="text" id="id_number" name="id_number" value="{{ employee.id_number if employee else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+
+                <div style="margin-bottom: 15px; grid-column: span 2;">
+                    <label for="street_location" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Street Location</label>
+                    <input type="text" id="street_location" name="street_location" value="{{ employee.street_location if employee else '' }}" placeholder="e.g., 123 Main Street, Accra" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                </div>
+            </div>
+
+            <!-- Status Summary -->
+            <div style="background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #3498db;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                    <div>
+                        <div style="font-size: 11px; color: #7f8c8d;">Employee Type</div>
+                        <div style="font-weight: bold; color: #2c3e50;" id="employeeTypeDisplay">
+                            {% if employee and (employee.is_tax_exempt or employee.exempt_from_social_security) %}Consultant{% else %}Regular Employee{% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: #7f8c8d;">Tax Status</div>
+                        <div style="font-weight: bold; color: #2c3e50;" id="taxStatusDisplay">
+                            {% if employee and employee.is_tax_exempt %}Tax Exempt{% else %}Taxable{% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: #7f8c8d;">Social Security</div>
+                        <div style="font-weight: bold; color: #2c3e50;" id="ssStatusDisplay">
+                            {% if employee and employee.exempt_from_social_security %}Exempt{% else %}Applied{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: #f8f9fa; padding: 12px 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #27ae60;">
+                <span style="font-size: 14px; color: #2c3e50;">💡 <strong>Note:</strong> Monthly salary is used for payroll calculations. Annual salary = Monthly × 12.</span>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">{{ action }} Employee</button>
+                <a href="{{ url_for('list_employees', company_id=company.id) }}" class="btn btn-secondary" style="padding: 10px 30px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Update status display when checkboxes change
+    document.addEventListener('DOMContentLoaded', function() {
+        const taxExemptCheckbox = document.getElementById('is_tax_exempt');
+        const ssExemptCheckbox = document.getElementById('exempt_from_social_security');
+        const employeeTypeDisplay = document.getElementById('employeeTypeDisplay');
+        const taxStatusDisplay = document.getElementById('taxStatusDisplay');
+        const ssStatusDisplay = document.getElementById('ssStatusDisplay');
+
+        function updateStatusDisplay() {
+            // Employee Type
+            if (taxExemptCheckbox.checked || ssExemptCheckbox.checked) {
+                employeeTypeDisplay.textContent = 'Consultant';
+                employeeTypeDisplay.style.color = '#e67e22';
+            } else {
+                employeeTypeDisplay.textContent = 'Regular Employee';
+                employeeTypeDisplay.style.color = '#2c3e50';
+            }
+
+            // Tax Status
+            if (taxExemptCheckbox.checked) {
+                taxStatusDisplay.textContent = 'Tax Exempt';
+                taxStatusDisplay.style.color = '#27ae60';
+            } else {
+                taxStatusDisplay.textContent = 'Taxable';
+                taxStatusDisplay.style.color = '#e74c3c';
+            }
+
+            // Social Security Status
+            if (ssExemptCheckbox.checked) {
+                ssStatusDisplay.textContent = 'Exempt';
+                ssStatusDisplay.style.color = '#e67e22';
+            } else {
+                ssStatusDisplay.textContent = 'Applied';
+                ssStatusDisplay.style.color = '#2c3e50';
+            }
+        }
+
+        taxExemptCheckbox.addEventListener('change', updateStatusDisplay);
+        ssExemptCheckbox.addEventListener('change', updateStatusDisplay);
+        updateStatusDisplay(); // Check initial state
+    });
+</script>
+{% endblock %}

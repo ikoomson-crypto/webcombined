@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ action }} Company - Payroll System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_companies') }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Companies</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">{{ action }} Company</h1>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <small>💡 Tax configurations for the current and adjacent years will be auto-created with default rates.</small>
+        </div>
+
+        <form method="POST">
+            <div style="margin-bottom: 20px;">
+                <label for="name" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Company Name *</label>
+                <input type="text" id="name" name="name" required value="{{ company.name if company else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="base_currency" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Base Currency *</label>
+                <select id="base_currency" name="base_currency" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <option value="USD" {% if company and company.base_currency == 'USD' %}selected{% endif %}>USD - US Dollar</option>
+                    <option value="EUR" {% if company and company.base_currency == 'EUR' %}selected{% endif %}>EUR - Euro</option>
+                    <option value="GBP" {% if company and company.base_currency == 'GBP' %}selected{% endif %}>GBP - British Pound</option>
+                    <option value="JPY" {% if company and company.base_currency == 'JPY' %}selected{% endif %}>JPY - Japanese Yen</option>
+                    <option value="CAD" {% if company and company.base_currency == 'CAD' %}selected{% endif %}>CAD - Canadian Dollar</option>
+                    <option value="AUD" {% if company and company.base_currency == 'AUD' %}selected{% endif %}>AUD - Australian Dollar</option>
+                    <option value="CHF" {% if company and company.base_currency == 'CHF' %}selected{% endif %}>CHF - Swiss Franc</option>
+                    <option value="CNY" {% if company and company.base_currency == 'CNY' %}selected{% endif %}>CNY - Chinese Yuan</option>
+                    <option value="GHS" {% if company and company.base_currency == 'GHS' %}selected{% endif %}>GHS - Ghana Cedis</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="address" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Address</label>
+                <input type="text" id="address" name="address" value="{{ company.address if company else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="tax_id" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Tax ID</label>
+                <input type="text" id="tax_id" name="tax_id" value="{{ company.tax_id if company else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="email" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Email</label>
+                <input type="email" id="email" name="email" value="{{ company.email if company else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label for="phone" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Phone</label>
+                <input type="text" id="phone" name="phone" value="{{ company.phone if company else '' }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">{{ action }} Company</button>
+                <a href="{{ url_for('list_companies') }}" class="btn btn-secondary" style="padding: 10px 30px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

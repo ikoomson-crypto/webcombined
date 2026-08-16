@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Bonus Management - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_companies') }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Companies</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: #2c3e50;">🎯 Bonus Management - {{ company.name }}</h1>
+                <p style="color: #7f8c8d; font-size: 14px;">Manage employee bonuses with effective date ranges</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('bonus_tax_config', company_id=company.id) }}" class="btn btn-warning" style="display: inline-block; padding: 8px 16px; background: #f39c12; color: white; text-decoration: none; border-radius: 5px;">⚙️ Tax Config</a>
+                <a href="{{ url_for('add_bonus', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">+ Add Bonus</a>
+            </div>
+        </div>
+
+        <!-- Bonus Tax Info -->
+        <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <span style="font-weight: bold; color: #2c3e50;">📌 Bonus Tax Rules:</span>
+                    <span style="color: #7f8c8d; margin-left: 10px; font-size: 14px;">
+                        Bonus up to <strong>{{ current_config.bonus_threshold_percentage if current_config else 15 }}%</strong> of Annual Basic Salary taxed at
+                        <strong>{{ current_config.bonus_tax_rate if current_config else 5 }}%</strong> flat rate.
+                        Excess added to salary and taxed at graduated rates.
+                    </span>
+                </div>
+                <a href="{{ url_for('bonus_tax_config', company_id=company.id) }}" class="btn btn-sm" style="display: inline-block; padding: 5px 15px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">
+                    ⚙️ Configure
+                </a>
+            </div>
+        </div>
+
+        <!-- Bonus Summary Stats -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                <div style="font-size: 11px; color: #7f8c8d;">Total Bonuses</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">
+                    {% set total_bonus_count = 0 %}
+                    {% for emp in employees %}
+                        {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                        {% set total_bonus_count = total_bonus_count + bonuses|length %}
+                    {% endfor %}
+                    {{ total_bonus_count }}
+                </div>
+            </div>
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                <div style="font-size: 11px; color: #7f8c8d;">Total Bonus Amount</div>
+                <div style="font-size: 18px; font-weight: bold; color: #27ae60;">
+                    {{ company.base_currency }}
+                    {% set total_bonus_amount = 0 %}
+                    {% for emp in employees %}
+                        {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                        {% for bonus in bonuses %}
+                            {% set total_bonus_amount = total_bonus_amount + bonus.bonus_amount %}
+                        {% endfor %}
+                    {% endfor %}
+                    {{ format_currency(total_bonus_amount) }}
+                </div>
+            </div>
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                <div style="font-size: 11px; color: #7f8c8d;">Active Bonuses</div>
+                <div style="font-size: 18px; font-weight: bold; color: #3498db;">
+                    {% set active_count = 0 %}
+                    {% for emp in employees %}
+                        {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                        {% for bonus in bonuses %}
+                            {% if is_date_active(bonus.start_date, bonus.end_date, current_year, 1) %}
+                                {% set active_count = active_count + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
+                    {{ active_count }}
+                </div>
+            </div>
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                <div style="font-size: 11px; color: #7f8c8d;">Employees with Bonuses</div>
+                <div style="font-size: 18px; font-weight: bold; color: #e67e22;">
+                    {% set emp_with_bonus = [] %}
+                    {% for emp in employees %}
+                        {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                        {% if bonuses %}
+                            {% set emp_with_bonus = emp_with_bonus + [emp.id] %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ emp_with_bonus|length }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Bonus List -->
+        <h3 style="color: #2c3e50; margin-bottom: 15px;">📋 Employee Bonuses</h3>
+        {% set has_bonuses = false %}
+        {% for emp in employees %}
+            {% set bonuses = get_all_employee_bonuses(emp.id) %}
+            {% if bonuses %}
+                {% set has_bonuses = true %}
+            {% endif %}
+        {% endfor %}
+
+        {% if has_bonuses %}
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Employee</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Position</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Start Date</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">End Date</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: right;">Bonus Amount</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Type</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Status</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Description</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in employees %}
+                            {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                            {% for bonus in bonuses %}
+                            <tr style="border-bottom: 1px solid #ecf0f1;
+                                {% if is_date_active(bonus.start_date, bonus.end_date, current_year, 1) %}background: #d4edda;{% endif %}">
+                                <td style="padding: 12px;">
+                                    <strong>{{ emp.first_name }} {{ emp.last_name }}</strong>
+                                    <br><span style="font-size: 11px; color: #7f8c8d;">{{ emp.department }}</span>
+                                </td>
+                                <td style="padding: 12px;">{{ emp.position }}</td>
+                                <td style="padding: 12px;">
+                                    <span style="font-weight: 500;">{{ bonus.start_date }}</span>
+                                </td>
+                                <td style="padding: 12px;">
+                                    {% if bonus.end_date %}
+                                        <span>{{ bonus.end_date }}</span>
+                                    {% else %}
+                                        <span style="color: #27ae60; font-style: italic;">One-time</span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 12px; text-align: right;">
+                                    <strong style="color: #2c3e50;">{{ company.base_currency }} {{ format_currency(bonus.bonus_amount) }}</strong>
+                                    <br><span style="font-size: 10px; color: #7f8c8d;">
+                                        {% set annual_basic = get_employee_annual_basic_salary(emp.id, bonus.start_date.split('-')[0]|int) if get_employee_annual_basic_salary is defined else emp.base_salary * 12 %}
+                                        {% set threshold_pct = current_config.bonus_threshold_percentage if current_config else 15 %}
+                                        {% set threshold_amount = annual_basic * (threshold_pct / 100) %}
+                                        {% if bonus.bonus_amount <= threshold_amount %}
+                                            Flat Tax: {{ current_config.bonus_tax_rate if current_config else 5 }}%
+                                        {% else %}
+                                            Flat + Graduated
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td style="padding: 12px;">
+                                    <span style="display: inline-block; padding: 2px 10px; background: #f39c12; color: white; border-radius: 12px; font-size: 11px;">
+                                        {{ bonus.bonus_type|capitalize }}
+                                    </span>
+                                </td>
+                                <td style="padding: 12px; text-align: center;">
+                                    {% if is_date_active(bonus.start_date, bonus.end_date, current_year, 1) %}
+                                        <span style="display: inline-block; padding: 3px 10px; background: #27ae60; color: white; border-radius: 12px; font-size: 11px;">✓ Active</span>
+                                    {% elif bonus.end_date and bonus.end_date < '%04d-01-01'|format(current_year) %}
+                                        <span style="display: inline-block; padding: 3px 10px; background: #95a5a6; color: white; border-radius: 12px; font-size: 11px;">Expired</span>
+                                    {% else %}
+                                        <span style="display: inline-block; padding: 3px 10px; background: #f39c12; color: white; border-radius: 12px; font-size: 11px;">Upcoming</span>
+                                    {% endif %}
+                                    <br>
+                                    {% set months = 0 %}
+                                    {% if bonus.end_date %}
+                                        {% set start = datetime.datetime.strptime(bonus.start_date, '%Y-%m-%d') %}
+                                        {% set end = datetime.datetime.strptime(bonus.end_date, '%Y-%m-%d') %}
+                                        {% set months = ((end.year - start.year) * 12 + (end.month - start.month)) + 1 %}
+                                    {% else %}
+                                        {% set months = 1 %}
+                                    {% endif %}
+                                    <span style="font-size: 10px; color: #7f8c8d;">{{ months }} month{{ 's' if months > 1 else '' }}</span>
+                                </td>
+                                <td style="padding: 12px;">{{ bonus.description or 'N/A' }}</td>
+                                <td style="padding: 12px; text-align: center;">
+                                    <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+                                        <a href="{{ url_for('add_bonus', company_id=company.id, employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;" title="Edit Bonus">✏️</a>
+                                        <a href="{{ url_for('delete_bonus', company_id=company.id, employee_id=emp.id, start_date=bonus.start_date) }}" class="btn btn-sm btn-danger" style="display: inline-block; padding: 5px 10px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;" onclick="return confirm('Delete this bonus?')" title="Delete">🗑️</a>
+                                        <a href="{{ url_for('manage_employee_deductions', employee_id=emp.id) }}" class="btn btn-sm" style="display: inline-block; padding: 5px 10px; background: #9b59b6; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;" title="View Employee">👤</a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Bonus Summary Footer -->
+            <div style="margin-top: 15px; padding: 12px 15px; background: #f8f9fa; border-radius: 5px; border-left: 4px solid #3498db; font-size: 13px; color: #2c3e50;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                    <div>
+                        <span style="color: #7f8c8d; font-size: 11px;">Total Bonus Amount</span>
+                        <div style="font-weight: bold; color: #27ae60;">
+                            {{ company.base_currency }}
+                            {% set total_bonus_amount = 0 %}
+                            {% for emp in employees %}
+                                {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                                {% for bonus in bonuses %}
+                                    {% set total_bonus_amount = total_bonus_amount + bonus.bonus_amount %}
+                                {% endfor %}
+                            {% endfor %}
+                            {{ format_currency(total_bonus_amount) }}
+                        </div>
+                    </div>
+                    <div>
+                        <span style="color: #7f8c8d; font-size: 11px;">Average Bonus</span>
+                        <div style="font-weight: bold; color: #2c3e50;">
+                            {{ company.base_currency }}
+                            {% set total_bonus_amount = 0 %}
+                            {% set bonus_count = 0 %}
+                            {% for emp in employees %}
+                                {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                                {% for bonus in bonuses %}
+                                    {% set total_bonus_amount = total_bonus_amount + bonus.bonus_amount %}
+                                    {% set bonus_count = bonus_count + 1 %}
+                                {% endfor %}
+                            {% endfor %}
+                            {{ format_currency(total_bonus_amount / bonus_count if bonus_count > 0 else 0) }}
+                        </div>
+                    </div>
+                    <div>
+                        <span style="color: #7f8c8d; font-size: 11px;">Active Bonuses</span>
+                        <div style="font-weight: bold; color: #3498db;">
+                            {% set active_count = 0 %}
+                            {% for emp in employees %}
+                                {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                                {% for bonus in bonuses %}
+                                    {% if is_date_active(bonus.start_date, bonus.end_date, current_year, 1) %}
+                                        {% set active_count = active_count + 1 %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                            {{ active_count }}
+                        </div>
+                    </div>
+                    <div>
+                        <span style="color: #7f8c8d; font-size: 11px;">Employees with Bonuses</span>
+                        <div style="font-weight: bold; color: #e67e22;">
+                            {% set emp_with_bonus = [] %}
+                            {% for emp in employees %}
+                                {% set bonuses = get_all_employee_bonuses(emp.id) %}
+                                {% if bonuses %}
+                                    {% set emp_with_bonus = emp_with_bonus + [emp.id] %}
+                                {% endif %}
+                            {% endfor %}
+                            {{ emp_with_bonus|length }} / {{ employees|length }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 5px;">
+                <p style="color: #7f8c8d;">No bonuses have been added yet.</p>
+                <a href="{{ url_for('add_bonus', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">+ Add First Bonus</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

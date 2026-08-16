@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}Payslip - {{ employee.first_name }} {{ employee.last_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Navigation -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px;">
+        <div>
+            <a href="{{ url_for('payslips_dashboard', company_id=company.id, year=year, month=month) }}"
+               style="display: inline-block; margin-bottom: 10px; color: #3498db; text-decoration: none;">
+                ← Back to Payslips
+            </a>
+            <h1 style="color: #2c3e50; margin-top: 5px;">📄 Payslip</h1>
+            <div style="color: #7f8c8d; font-size: 14px;">
+                {{ employee.first_name }} {{ employee.last_name }} - {{ company.name }}
+                {% if payslip.payroll.is_tax_exempt %}
+                    <span style="display: inline-block; padding: 2px 10px; background: #fff3cd; color: #856404; border-radius: 12px; font-size: 11px; margin-left: 10px; border: 1px solid #ffeeba;">
+                        🏷️ Tax Exempt
+                    </span>
+                {% endif %}
+                {% if payslip.payroll.exempt_from_social_security %}
+                    <span style="display: inline-block; padding: 2px 10px; background: #fdebd0; color: #6c3a0a; border-radius: 12px; font-size: 11px; margin-left: 5px; border: 1px solid #f5cba7;">
+                        🔒 SS Exempt
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('download_payslip', employee_id=employee.id, year=year, month=month) }}"
+               class="btn btn-success"
+               style="display: inline-block; padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+                📥 Download PDF
+            </a>
+            <a href="{{ url_for('manage_monthly_salary', employee_id=employee.id) }}"
+               class="btn btn-info"
+               style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                📅 Manage Salary
+            </a>
+            <a href="{{ url_for('bulk_payslip', company_id=company.id, year=year, month=month) }}"
+               class="btn btn-warning"
+               style="display: inline-block; padding: 10px 20px; background: #f39c12; color: white; text-decoration: none; border-radius: 5px;">
+                📋 Bulk Payslips
+            </a>
+        </div>
+    </div>
+
+    <!-- Period Selector -->
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <span style="font-weight: bold; color: #2c3e50;">📅 Period:</span>
+            <form method="GET" action="{{ url_for('view_payslip', employee_id=employee.id) }}" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select name="month" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                    {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>
+                            {{ get_month_name(m) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <select name="year" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                    {% for y in range(2020, 2027) %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        <div style="font-size: 14px; color: #7f8c8d;">
+            <span style="background: #27ae60; color: white; padding: 3px 12px; border-radius: 12px;">
+                {{ payslip.period }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Payslip Content -->
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+
+        <!-- Company Header -->
+        <div style="text-align: center; border-bottom: 2px solid #3498db; padding-bottom: 15px; margin-bottom: 20px;">
+            <h2 style="color: #2c3e50; margin: 0;">{{ company.name }}</h2>
+            <div style="color: #7f8c8d; font-size: 13px;">
+                {% if company.address %}{{ company.address }}{% endif %}
+                {% if company.email %} | Email: {{ company.email }}{% endif %}
+                {% if company.phone %} | Phone: {{ company.phone }}{% endif %}
+            </div>
+            <h3 style="color: #2c3e50; margin: 10px 0 0 0;">PAYSLIP</h3>
+            <div style="color: #7f8c8d; font-size: 14px;">{{ payslip.period }}</div>
+            {% if payslip.payroll.is_tax_exempt %}
+                <div style="margin-top: 5px; font-size: 12px; color: #e67e22;">
+                    ⚠️ This employee is <strong>Tax Exempt</strong> - No income tax deducted
+                </div>
+            {% endif %}
+            {% if payslip.payroll.exempt_from_social_security %}
+                <div style="margin-top: 3px; font-size: 12px; color: #e67e22;">
+                    🔒 This employee is <strong>Exempt from Social Security</strong> - No SS deductions
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Employee Info -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div><strong>Employee:</strong> {{ employee.first_name }} {{ employee.last_name }}</div>
+            <div><strong>Employee ID:</strong> {{ employee.id }}</div>
+            <div><strong>Position:</strong> {{ employee.position }}</div>
+            <div><strong>Department:</strong> {{ employee.department }}</div>
+            <div><strong>Status:</strong>
+                <span style="display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+                    {% if employee.status == 'Active' %}background: #d4edda; color: #155724;
+                    {% elif employee.status == 'Inactive' %}background: #f8d7da; color: #721c24;
+                    {% elif employee.status == 'On Leave' %}background: #fff3cd; color: #856404;
+                    {% elif employee.status == 'Consultant' %}background: #fdebd0; color: #6c3a0a;
+                    {% else %}background: #f8d7da; color: #721c24;{% endif %}">
+                    {{ employee.status }}
+                </span>
+            </div>
+            <div>
+                <strong>Exemptions:</strong>
+                {% if payslip.payroll.is_tax_exempt %}
+                    <span style="display: inline-block; padding: 2px 8px; background: #fff3cd; color: #856404; border-radius: 10px; font-size: 10px; border: 1px solid #ffeeba;">🏷️ Tax Exempt</span>
+                {% endif %}
+                {% if payslip.payroll.exempt_from_social_security %}
+                    <span style="display: inline-block; padding: 2px 8px; background: #fdebd0; color: #6c3a0a; border-radius: 10px; font-size: 10px; border: 1px solid #f5cba7;">🔒 SS Exempt</span>
+                {% endif %}
+                {% if not payslip.payroll.is_tax_exempt and not payslip.payroll.exempt_from_social_security %}
+                    <span style="color: #7f8c8d; font-size: 12px;">None</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Earnings -->
+        <h4 style="color: #2c3e50; margin-top: 20px; border-bottom: 2px solid #27ae60; padding-bottom: 8px;">💰 Earnings</h4>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr>
+                    <th style="background: #34495e; color: white; padding: 10px; text-align: left;">Description</th>
+                    <th style="background: #34495e; color: white; padding: 10px; text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;"><strong>Basic Salary</strong></td>
+                    <td style="padding: 8px 10px; text-align: right;">{{ company.base_currency }} {{ format_currency(payslip.payroll.base_salary) }}</td>
+                </tr>
+                {% for detail in payslip.allowance_details %}
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;">
+                        {{ detail.name }}
+                        {% if detail.is_taxable %}
+                            <span style="display: inline-block; padding: 1px 6px; background: #f8d7da; color: #721c24; border-radius: 8px; font-size: 8px; margin-left: 5px;">Taxable</span>
+                        {% else %}
+                            <span style="display: inline-block; padding: 1px 6px; background: #d4edda; color: #155724; border-radius: 8px; font-size: 8px; margin-left: 5px;">Non-Taxable</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right;">{{ company.base_currency }} {{ format_currency(detail.value) }}</td>
+                </tr>
+                {% endfor %}
+                {% if payslip.payroll.bonus_amount > 0 %}
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;">
+                        <span style="color: #f39c12;">🎯 Bonus</span>
+                        {% if payslip.bonus_details %}
+                            <span style="font-size: 10px; color: #7f8c8d; display: block;">
+                                ({{ payslip.bonus_details.threshold_percentage }}% threshold,
+                                {{ payslip.bonus_details.flat_rate }}% flat tax)
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right; color: #f39c12;">{{ company.base_currency }} {{ format_currency(payslip.payroll.bonus_amount) }}</td>
+                </tr>
+                {% endif %}
+                {% if payslip.payroll.bik_total > 0 %}
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;">
+                        <span style="color: #e67e22;">🎁 BIK (Non-Cash)</span>
+                        <span style="font-size: 10px; color: #7f8c8d; display: block;">
+                            (Added to taxable income)
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right; color: #e67e22;">{{ company.base_currency }} {{ format_currency(payslip.payroll.bik_total) }}</td>
+                </tr>
+                {% endif %}
+                <tr style="background: #d4edda; font-weight: bold;">
+                    <td style="padding: 8px 10px; color: #155724;">Total Earnings</td>
+                    <td style="padding: 8px 10px; text-align: right; color: #155724;">{{ company.base_currency }} {{ format_currency(payslip.payroll.gross_salary) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Deductions -->
+        <h4 style="color: #2c3e50; margin-top: 20px; border-bottom: 2px solid #e74c3c; padding-bottom: 8px;">📊 Deductions</h4>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr>
+                    <th style="background: #34495e; color: white; padding: 10px; text-align: left;">Description</th>
+                    <th style="background: #34495e; color: white; padding: 10px; text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detail in payslip.deduction_details %}
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;">
+                        {{ detail.name }}
+                        {% if detail.is_percentage %}
+                            <span style="font-size: 10px; color: #7f8c8d; display: block;">({{ detail.rate }}% of gross)</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right;">{{ company.base_currency }} {{ format_currency(detail.value) }}</td>
+                </tr>
+                {% endfor %}
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;">
+                        Income Tax
+                        {% if payslip.payroll.is_tax_exempt %}
+                            <span style="display: inline-block; padding: 1px 6px; background: #fff3cd; color: #856404; border-radius: 8px; font-size: 8px; margin-left: 5px;">Exempt</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right; {% if payslip.payroll.total_tax == 0 %}color: #27ae60; font-weight: bold;{% endif %}">
+                        {% if payslip.payroll.total_tax == 0 %}
+                            ✓ Zero
+                        {% else %}
+                            {{ company.base_currency }} {{ format_currency(payslip.payroll.total_tax) }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if payslip.payroll.social_security > 0 %}
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;">
+                        Social Security
+                        <span style="font-size: 10px; color: #7f8c8d; display: block;">
+                            ({{ payslip.tax_config.social_security_rate if payslip.tax_config else '5.5' }}% of basic salary)
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: right;">{{ company.base_currency }} {{ format_currency(payslip.payroll.social_security) }}</td>
+                </tr>
+                {% endif %}
+                {% if payslip.payroll.bonus_tax_flat > 0 %}
+                <tr style="border-bottom: 1px solid #ecf0f1;">
+                    <td style="padding: 8px 10px;">Bonus Tax (Flat)</td>
+                    <td style="padding: 8px 10px; text-align: right;">{{ company.base_currency }} {{ format_currency(payslip.payroll.bonus_tax_flat) }}</td>
+                </tr>
+                {% endif %}
+                <tr style="background: #f8d7da; font-weight: bold;">
+                    <td style="padding: 8px 10px; color: #721c24;">Total Deductions</td>
+                    <td style="padding: 8px 10px; text-align: right; color: #721c24;">{{ company.base_currency }} {{ format_currency(payslip.payroll.total_deductions) }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Net Pay -->
+        <div style="background: #d4edda; padding: 20px; border-radius: 8px; border: 2px solid #27ae60; margin: 20px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <h3 style="color: #155724; margin: 0;">💰 Net Pay</h3>
+                    <div style="color: #155724; font-size: 14px; margin-top: 5px;">
+                        {{ payslip.period }}
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 12px; color: #155724;">Amount</div>
+                    <div style="font-size: 28px; font-weight: bold; color: #155724;">
+                        {{ company.base_currency }} {{ format_currency(payslip.payroll.net_pay) }}
+                    </div>
+                    <div style="font-size: 11px; color: #155724; margin-top: 3px;">
+                        {{ get_month_name(month) }} {{ year }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tax Breakdown -->
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">📈 Tax Breakdown</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                <div style="background: white; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                    <div style="font-size: 11px; color: #7f8c8d;">Taxable Income</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #2c3e50;">
+                        {{ company.base_currency }} {{ format_currency(payslip.payroll.annual_taxable / 12 if payslip.payroll.annual_taxable else 0) }}
+                    </div>
+                </div>
+                <div style="background: white; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                    <div style="font-size: 11px; color: #7f8c8d;">Annual Tax</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #2c3e50;">
+                        {{ company.base_currency }} {{ format_currency(payslip.payroll.annual_tax or 0) }}
+                    </div>
+                </div>
+                <div style="background: white; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                    <div style="font-size: 11px; color: #7f8c8d;">Effective Tax Rate</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #2c3e50;">
+                        {% if payslip.payroll.gross_salary > 0 %}
+                            {{ ((payslip.payroll.total_tax / payslip.payroll.gross_salary) * 100)|round(2) }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </div>
+                </div>
+                {% if payslip.payroll.bonus_amount > 0 %}
+                <div style="background: white; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #ecf0f1;">
+                    <div style="font-size: 11px; color: #7f8c8d;">Bonus Threshold</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #f39c12;">
+                        {{ payslip.bonus_details.threshold_percentage if payslip.bonus_details else 'N/A' }}%
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Year-to-Date Summary -->
+        {% if payslip.ytd %}
+        <h4 style="color: #2c3e50; margin-top: 20px; border-bottom: 2px solid #3498db; padding-bottom: 8px;">📈 Year-to-Date Summary</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 12px; color: #7f8c8d;">Gross Pay</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">{{ company.base_currency }} {{ format_currency(payslip.ytd.total_gross or 0) }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 12px; color: #7f8c8d;">Total Tax</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">{{ company.base_currency }} {{ format_currency(payslip.ytd.total_tax or 0) }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 12px; color: #7f8c8d;">Social Security</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2c3e50;">{{ company.base_currency }} {{ format_currency(payslip.ytd.total_ss or 0) }}</div>
+            </div>
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 12px; color: #7f8c8d;">Net Pay</div>
+                <div style="font-size: 18px; font-weight: bold; color: #27ae60;">{{ company.base_currency }} {{ format_currency(payslip.ytd.total_net or 0) }}</div>
+            </div>
+            {% if payslip.ytd.total_bonus %}
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 12px; color: #7f8c8d;">Total Bonus</div>
+                <div style="font-size: 18px; font-weight: bold; color: #f39c12;">{{ company.base_currency }} {{ format_currency(payslip.ytd.total_bonus or 0) }}</div>
+            </div>
+            {% endif %}
+            {% if payslip.ytd.total_allowances %}
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 12px; color: #7f8c8d;">Total Allowances</div>
+                <div style="font-size: 18px; font-weight: bold; color: #8e44ad;">{{ company.base_currency }} {{ format_currency(payslip.ytd.total_allowances or 0) }}</div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Payment Details -->
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">💳 Payment Details</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><strong>Payment Method:</strong> Bank Transfer</div>
+                <div><strong>Currency:</strong> {{ company.base_currency }}</div>
+                <div><strong>Pay Period:</strong> {{ get_month_name(month) }} {{ year }}</div>
+                <div><strong>Generated:</strong> {{ datetime.now().strftime('%Y-%m-%d %H:%M') }}</div>
+                {% if payslip.payroll.processed_date %}
+                <div><strong>Processed Date:</strong> {{ payslip.payroll.processed_date }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; border-top: 1px solid #ecf0f1; padding-top: 15px; margin-top: 20px;">
+            <div style="color: #95a5a6; font-size: 11px;">
+                This is a computer-generated payslip. Please verify all details.
+            </div>
+            <div style="color: #95a5a6; font-size: 11px;">
+                Generated: {{ datetime.now().strftime('%Y-%m-%d %H:%M') }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <span style="color: #7f8c8d; font-size: 13px;">
+                💡 View payslip for {{ employee.first_name }} {{ employee.last_name }} - {{ get_month_name(month) }} {{ year }}
+            </span>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('download_payslip', employee_id=employee.id, year=year, month=month) }}"
+               class="btn btn-success"
+               style="display: inline-block; padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+                📥 Download PDF
+            </a>
+            <a href="{{ url_for('payslips_dashboard', company_id=company.id, year=year, month=month) }}"
+               class="btn btn-secondary"
+               style="display: inline-block; padding: 8px 16px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">
+                ← Back to Payslips
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

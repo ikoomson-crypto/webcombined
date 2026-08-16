@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Payslips Dashboard - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="header" style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: #2c3e50;">📄 Payslips Dashboard</h1>
+                <div style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">
+                    {{ company.name }} | Currency: {{ company.base_currency }} | Employees: {{ employees|length }}
+                </div>
+            </div>
+            <!-- REMOVED: Bulk Payslips and Payroll Dashboard buttons -->
+        </div>
+    </div>
+
+    <!-- Period Selector -->
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <span style="font-weight: bold; color: #2c3e50;">📅 Period:</span>
+            <form method="GET" action="{{ url_for('payslips_dashboard', company_id=company.id) }}" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <select name="month" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                    {% for m in range(1, 13) %}
+                        <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>
+                            {{ get_month_name(m) }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <select name="year" onchange="this.form.submit()" style="padding: 8px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer;">
+                    {% for y in range(2020, 2027) %}
+                        <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        <div style="font-size: 14px; color: #7f8c8d;">
+            <span style="background: #27ae60; color: white; padding: 3px 12px; border-radius: 12px;">
+                {{ get_month_name(selected_month) }} {{ selected_year }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
+        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Total Payslips</h4>
+            <div style="font-size: 24px; font-weight: bold; color: #2c3e50; margin: 5px 0;">
+                {{ payslips|length }}
+            </div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Total Net Pay</h4>
+            <div style="font-size: 24px; font-weight: bold; color: #27ae60; margin: 5px 0;">
+                {{ company.base_currency }} {{ format_currency(total_net) }}
+            </div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Total Tax</h4>
+            <div style="font-size: 24px; font-weight: bold; color: #2c3e50; margin: 5px 0;">
+                {{ company.base_currency }} {{ format_currency(total_tax) }}
+            </div>
+        </div>
+        <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <h4 style="color: #7f8c8d; font-size: 12px; text-transform: uppercase;">Generated</h4>
+            <div style="font-size: 24px; font-weight: bold; color: #3498db; margin: 5px 0;">
+                {{ generated_count }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Payslips Table -->
+    {% if payslips %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: left; font-size: 11px;">Employee</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: left; font-size: 11px;">Position</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: right; font-size: 11px;">Gross Pay</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: right; font-size: 11px;">Net Pay</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: right; font-size: 11px;">Tax</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: center; font-size: 11px;">Status</th>
+                        <th style="background: #34495e; color: white; padding: 10px 8px; text-align: center; font-size: 11px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payslip in payslips %}
+                    <tr style="border-bottom: 1px solid #ecf0f1;
+                        {% if payslip.payroll and payslip.payroll.is_tax_exempt %}background: #fef9e7;{% endif %}">
+                        <td style="padding: 10px 8px; font-size: 12px;">
+                            <strong>{{ payslip.employee.first_name }} {{ payslip.employee.last_name }}</strong>
+                            {% if payslip.payroll and payslip.payroll.is_tax_exempt %}
+                                <span style="display: inline-block; padding: 1px 6px; background: #f39c12; color: white; border-radius: 8px; font-size: 8px; margin-left: 3px;">Exempt</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 8px; font-size: 12px;">{{ payslip.employee.position }}</td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px;">
+                            {{ company.base_currency }} {{ format_currency(payslip.payroll.gross_salary if payslip.payroll else 0) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px; font-weight: bold; color: #27ae60;">
+                            {{ company.base_currency }} {{ format_currency(payslip.payroll.net_pay if payslip.payroll else 0) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px;">
+                            {{ company.base_currency }} {{ format_currency(payslip.payroll.total_tax if payslip.payroll else 0) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: center; font-size: 12px;">
+                            {% if payslip.payroll %}
+                                <span style="display: inline-block; padding: 3px 10px; background: #d4edda; color: #155724; border-radius: 12px; font-size: 11px;">✓ Generated</span>
+                            {% else %}
+                                <span style="display: inline-block; padding: 3px 10px; background: #f8d7da; color: #721c24; border-radius: 12px; font-size: 11px;">✗ Missing</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: center; font-size: 12px;">
+                            <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+                                {% if payslip.payroll %}
+                                    <a href="{{ url_for('view_payslip', employee_id=payslip.employee.id, year=selected_year, month=selected_month) }}"
+                                       class="btn btn-sm"
+                                       style="display: inline-block; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 11px;">👁️ View</a>
+                                    <a href="{{ url_for('download_payslip', employee_id=payslip.employee.id, year=selected_year, month=selected_month) }}"
+                                       class="btn btn-sm"
+                                       style="display: inline-block; padding: 5px 10px; background: #27ae60; color: white; text-decoration: none; border-radius: 3px; font-size: 11px;">📥 PDF</a>
+                                {% else %}
+                                    <span style="color: #95a5a6; font-size: 11px;">No record</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #f8f9fa; font-weight: bold;">
+                        <td colspan="2" style="padding: 10px 8px; text-align: right; font-size: 12px;">TOTALS:</td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px;">
+                            {{ company.base_currency }} {{ format_currency(total_gross) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px; color: #27ae60;">
+                            {{ company.base_currency }} {{ format_currency(total_net) }}
+                        </td>
+                        <td style="padding: 10px 8px; text-align: right; font-size: 12px;">
+                            {{ company.base_currency }} {{ format_currency(total_tax) }}
+                        </td>
+                        <td colspan="2" style="padding: 10px 8px; text-align: center; font-size: 12px; color: #7f8c8d;">
+                            {{ payslips|length }} Employees | {{ generated_count }} Generated
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <span style="color: #7f8c8d; font-size: 13px;">
+                    💡 {{ generated_count }} of {{ payslips|length }} payslips generated for {{ get_month_name(selected_month) }} {{ selected_year }}
+                </span>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('bulk_payslip', company_id=company.id, year=selected_year, month=selected_month) }}" class="btn btn-success" style="display: inline-block; padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+                    📋 Generate All Payslips
+                </a>
+                <a href="{{ url_for('download_bulk_payslip', company_id=company.id, year=selected_year, month=selected_month) }}" class="btn btn-warning" style="display: inline-block; padding: 8px 16px; background: #f39c12; color: white; text-decoration: none; border-radius: 5px;">
+                    📥 Download All (ZIP)
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <div style="text-align: center; padding: 50px; background: white; border-radius: 10px;">
+            <p style="font-size: 18px; color: #7f8c8d;">No payslips found for {{ get_month_name(selected_month) }} {{ selected_year }}.</p>
+            <p style="color: #95a5a6; margin: 10px 0;">Process payroll or generate payslips to create records.</p>
+            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px;">
+                <a href="{{ url_for('payroll_dashboard', company_id=company.id, year=selected_year, month=selected_month) }}" class="btn btn-success" style="display: inline-block; padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+                    💰 Process Payroll
+                </a>
+                <a href="{{ url_for('bulk_payslip', company_id=company.id, year=selected_year, month=selected_month) }}" class="btn btn-info" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px;">
+                    📋 Generate Payslips
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Legend -->
+<div style="margin-top: 20px; padding: 12px 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ecf0f1; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+    <span style="font-size: 12px; color: #7f8c8d; font-weight: bold;">📌 Legend:</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #fef9e7; border-radius: 3px; font-size: 11px; border: 1px solid #f9e79f;">Highlighted rows = Tax Exempt</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #d4edda; color: #155724; border-radius: 8px; font-size: 10px;">✓ Generated</span>
+    <span style="display: inline-block; padding: 2px 10px; background: #f8d7da; color: #721c24; border-radius: 8px; font-size: 10px;">✗ Missing</span>
+</div>
+{% endblock %}

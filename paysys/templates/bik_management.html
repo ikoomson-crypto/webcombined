@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Benefit-in-Kind Management - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_companies') }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Companies</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: #2c3e50;">🎁 Benefit-in-Kind Management - {{ company.name }}</h1>
+                <p style="color: #7f8c8d; font-size: 14px;">Manage non-cash benefits (Company Car, Housing, Medical Insurance, etc.)</p>
+            </div>
+            <a href="{{ url_for('add_bik', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">+ Add BIK</a>
+        </div>
+
+        <!-- BIK Info -->
+        <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <span style="font-weight: bold; color: #2c3e50;">📌 Benefit-in-Kind (BIK):</span>
+                    <span style="color: #7f8c8d; margin-left: 10px; font-size: 14px;">
+                        Non-cash benefits that are taxable or non-taxable
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        {% if definitions %}
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">ID</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Name</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Type</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: right;">Default Value</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Taxable</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Description</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for defn in definitions %}
+                        <tr style="border-bottom: 1px solid #ecf0f1;">
+                            <td style="padding: 12px;">{{ defn.id }}</td>
+                            <td style="padding: 12px;"><strong>{{ defn.name }}</strong></td>
+                            <td style="padding: 12px;">
+                                <span style="display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; background: #d4edda; color: #155724;">
+                                    {{ defn.type|capitalize }}
+                                </span>
+                            </td>
+                            <td style="padding: 12px; text-align: right;"><strong>{{ company.base_currency }} {{ format_currency(defn.default_value) }}</strong></td>
+                            <td style="padding: 12px; text-align: center;">
+                                <span style="display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; {% if defn.is_taxable %}background: #f8d7da; color: #721c24;{% else %}background: #d4edda; color: #155724;{% endif %}">
+                                    {% if defn.is_taxable %}Yes{% else %}No{% endif %}
+                                </span>
+                            </td>
+                            <td style="padding: 12px;">{{ defn.description or 'N/A' }}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <div style="display: flex; gap: 5px; justify-content: center;">
+                                    <a href="{{ url_for('edit_bik', bik_id=defn.id) }}" class="btn btn-sm" style="display: inline-block; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;">✏️</a>
+                                    <a href="{{ url_for('delete_bik', bik_id=defn.id) }}" class="btn btn-sm btn-danger" style="display: inline-block; padding: 5px 10px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;" onclick="return confirm('Delete this BIK?')">🗑️</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 5px;">
+                <p style="color: #7f8c8d;">No Benefit-in-Kind defined for this company.</p>
+                <a href="{{ url_for('add_bik', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">+ Add First BIK</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Invoices - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
+        <!-- REMOVED: Back to Invoices link -->
+
+        {% if consultants_with_payroll %}
+        <div style="display: flex; gap: 10px; margin-left: auto;">
+            <a href="{{ url_for('download_bulk_invoices', company_id=company.id, year=selected_year, month=selected_month) }}"
+               class="btn btn-success"
+               style="display: inline-block; padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">
+                📥 Download All Invoices (ZIP)
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">📄 Generate Invoices</h1>
+            <p style="color: #7f8c8d; font-size: 14px;">Generate invoices for all consultants based on their gross salary</p>
+        </div>
+
+        <!-- Info Box -->
+        <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <span style="font-size: 13px; color: #2c3e50;">
+                💡 Invoices are generated from the <strong>gross salary</strong> of consultants in the payroll records.
+                Only consultants with payroll records will receive invoices.
+            </span>
+        </div>
+
+        <!-- Period Selection with Auto-Submit -->
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e9ecef;">
+            <form method="GET" action="{{ url_for('generate_invoices', company_id=company.id) }}" id="periodForm" style="display: flex; align-items: end; gap: 20px; flex-wrap: wrap;">
+                <div>
+                    <label for="month" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Month</label>
+                    <select id="month" name="month" onchange="this.form.submit()" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer; min-width: 150px;">
+                        {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>
+                                {{ get_month_name(m) }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="year" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Year</label>
+                    <select id="year" name="year" onchange="this.form.submit()" style="padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white; cursor: pointer; min-width: 120px;">
+                        {% for y in range(2020, 2027) %}
+                            <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div style="padding-bottom: 3px;">
+                    <span style="background: #3498db; color: white; padding: 6px 15px; border-radius: 5px; font-size: 13px;">
+                        {{ get_month_name(selected_month) }} {{ selected_year }}
+                    </span>
+                </div>
+                <div style="padding-bottom: 3px; margin-left: auto;">
+                    <span style="color: #7f8c8d; font-size: 13px;">
+                        📊 Showing records for {{ get_month_name(selected_month) }} {{ selected_year }}
+                    </span>
+                </div>
+            </form>
+        </div>
+
+        <!-- Consultants with Payroll -->
+        <h4 style="color: #2c3e50; margin-bottom: 10px;">👥 Consultants with Payroll Records</h4>
+
+        {% if consultants_with_payroll %}
+            <div style="overflow-x: auto; margin-bottom: 20px;">
+                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr>
+                            <th style="background: #34495e; color: white; padding: 10px; text-align: left;">Consultant</th>
+                            <th style="background: #34495e; color: white; padding: 10px; text-align: left;">Position</th>
+                            <th style="background: #34495e; color: white; padding: 10px; text-align: right;">Gross Salary</th>
+                            <th style="background: #34495e; color: white; padding: 10px; text-align: center;">Status</th>
+                            <th style="background: #34495e; color: white; padding: 10px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for consultant in consultants_with_payroll %}
+                        <tr style="border-bottom: 1px solid #ecf0f1;
+                            {% if consultant.id in existing_invoice_employees %}background: #d4edda;{% endif %}">
+                            <td style="padding: 10px;">
+                                <strong>{{ consultant.first_name }} {{ consultant.last_name }}</strong>
+                            </td>
+                            <td style="padding: 10px;">{{ consultant.position }}</td>
+                            <td style="padding: 10px; text-align: right; font-weight: bold;">
+                                {{ company.base_currency }} {{ format_currency(consultant.gross_salary) }}
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                {% if consultant.id in existing_invoice_employees %}
+                                    <span style="display: inline-block; padding: 3px 10px; background: #d4edda; color: #155724; border-radius: 12px; font-size: 11px;">✓ Invoice Generated</span>
+                                {% else %}
+                                    <span style="display: inline-block; padding: 3px 10px; background: #fff3cd; color: #856404; border-radius: 12px; font-size: 11px;">⏳ Pending</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                <div style="display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
+                                    {% if consultant.id in existing_invoice_employees %}
+                                        <a href="{{ url_for('download_invoice_by_employee', employee_id=consultant.id, year=selected_year, month=selected_month) }}"
+                                           class="btn btn-sm"
+                                           style="display: inline-block; padding: 4px 8px; background: #27ae60; color: white; text-decoration: none; border-radius: 3px; font-size: 10px;"
+                                           title="Download Invoice">📥</a>
+                                        <a href="{{ url_for('view_invoice_by_employee', employee_id=consultant.id, year=selected_year, month=selected_month) }}"
+                                           class="btn btn-sm"
+                                           style="display: inline-block; padding: 4px 8px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; font-size: 10px;"
+                                           title="View Invoice">👁️</a>
+                                    {% else %}
+                                        <span style="color: #95a5a6; font-size: 10px;">Generate first</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: #f8f9fa; font-weight: bold;">
+                            <td colspan="2" style="padding: 10px; text-align: right;">TOTAL:</td>
+                            <td style="padding: 10px; text-align: right;">
+                                {{ company.base_currency }}
+                                {% set total = 0 %}
+                                {% for consultant in consultants_with_payroll %}
+                                    {% set total = total + consultant.gross_salary %}
+                                {% endfor %}
+                                {{ format_currency(total) }}
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                {{ consultants_with_payroll|length }} Consultants
+                                {% set generated = existing_invoice_employees|length %}
+                                ({{ generated }} Generated)
+                            </td>
+                            <td style="padding: 10px; text-align: center;">
+                                {% set generated = existing_invoice_employees|length %}
+                                {% if generated > 0 %}
+                                    <a href="{{ url_for('download_bulk_invoices', company_id=company.id, year=selected_year, month=selected_month) }}"
+                                       class="btn btn-sm btn-success"
+                                       style="display: inline-block; padding: 4px 10px; background: #27ae60; color: white; text-decoration: none; border-radius: 3px; font-size: 10px;">
+                                        📥 All
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <span style="color: #7f8c8d; font-size: 13px;">
+                        📊 {{ consultants_with_payroll|length }} consultant(s) found with payroll records for {{ get_month_name(selected_month) }} {{ selected_year }}
+                        {% set generated = existing_invoice_employees|length %}
+                        {% if generated > 0 %}
+                            | ✅ {{ generated }} already have invoices
+                            | <a href="{{ url_for('download_bulk_invoices', company_id=company.id, year=selected_year, month=selected_month) }}"
+                                  style="color: #27ae60; text-decoration: none; font-weight: bold;">
+                                📥 Download All ({{ generated }})
+                            </a>
+                        {% endif %}
+                    </span>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <form method="POST" action="{{ url_for('generate_invoices', company_id=company.id) }}" style="display: inline;">
+                        <input type="hidden" name="year" value="{{ selected_year }}">
+                        <input type="hidden" name="month" value="{{ selected_month }}">
+                        <button type="submit" class="btn btn-success" style="padding: 10px 25px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 15px; font-weight: bold;">
+                            📄 Generate Invoices
+                        </button>
+                    </form>
+                    {% set generated = existing_invoice_employees|length %}
+                    {% if generated > 0 %}
+                        <a href="{{ url_for('download_bulk_invoices', company_id=company.id, year=selected_year, month=selected_month) }}"
+                           class="btn btn-primary"
+                           style="display: inline-block; padding: 10px 25px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; font-size: 15px;">
+                            📥 Download All (ZIP)
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <!-- NO CONSULTANTS FOUND -->
+            <div style="text-align: center; padding: 40px; background: #fef9e7; border-radius: 8px; border: 1px solid #f9e79f;">
+                <div style="font-size: 48px; margin-bottom: 15px;">📋</div>
+                <p style="font-size: 18px; color: #856404; font-weight: bold;">No consultants found with payroll records for {{ get_month_name(selected_month) }} {{ selected_year }}</p>
+                <p style="color: #856404; font-size: 14px; margin: 10px 0;">
+                    Try selecting a different month or year.
+                </p>
+
+                <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px auto; max-width: 500px; text-align: left; border: 1px solid #ecf0f1;">
+                    <h5 style="color: #2c3e50; margin-bottom: 10px;">📌 To generate invoices, you need:</h5>
+                    <ol style="margin-left: 20px; color: #34495e; line-height: 2;">
+                        <li><strong>Consultants</strong> - Employees marked as
+                            <span style="background: #fff3cd; padding: 2px 8px; border-radius: 3px; font-size: 12px;">🏷️ Tax Exempt</span>
+                            or
+                            <span style="background: #fdebd0; padding: 2px 8px; border-radius: 3px; font-size: 12px;">🔒 SS Exempt</span>
+                        </li>
+                        <li><strong>Payroll Records</strong> - Process payroll for the selected period</li>
+                    </ol>
+                </div>
+
+                <form method="POST" action="{{ url_for('generate_invoices', company_id=company.id) }}">
+                    <input type="hidden" name="year" value="{{ selected_year }}">
+                    <input type="hidden" name="month" value="{{ selected_month }}">
+                    <button type="submit" class="btn btn-success" style="padding: 12px 35px; background: #27ae60; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold;">
+                        📄 Generate Invoices for {{ get_month_name(selected_month) }} {{ selected_year }}
+                    </button>
+                </form>
+
+                <div style="margin-top: 15px; font-size: 13px; color: #95a5a6;">
+                    <span>💡 <strong>Tip:</strong> Select a different month/year from the dropdown above.</span>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Help Section -->
+        <div style="margin-top: 20px; padding: 15px; background: #e8f4fd; border-radius: 8px; border-left: 4px solid #3498db;">
+            <h5 style="color: #2c3e50; margin-bottom: 8px;">📖 How It Works</h5>
+            <ul style="margin-left: 20px; color: #34495e; line-height: 1.8; font-size: 13px;">
+                <li><strong>Step 1:</strong> Mark employees as consultants (Tax Exempt or SS Exempt) in the employee form</li>
+                <li><strong>Step 2:</strong> Process payroll for the desired month in the Payroll Dashboard</li>
+                <li><strong>Step 3:</strong> Select the month/year above and click "Generate Invoices"</li>
+                <li><strong>Step 4:</strong> Download individual invoices or all as ZIP from this page</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    // The form auto-submits when month/year changes via onchange="this.form.submit()"
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Generate Invoices page loaded');
+        console.log('Selected Month:', '{{ selected_month }}');
+        console.log('Selected Year:', '{{ selected_year }}');
+        console.log('Consultants with payroll:', {{ consultants_with_payroll|length }});
+    });
+</script>
+{% endblock %}

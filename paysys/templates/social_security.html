@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Social Security Configuration - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_companies') }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Companies</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">🔒 Social Security Configuration - {{ company.name }}</h1>
+            <p style="color: #7f8c8d; font-size: 14px;">Manage Social Security contribution limits and monthly thresholds</p>
+        </div>
+
+        <!-- System Type Info -->
+        <div style="background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <span style="font-weight: bold; color: #2c3e50;">📌 System Type:</span>
+                    <span style="color: #7f8c8d; margin-left: 10px; font-size: 14px;">
+                        <strong>Monthly Threshold</strong> (Ghana SSNIT System)
+                    </span>
+                </div>
+                <div style="font-size: 13px; color: #7f8c8d;">
+                    <span style="background: #27ae60; color: white; padding: 2px 12px; border-radius: 12px;">Monthly Cap</span>
+                </div>
+            </div>
+            <div style="margin-top: 8px; font-size: 13px; color: #7f8c8d;">
+                💡 Social Security is calculated on <strong>Basic Salary only</strong> up to the monthly threshold.
+                If salary exceeds the threshold, SS is calculated on the threshold amount only.
+            </div>
+        </div>
+
+        <!-- Current Year Defaults -->
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ecf0f1;">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">📋 Monthly Thresholds by Year</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+                {% for config in tax_configs|sort(attribute='year') %}
+                    <div style="background: white; padding: 12px; border-radius: 5px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="font-weight: bold; color: #2c3e50;">{{ config.year }}</div>
+                        <div style="color: #27ae60; font-size: 14px;">{{ company.base_currency }} {{ format_currency(config.social_security_threshold) }}</div>
+                        <div style="font-size: 11px; color: #7f8c8d;">Rate: {{ config.social_security_rate }}%</div>
+                        <div style="font-size: 10px; color: #95a5a6; margin-top: 3px;">Monthly Cap</div>
+                    </div>
+                {% endfor %}
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: #7f8c8d;">
+                💡 <strong>Note:</strong> These are <strong>monthly</strong> thresholds. Social Security is applied only up to this amount per month.
+            </div>
+        </div>
+
+        <!-- Set Monthly Threshold -->
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #ecf0f1;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">Set Monthly Threshold Override</h3>
+            <p style="color: #7f8c8d; margin-bottom: 15px;">Override the monthly threshold for a specific month (e.g., if the government changes the cap).</p>
+            <form method="POST" action="{{ url_for('set_social_security_threshold_route', company_id=company.id) }}">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end;">
+                    <div>
+                        <label for="year" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Year</label>
+                        <select id="year" name="year" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            {% for year in range(2020, 2027) %}
+                                <option value="{{ year }}" {% if year == 2024 %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="month" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Month</label>
+                        <select id="month" name="month" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            {% for m in range(1, 13) %}
+                                <option value="{{ m }}" {% if m == 1 %}selected{% endif %}>{{ get_month_name(m) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="threshold" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Monthly Threshold ({{ company.base_currency }})</label>
+                        <input type="number" step="0.01" id="threshold" name="threshold" required value="{{ tax_configs[0].social_security_threshold if tax_configs else 15000 }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Set Monthly Threshold</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Threshold History -->
+        <h3 style="color: #2c3e50; margin-bottom: 15px;">📋 Monthly Threshold Overrides</h3>
+        {% if thresholds %}
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Year</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Month</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: right;">Monthly Threshold</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Created Date</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for threshold in thresholds %}
+                        <tr style="border-bottom: 1px solid #ecf0f1;">
+                            <td style="padding: 12px;">{{ threshold.year }}</td>
+                            <td style="padding: 12px;">{{ get_month_name(threshold.month) }}</td>
+                            <td style="padding: 12px; text-align: right;"><strong>{{ company.base_currency }} {{ format_currency(threshold.threshold) }}</strong></td>
+                            <td style="padding: 12px;">{{ threshold.created_date }}</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <a href="{{ url_for('delete_social_security_threshold', company_id=company.id, year=threshold.year, month=threshold.month) }}" class="btn btn-sm btn-danger" style="display: inline-block; padding: 5px 10px; background: #e74c3c; color: white; text-decoration: none; border-radius: 3px; font-size: 12px;" onclick="return confirm('Remove this threshold override?')">🗑️</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 5px;">
+                <p style="color: #7f8c8d;">No monthly threshold overrides set. Using defaults from Tax Config.</p>
+            </div>
+        {% endif %}
+
+        <!-- How It Works -->
+        <div style="margin-top: 30px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #3498db;">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">📖 How Social Security Works (Ghana SSNIT System)</h4>
+            <ul style="margin-left: 20px; color: #34495e; line-height: 1.8;">
+                <li><strong>Monthly Threshold:</strong> Social Security is calculated on <strong>Basic Salary only</strong> up to the monthly threshold.</li>
+                <li><strong>Calculation:</strong> SS = MIN(Monthly Salary, Monthly Threshold) × Rate</li>
+                <li><strong>Example:</strong> If salary is GHS 20,000 and threshold is GHS 15,000, SS is calculated on GHS 15,000.</li>
+                <li><strong>Monthly Override:</strong> You can set a different threshold for any specific month.</li>
+                <li><strong>Deduction Order:</strong> Social Security is deducted <strong>BEFORE</strong> tax is calculated.</li>
+                <li><strong>Reset:</strong> The threshold resets every month (not annually).</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

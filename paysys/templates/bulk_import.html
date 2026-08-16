@@ -1,0 +1,639 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Import - {{ company.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .instruction-box {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+        margin-bottom: 20px;
+    }
+    .instruction-box ul {
+        margin-left: 20px;
+        line-height: 1.8;
+    }
+    .instruction-box .highlight {
+        background: #fff3cd;
+        padding: 2px 8px;
+        border-radius: 3px;
+        color: #856404;
+    }
+
+    /* File upload area using label - MORE RELIABLE */
+    .file-upload-area {
+        display: block;
+        border: 2px dashed #ddd;
+        padding: 40px;
+        text-align: center;
+        border-radius: 8px;
+        transition: all 0.3s;
+        cursor: pointer;
+        background: #fafafa;
+        position: relative;
+    }
+    .file-upload-area:hover {
+        border-color: #3498db;
+        background: #f0f7ff;
+    }
+    .file-upload-area.dragover {
+        border-color: #27ae60;
+        background: #d4edda;
+    }
+    .file-upload-area.has-file {
+        border-color: #27ae60;
+        background: #d4edda;
+    }
+    .file-upload-area .icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+        pointer-events: none;
+    }
+    .file-upload-area .text {
+        color: #7f8c8d;
+        font-size: 16px;
+        pointer-events: none;
+    }
+    .file-upload-area .filename {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    .file-upload-area .sub-text {
+        font-size: 13px;
+        color: #95a5a6;
+        margin-top: 5px;
+    }
+    .file-upload-area input[type="file"] {
+        display: none;
+    }
+
+    .file-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 12px 15px;
+        background: #f8f9fa;
+        border-radius: 5px;
+        margin-top: 10px;
+        border: 1px solid #e9ecef;
+    }
+    .file-info .file-icon {
+        font-size: 24px;
+    }
+    .file-info .file-details {
+        flex: 1;
+    }
+    .file-info .file-details .name {
+        font-weight: 500;
+        color: #2c3e50;
+    }
+    .file-info .file-details .size {
+        font-size: 12px;
+        color: #7f8c8d;
+    }
+    .file-info .remove-btn {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 5px 15px;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 0.3s;
+    }
+    .file-info .remove-btn:hover {
+        background: #c0392b;
+    }
+
+    .period-box {
+        background: #e8f4fd;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #bee5eb;
+        margin-bottom: 20px;
+    }
+    .period-box .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    .period-box .date-select {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    .period-box .date-select select {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+        width: 100%;
+    }
+    .period-summary {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 15px;
+        text-align: center;
+        font-size: 14px;
+        color: #2c3e50;
+        border: 1px solid #e9ecef;
+    }
+    .period-summary .highlight {
+        font-weight: bold;
+        color: #3498db;
+    }
+
+    .copy-option {
+        padding: 15px;
+        border-radius: 8px;
+        border: 2px solid #ddd;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-bottom: 10px;
+    }
+    .copy-option:hover {
+        border-color: #3498db;
+    }
+    .copy-option.selected {
+        border-color: #27ae60;
+        background: #d4edda;
+    }
+    .copy-option .title {
+        font-weight: bold;
+        color: #2c3e50;
+        font-size: 16px;
+    }
+    .copy-option .desc {
+        font-size: 13px;
+        color: #7f8c8d;
+        margin-top: 5px;
+    }
+    .copy-option input[type="radio"] {
+        margin-top: 10px;
+        cursor: pointer;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+        vertical-align: middle;
+    }
+
+    .btn-import {
+        padding: 10px 30px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-import:hover:not(:disabled) {
+        background: #2980b9;
+    }
+    .btn-import:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #95a5a6;
+    }
+
+    .btn-secondary-custom {
+        padding: 10px 30px;
+        background: #95a5a6;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 16px;
+        display: inline-block;
+        transition: background 0.3s;
+        border: none;
+    }
+    .btn-secondary-custom:hover {
+        background: #7f8c8d;
+        color: white;
+    }
+
+    #loadingMessage {
+        display: none;
+        margin-top: 15px;
+        padding: 15px;
+        background: #fff3cd;
+        border-radius: 5px;
+        border-left: 4px solid #f39c12;
+        color: #856404;
+    }
+
+    #errorMessage {
+        display: none;
+        margin-top: 15px;
+        padding: 15px;
+        background: #f8d7da;
+        border-radius: 5px;
+        border-left: 4px solid #e74c3c;
+        color: #721c24;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_companies') }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Companies</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <h1 style="color: #2c3e50;">📥 Bulk Import - {{ company.name }}</h1>
+                <p style="color: #7f8c8d; font-size: 14px;">Import monthly salary and allowance changes for all employees</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{{ url_for('download_bulk_import_template', company_id=company.id) }}" class="btn" style="display: inline-block; padding: 8px 16px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px;">📄 Download Template</a>
+                <a href="{{ url_for('download_bulk_import_sample', company_id=company.id) }}" class="btn" style="display: inline-block; padding: 8px 16px; background: #f39c12; color: white; text-decoration: none; border-radius: 5px;">📊 Sample File</a>
+               <a href="{{ url_for('bulk_delete', company_id=company.id) }}" class="btn btn-danger" style="display: inline-block; padding: 8px 16px; background: #e74c3c; color: white; text-decoration: none; border-radius: 5px;">🗑️ Bulk Delete</a>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="instruction-box">
+            <h4 style="color: #2c3e50; margin-bottom: 10px;">📌 Instructions</h4>
+            <ul>
+                <li>Download the <strong>template</strong> or <strong>sample</strong> file above</li>
+                <li>Fill in the <span class="highlight">salary</span> and <span class="highlight">allowance</span> values</li>
+                <li>Select the <strong>Start Month</strong> when this data should begin</li>
+                <li>Select the <strong>End Month</strong> when this data should stop</li>
+                <li>The system will automatically apply the data from start to end month</li>
+            </ul>
+        </div>
+
+        <!-- Upload Form -->
+        <form method="POST" enctype="multipart/form-data" id="bulkImportForm" action="{{ url_for('bulk_import', company_id=company.id) }}">
+            <!-- Period Selection -->
+            <div class="period-box">
+                <h4 style="color: #2c3e50; margin-bottom: 15px;">📅 Select Period</h4>
+                <div class="row">
+                    <div>
+                        <label style="font-weight: 500; color: #34495e; display: block; margin-bottom: 5px;">Start Month</label>
+                        <div class="date-select">
+                            <select id="start_month" name="start_month" required>
+                                {% for m in range(1, 13) %}
+                                    <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>{{ get_month_name(m) }}</option>
+                                {% endfor %}
+                            </select>
+                            <select id="start_year" name="start_year" required>
+                                {% for y in range(2020, 2027) %}
+                                    <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                            💡 Data will be applied starting from this month
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-weight: 500; color: #34495e; display: block; margin-bottom: 5px;">End Month</label>
+                        <div class="date-select">
+                            <select id="end_month" name="end_month" required>
+                                {% for m in range(1, 13) %}
+                                    <option value="{{ m }}" {% if m == 12 %}selected{% endif %}>{{ get_month_name(m) }}</option>
+                                {% endfor %}
+                            </select>
+                            <select id="end_year" name="end_year" required>
+                                {% for y in range(2020, 2028) %}
+                                    <option value="{{ y }}" {% if y == current_year + 1 %}selected{% endif %}>{{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                            📅 Data will be applied until this month
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Period Summary -->
+                <div class="period-summary" id="periodSummary">
+                    Data will be applied from <span class="highlight" id="summaryStart">January 2024</span>
+                    to <span class="highlight" id="summaryEnd">December 2024</span>
+                    (<span class="highlight" id="summaryMonths">12</span> months)
+                </div>
+            </div>
+
+            <!-- Copy Type Selection -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="color: #2c3e50; margin-bottom: 10px;">🔄 Copy Type</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="copy-option selected" id="optionMonthly" onclick="selectCopyType('monthly')">
+                        <div class="title">📋 Monthly Copy</div>
+                        <div class="desc">Copy data forward to each month in the period</div>
+                        <input type="radio" name="copy_type" value="monthly" checked>
+                    </div>
+                    <div class="copy-option" id="optionOneTime" onclick="selectCopyType('one_time')">
+                        <div class="title">📌 One-Time Import</div>
+                        <div class="desc">Only import data for the start month</div>
+                        <input type="radio" name="copy_type" value="one_time">
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Upload Area - Using LABEL for reliable click handling -->
+            <label for="fileInput" class="file-upload-area" id="fileUploadArea">
+                <div class="icon" id="uploadIcon">📄</div>
+                <div class="text">
+                    <span class="filename" id="fileName">Click here to select a file</span>
+                    <br>
+                    <span class="sub-text">or drag and drop your Excel file here</span>
+                    <br>
+                    <span class="sub-text" style="font-size: 11px; color: #bdc3c7;">Supported formats: .xlsx, .xls</span>
+                </div>
+                <input type="file" id="fileInput" name="file" accept=".xlsx,.xls">
+            </label>
+
+            <!-- File Preview -->
+            <div id="filePreview" style="display: none; margin-top: 15px;">
+                <div class="file-info">
+                    <span class="file-icon">📊</span>
+                    <div class="file-details">
+                        <div class="name" id="previewFileName">file.xlsx</div>
+                        <div class="size" id="previewFileSize">0 KB</div>
+                    </div>
+                    <button type="button" class="remove-btn" onclick="clearFile()">✕ Remove</button>
+                </div>
+            </div>
+
+            <!-- Error Message -->
+            <div id="errorMessage">
+                <strong>⚠️ Error:</strong> <span id="errorText"></span>
+            </div>
+
+            <!-- Allowance Summary -->
+            {% if allowance_defs %}
+            <div style="margin-top: 20px; padding: 15px; background: #e8f4fd; border-radius: 5px; border-left: 4px solid #3498db;">
+                <h4 style="color: #2c3e50; margin-bottom: 10px;">💳 Available Allowances</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    {% for defn in allowance_defs %}
+                        <span style="background: white; padding: 5px 12px; border-radius: 15px; font-size: 13px; border: 1px solid #ecf0f1;">
+                            {{ defn.name }}
+                            <span style="margin-left: 5px; padding: 2px 8px; border-radius: 3px; font-size: 11px; {% if defn.is_taxable %}background: #f8d7da; color: #721c24;{% else %}background: #d4edda; color: #155724;{% endif %}">
+                                {% if defn.is_taxable %}Taxable{% else %}Non-Taxable{% endif %}
+                            </span>
+                        </span>
+                    {% endfor %}
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #7f8c8d;">
+                    Column format: <strong>allowance_[name_lowercase_with_underscores]</strong>
+                </div>
+            </div>
+            {% endif %}
+
+            <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button type="submit" class="btn-import" id="importBtn" disabled>
+                    📤 Import & Propagate
+                </button>
+                <a href="{{ url_for('list_employees', company_id=company.id) }}" class="btn-secondary-custom">Cancel</a>
+            </div>
+
+            <div id="loadingMessage">
+                <span class="loading-spinner"></span>
+                <span>Processing your import and propagating data... Please wait.</span>
+            </div>
+        </form>
+
+        <!-- Employee Count -->
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+            <span style="color: #7f8c8d;">👥 <strong>{{ employees|length }}</strong> employees will be affected.</span>
+            <span style="margin-left: 15px; color: #7f8c8d;">📅 Data will be applied from <strong id="footerStart">{{ get_month_name(current_month) }} {{ current_year }}</strong></span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Wait for DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Bulk Import page loaded - DOM ready');
+
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const filePreview = document.getElementById('filePreview');
+        const previewFileName = document.getElementById('previewFileName');
+        const previewFileSize = document.getElementById('previewFileSize');
+        const uploadIcon = document.getElementById('uploadIcon');
+        const importBtn = document.getElementById('importBtn');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const bulkForm = document.getElementById('bulkImportForm');
+        const fileUploadArea = document.getElementById('fileUploadArea');
+
+        // File input change handler
+        fileInput.addEventListener('change', function() {
+            console.log('File input changed event fired');
+            if (this.files && this.files.length > 0) {
+                console.log('File selected:', this.files[0].name);
+                handleFileSelect(this.files[0]);
+            } else {
+                clearFile();
+            }
+        });
+
+        // Drag and drop handlers on the label
+        fileUploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.add('dragover');
+        });
+
+        fileUploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('dragover');
+        });
+
+        fileUploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('dragover');
+
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect(file);
+            }
+        });
+
+        function handleFileSelect(file) {
+            console.log('handleFileSelect called with:', file.name);
+
+            const validExtensions = ['.xlsx', '.xls'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+
+            if (!validExtensions.includes(ext)) {
+                showError('Please select an Excel file (.xlsx or .xls)');
+                fileInput.value = '';
+                return;
+            }
+
+            // Hide any previous errors
+            errorMessage.style.display = 'none';
+
+            // Update UI
+            fileName.textContent = file.name;
+            uploadIcon.textContent = '📊';
+            fileUploadArea.classList.add('has-file');
+
+            previewFileName.textContent = file.name;
+            previewFileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+            filePreview.style.display = 'block';
+
+            // Enable import button
+            importBtn.disabled = false;
+            console.log('Import button enabled');
+        }
+
+        function clearFile() {
+            console.log('Clearing file selection');
+            fileInput.value = '';
+            fileName.textContent = 'Click here to select a file';
+            uploadIcon.textContent = '📄';
+            fileUploadArea.classList.remove('has-file');
+            filePreview.style.display = 'none';
+            importBtn.disabled = true;
+            errorMessage.style.display = 'none';
+            console.log('Import button disabled');
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(function() {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        // Form submission
+        bulkForm.addEventListener('submit', function(e) {
+            console.log('Form submission triggered');
+
+            // Check if file is selected
+            const fileInputField = document.getElementById('fileInput');
+            if (!fileInputField.files || fileInputField.files.length === 0) {
+                e.preventDefault();
+                showError('Please select a file to import.');
+                return;
+            }
+
+            // Validate period
+            const startYear = parseInt(document.getElementById('start_year').value);
+            const startMonth = parseInt(document.getElementById('start_month').value);
+            const endYear = parseInt(document.getElementById('end_year').value);
+            const endMonth = parseInt(document.getElementById('end_month').value);
+
+            if (startYear > endYear || (startYear === endYear && startMonth > endMonth)) {
+                e.preventDefault();
+                showError('Start month must be before or equal to end month!');
+                return;
+            }
+
+            // Show loading message
+            importBtn.disabled = true;
+            importBtn.innerHTML = '<span class="loading-spinner"></span> Processing...';
+            loadingMessage.style.display = 'block';
+
+            console.log('Form submitted successfully - processing...');
+        });
+
+        // Update summary when selects change
+        document.getElementById('start_month').addEventListener('change', updateSummary);
+        document.getElementById('start_year').addEventListener('change', updateSummary);
+        document.getElementById('end_month').addEventListener('change', updateSummary);
+        document.getElementById('end_year').addEventListener('change', updateSummary);
+
+        // Initialize
+        updateSummary();
+
+        // Initial state - disable import button if no file
+        if (!fileInput.files || fileInput.files.length === 0) {
+            importBtn.disabled = true;
+            console.log('Initial state: Import button disabled');
+        }
+
+        console.log('Bulk Import page initialization complete');
+    });
+
+    // Update period summary
+    function updateSummary() {
+        const startMonth = document.getElementById('start_month').value;
+        const startYear = document.getElementById('start_year').value;
+        const endMonth = document.getElementById('end_month').value;
+        const endYear = document.getElementById('end_year').value;
+
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                            'July', 'August', 'September', 'October', 'November', 'December'];
+
+        const startName = monthNames[startMonth - 1];
+        const endName = monthNames[endMonth - 1];
+
+        // Calculate number of months
+        let months = 0;
+        let year = parseInt(startYear);
+        let month = parseInt(startMonth);
+        const endY = parseInt(endYear);
+        const endM = parseInt(endMonth);
+
+        while (year < endY || (year === endY && month <= endM)) {
+            months++;
+            month++;
+            if (month > 12) {
+                month = 1;
+                year++;
+            }
+        }
+
+        document.getElementById('summaryStart').textContent = startName + ' ' + startYear;
+        document.getElementById('summaryEnd').textContent = endName + ' ' + endYear;
+        document.getElementById('summaryMonths').textContent = months;
+        document.getElementById('footerStart').textContent = startName + ' ' + startYear;
+    }
+
+    // Select copy type
+    function selectCopyType(type) {
+        document.querySelectorAll('.copy-option').forEach(function(el) {
+            el.classList.remove('selected');
+        });
+
+        if (type === 'monthly') {
+            document.getElementById('optionMonthly').classList.add('selected');
+            document.getElementById('optionMonthly').querySelector('input[type="radio"]').checked = true;
+        } else {
+            document.getElementById('optionOneTime').classList.add('selected');
+            document.getElementById('optionOneTime').querySelector('input[type="radio"]').checked = true;
+        }
+    }
+</script>
+{% endblock %}

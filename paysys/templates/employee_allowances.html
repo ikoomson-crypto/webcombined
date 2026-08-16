@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Allowances - Payroll System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_employees', company_id=company.id) }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Employees</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">💰 Employee Allowances</h1>
+            <div style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">
+                {{ employee.first_name }} {{ employee.last_name }} - {{ company.name }}
+            </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><strong>Position:</strong> {{ employee.position }}</div>
+                <div><strong>Department:</strong> {{ employee.department }}</div>
+                <div><strong>Monthly Salary:</strong> {{ company.base_currency }} {{ format_currency(employee.base_salary) }}</div>
+                <div><strong>Annual Salary:</strong> {{ company.base_currency }} {{ format_currency(employee.base_salary * 12) }}</div>
+                <div><strong>Status:</strong> {{ employee.status }}</div>
+            </div>
+        </div>
+
+        <form method="POST">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">Allowance Details</h3>
+            <p style="color: #7f8c8d; margin-bottom: 15px;">Adjust allowance amounts for this employee. Leave default values as is.</p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                {% for defn in definitions %}
+                <div style="margin-bottom: 20px;">
+                    <label for="allowance_{{ defn.id }}" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">
+                        {{ defn.name }}
+                        <span style="display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px;
+                            {% if defn.is_taxable %}background: #f8d7da; color: #721c24;{% else %}background: #d4edda; color: #155724;{% endif %}">
+                            {% if defn.is_taxable %}Taxable{% else %}Non-Taxable{% endif %}
+                        </span>
+                    </label>
+                    <input type="number" step="0.01" id="allowance_{{ defn.id }}"
+                           name="allowance_{{ defn.id }}"
+                           value="{{ current_allowances.get(defn.id, defn.default_value) }}"
+                           style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">
+                        Default: {{ company.base_currency }} {{ format_currency(defn.default_value) }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if definitions %}
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #27ae60;">
+                <strong>💡 Allowance Summary:</strong><br>
+                <span style="color: #7f8c8d;">Total allowances will be added to the employee's monthly salary.</span>
+                <br><span style="color: #7f8c8d; font-size: 12px;">Taxable allowances are subject to income tax.</span>
+            </div>
+            {% else %}
+            <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 5px;">
+                <p style="color: #7f8c8d;">No allowances defined for this company.</p>
+                <a href="{{ url_for('manage_allowances', company_id=company.id) }}" class="btn btn-success" style="display: inline-block; padding: 10px 20px; background: #27ae60; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">+ Add Allowance</a>
+            </div>
+            {% endif %}
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Save Allowances</button>
+                <a href="{{ url_for('list_employees', company_id=company.id) }}" class="btn btn-secondary" style="padding: 10px 30px; background: #95a5a6; color: white; text-decoration: none; border-radius: 5px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

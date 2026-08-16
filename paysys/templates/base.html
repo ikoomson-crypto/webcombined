@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}Payroll System{% endblock %}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #ecf0f1;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ============================================
+           SIDEBAR NAVIGATION
+           ============================================ */
+        .sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, #1a2634, #2c3e50);
+            color: white;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.2);
+        }
+
+        .sidebar-brand {
+            padding: 20px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .sidebar-brand a {
+            color: white;
+            text-decoration: none;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .sidebar-brand a:hover {
+            color: #3498db;
+        }
+
+        .sidebar-brand .brand-icon {
+            font-size: 28px;
+        }
+
+        /* Company Switcher in Sidebar */
+        .sidebar-company {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .sidebar-company label {
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            display: block;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-company select {
+            width: 100%;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            background: white;
+            color: #2c3e50;
+            font-size: 13px;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-company select:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px #3498db;
+        }
+
+        .sidebar-company .switch-btn {
+            width: 100%;
+            padding: 6px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.3s;
+        }
+
+        .sidebar-company .switch-btn:hover {
+            background: #2980b9;
+        }
+
+        .sidebar-company .company-badge {
+            display: inline-block;
+            background: #27ae60;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: white;
+            margin-top: 5px;
+        }
+
+        /* Navigation Links */
+        .sidebar-nav {
+            padding: 10px 0;
+        }
+
+        .sidebar-nav .nav-section {
+            padding: 10px 15px 5px 15px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.4);
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 18px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.3s;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-nav a:hover {
+            background: rgba(255,255,255,0.08);
+            color: white;
+            border-left-color: #3498db;
+        }
+
+        .sidebar-nav a.active {
+            background: rgba(52,152,219,0.2);
+            color: white;
+            border-left-color: #3498db;
+        }
+
+        .sidebar-nav a .nav-icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .sidebar-nav a .nav-text {
+            flex: 1;
+        }
+
+        .sidebar-nav a .nav-badge {
+            background: #e74c3c;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .sidebar-nav a .nav-badge-danger {
+            background: #e74c3c;
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        /* Sub-menu items (indented) */
+        .sidebar-nav a.sub-item {
+            padding-left: 54px;
+            font-size: 13px;
+            border-left-color: transparent;
+        }
+
+        .sidebar-nav a.sub-item:hover {
+            border-left-color: #3498db;
+        }
+
+        .sidebar-nav a.sub-item.active {
+            border-left-color: #3498db;
+        }
+
+        /* Delete link special styling - RED theme */
+        .sidebar-nav a.delete-link {
+            color: #e74c3c;
+            border-left-color: #c0392b;
+        }
+
+        .sidebar-nav a.delete-link:hover {
+            background: rgba(231, 76, 60, 0.15);
+            color: #e74c3c;
+            border-left-color: #e74c3c;
+        }
+
+        .sidebar-nav a.delete-link.active {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border-left-color: #e74c3c;
+        }
+
+        /* ============================================
+           MAIN CONTENT
+           ============================================ */
+        .main-content-wrapper {
+            margin-left: 260px;
+            flex: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: white;
+            padding: 12px 25px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            min-height: 60px;
+        }
+
+        .top-bar .page-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .top-bar .page-title .sub {
+            font-size: 13px;
+            font-weight: normal;
+            color: #7f8c8d;
+        }
+
+        .top-bar .top-bar-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .top-bar .top-bar-actions .current-company {
+            background: #e8f4fd;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #2c3e50;
+        }
+
+        .top-bar .top-bar-actions .current-company strong {
+            color: #3498db;
+        }
+
+        /* Mobile Toggle Button */
+        .sidebar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #2c3e50;
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+
+        .sidebar-toggle:hover {
+            color: #3498db;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            padding: 20px 25px;
+            flex: 1;
+        }
+
+        /* Flash Messages */
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .flash {
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .flash.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .flash.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+
+            .main-content-wrapper {
+                margin-left: 0;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .top-bar .page-title {
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .top-bar {
+                flex-wrap: wrap;
+                gap: 10px;
+                padding: 10px 15px;
+            }
+
+            .top-bar .top-bar-actions {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+
+            .top-bar .top-bar-actions .current-company {
+                font-size: 12px;
+                padding: 3px 10px;
+            }
+
+            .main-content {
+                padding: 15px;
+            }
+
+            .sidebar {
+                width: 280px;
+            }
+        }
+
+        /* Scrollbar styling for sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.3);
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar Overlay (for mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <!-- Brand -->
+        <div class="sidebar-brand">
+            <a href="{{ url_for('index') }}">
+                <span class="brand-icon">💼</span>
+                Payroll System
+            </a>
+        </div>
+
+        <!-- Company Switcher - FIXED to match top bar approach -->
+        <div class="sidebar-company">
+            <label>🏢 Company</label>
+            <form method="GET" action="{{ url_for('switch_company', company_id=0) }}"
+                  onsubmit="event.preventDefault();
+                            window.location.href = this.action.replace('/0', '/' + this.company_select.value);">
+                <select name="company_select" id="company_select">
+                    {% for company in all_companies %}
+                        <option value="{{ company.id }}"
+                                {% if current_company and current_company.id == company.id %}selected{% endif %}>
+                            {{ company.name }} ({{ company.base_currency }})
+                        </option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="switch-btn">Switch Company</button>
+            </form>
+            {% if current_company %}
+                <div style="margin-top: 5px; text-align: center;">
+                    <span class="company-badge">{{ current_company.base_currency }}</span>
+                    <span style="color: rgba(255,255,255,0.5); font-size: 12px; margin-left: 10px;">
+                        {{ current_company.name }}
+                    </span>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Navigation Links -->
+        <div class="sidebar-nav">
+            <div class="nav-section">Main</div>
+            <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">Dashboard</span>
+            </a>
+            <a href="{{ url_for('list_companies') }}" class="{% if request.endpoint == 'list_companies' %}active{% endif %}">
+                <span class="nav-icon">🏢</span>
+                <span class="nav-text">Companies</span>
+                <span class="nav-badge">{{ all_companies|length }}</span>
+            </a>
+
+            {% if current_company %}
+                <div class="nav-section">Employees</div>
+                <a href="{{ url_for('list_employees', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'list_employees' %}active{% endif %}">
+                    <span class="nav-icon">👥</span>
+                    <span class="nav-text">All Employees</span>
+                </a>
+                <a href="{{ url_for('add_employee', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'add_employee' %}active{% endif %}">
+                    <span class="nav-icon">➕</span>
+                    <span class="nav-text">Add Employee</span>
+                </a>
+                <a href="{{ url_for('import_employees', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'import_employees' %}active{% endif %}">
+                    <span class="nav-icon">📥</span>
+                    <span class="nav-text">Import Employees</span>
+                </a>
+
+                <div class="nav-section">Payroll</div>
+                <a href="{{ url_for('payroll_dashboard', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'payroll_dashboard' %}active{% endif %}">
+                    <span class="nav-icon">💰</span>
+                    <span class="nav-text">Process Payroll</span>
+                </a>
+
+                <!-- NEW: Delete Payroll link - RED theme -->
+                <a href="{{ url_for('delete_payroll', company_id=current_company.id) }}"
+                   class="delete-link {% if request.endpoint == 'delete_payroll' %}active{% endif %}">
+                    <span class="nav-icon">🗑️</span>
+                    <span class="nav-text">Delete Payroll</span>
+                    <span class="nav-badge-danger">Danger</span>
+                </a>
+
+                <a href="{{ url_for('bulk_import', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'bulk_import' %}active{% endif %}">
+                    <span class="nav-icon">📤</span>
+                    <span class="nav-text">Bulk Import</span>
+                </a>
+                <a href="{{ url_for('bulk_delete', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'bulk_delete' %}active{% endif %}">
+                    <span class="nav-icon">🗑️</span>
+                    <span class="nav-text">Bulk Delete</span>
+                </a>
+
+                <div class="nav-section">Reports</div>
+                <a href="{{ url_for('payslips_dashboard', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'payslips_dashboard' %}active{% endif %}">
+                    <span class="nav-icon">📄</span>
+                    <span class="nav-text">Payslips</span>
+                </a>
+                <a href="{{ url_for('generate_invoices', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'generate_invoices' %}active{% endif %}">
+                    <span class="nav-icon">📄</span>
+                    <span class="nav-text">Generate Invoices</span>
+                </a>
+
+                <div class="nav-section">Configuration</div>
+                <a href="{{ url_for('manage_allowances', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'manage_allowances' %}active{% endif %}">
+                    <span class="nav-icon">💳</span>
+                    <span class="nav-text">Allowances</span>
+                </a>
+                <a href="{{ url_for('manage_deductions', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'manage_deductions' %}active{% endif %}">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Deductions</span>
+                </a>
+                <a href="{{ url_for('manage_tax_config', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'manage_tax_config' %}active{% endif %}">
+                    <span class="nav-icon">📈</span>
+                    <span class="nav-text">Tax Config</span>
+                </a>
+                <a href="{{ url_for('manage_social_security', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'manage_social_security' %}active{% endif %}">
+                    <span class="nav-icon">🔒</span>
+                    <span class="nav-text">Social Security</span>
+                </a>
+                <a href="{{ url_for('manage_bonuses', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'manage_bonuses' %}active{% endif %}">
+                    <span class="nav-icon">🎯</span>
+                    <span class="nav-text">Bonuses</span>
+                </a>
+                <a href="{{ url_for('manage_bik', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'manage_bik' %}active{% endif %}">
+                    <span class="nav-icon">🎁</span>
+                    <span class="nav-text">Benefit-in-Kind</span>
+                </a>
+                <a href="{{ url_for('bonus_tax_config', company_id=current_company.id) }}"
+                   class="{% if request.endpoint == 'bonus_tax_config' %}active{% endif %}">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Bonus Tax Config</span>
+                </a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content-wrapper">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle Sidebar">
+                    ☰
+                </button>
+                <span class="page-title">
+                    {% block page_title %}
+                        {% if current_company %}
+                            {{ current_company.name }}
+                            <span class="sub">- {{ current_company.base_currency }}</span>
+                        {% else %}
+                            Payroll System
+                        {% endif %}
+                    {% endblock %}
+                </span>
+            </div>
+            <div class="top-bar-actions">
+                {% if current_company %}
+                    <span class="current-company">
+                        <strong>{{ current_company.base_currency }}</strong>
+                        {{ current_company.name }}
+                    </span>
+                {% endif %}
+                <a href="{{ url_for('list_companies') }}" style="color: #3498db; text-decoration: none; font-size: 13px;">
+                    Switch Company
+                </a>
+            </div>
+        </div>
+
+        <!-- Flash Messages -->
+        <div style="padding: 0 25px;">
+            <div class="flash-messages">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="flash {{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script>
+        // Sidebar toggle for mobile
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.querySelector('.sidebar-toggle');
+            const isClickInside = sidebar.contains(event.target) || toggleBtn.contains(event.target);
+
+            if (!isClickInside && window.innerWidth <= 992) {
+                closeSidebar();
+            }
+        });
+
+        // Close sidebar on escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeSidebar();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 992) {
+                closeSidebar();
+            }
+        });
+
+        // Company switcher - NOW USES THE SAME APPROACH AS TOP BAR
+        // The form already has the onsubmit handler, so we don't need this additional listener
+        // Keeping it as a fallback for any other forms
+
+        {% block extra_js %}{% endblock %}
+    </script>
+</body>
+</html>

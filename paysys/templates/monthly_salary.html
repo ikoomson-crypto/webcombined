@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Monthly Salary - {{ company.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="flash-messages">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <a href="{{ url_for('list_employees', company_id=company.id) }}" style="display: inline-block; margin-bottom: 15px; color: #3498db; text-decoration: none;">← Back to Employees</a>
+
+    <div style="background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="margin-bottom: 20px;">
+            <h1 style="color: #2c3e50;">💰 Monthly Salary Management</h1>
+            <div style="color: #7f8c8d; font-size: 14px; margin-top: 5px;">
+                {{ employee.first_name }} {{ employee.last_name }} - {{ company.name }}
+                <span style="background: #3498db; color: white; padding: 2px 10px; border-radius: 12px; margin-left: 10px; font-size: 12px;">
+                    Base Monthly Salary: {{ company.base_currency }} {{ format_currency(employee.base_salary) }}
+                </span>
+                <span style="background: #27ae60; color: white; padding: 2px 10px; border-radius: 12px; margin-left: 5px; font-size: 12px;">
+                    Annual: {{ company.base_currency }} {{ format_currency(employee.base_salary * 12) }}
+                </span>
+            </div>
+        </div>
+
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #3498db;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                <div><strong>Position:</strong> {{ employee.position }}</div>
+                <div><strong>Department:</strong> {{ employee.department }}</div>
+                <div><strong>Status:</strong> {{ employee.status }}</div>
+            </div>
+        </div>
+
+        <!-- Set Monthly Salary Form -->
+        <div style="background: #e8f4fd; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #bee5eb;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px;">Set Salary for Specific Month</h3>
+            <form method="POST">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end;">
+                    <div>
+                        <label for="year" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Year</label>
+                        <select id="year" name="year" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            {% for y in range(current_year - 3, current_year + 2) %}
+                                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="month" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Month</label>
+                        <select id="month" name="month" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            {% for m in range(1, 13) %}
+                                <option value="{{ m }}" {% if m == 1 %}selected{% endif %}>{{ get_month_name(m) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="salary" style="display: block; margin-bottom: 5px; font-weight: 500; color: #34495e;">Monthly Salary ({{ company.base_currency }})</label>
+                        <input type="number" step="0.01" id="salary" name="salary" required value="{{ employee.base_salary }}" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 30px; background: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">Set Monthly Salary</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Salary History -->
+        <h3 style="color: #2c3e50; margin-bottom: 15px;">📋 Salary History</h3>
+        {% if salary_history %}
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Year</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: left;">Month</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: right;">Monthly Salary</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: right;">Annual Salary</th>
+                            <th style="background: #34495e; color: white; padding: 12px; text-align: right;">Vs Base Monthly</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in salary_history %}
+                        <tr style="border-bottom: 1px solid #ecf0f1;">
+                            <td style="padding: 12px;">{{ record.year }}</td>
+                            <td style="padding: 12px;">{{ get_month_name(record.month) }}</td>
+                            <td style="padding: 12px; text-align: right;"><strong>{{ company.base_currency }} {{ format_currency(record.salary) }}</strong></td>
+                            <td style="padding: 12px; text-align: right; color: #7f8c8d;">{{ company.base_currency }} {{ format_currency(record.salary * 12) }}</td>
+                            <td style="padding: 12px; text-align: right;">
+                                {% if record.salary > employee.base_salary %}
+                                    <span style="color: #27ae60;">+{{ company.base_currency }} {{ format_currency(record.salary - employee.base_salary) }}</span>
+                                {% elif record.salary < employee.base_salary %}
+                                    <span style="color: #e74c3c;">-{{ company.base_currency }} {{ format_currency(employee.base_salary - record.salary) }}</span>
+                                {% else %}
+                                    <span style="color: #7f8c8d;">Same</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 30px; background: #f8f9fa; border-radius: 5px;">
+                <p style="color: #7f8c8d;">No salary history found for this employee.</p>
+                <small style="color: #95a5a6;">Set a monthly salary above to create history.</small>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,903 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Payroll System{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.6);
+        overflow-y: auto;
+        animation: fadeIn 0.3s;
+    }
+
+    .modal-content {
+        background-color: #fff;
+        margin: 40px auto;
+        padding: 30px;
+        border-radius: 12px;
+        max-width: 900px;
+        width: 95%;
+        position: relative;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideDown {
+        from { transform: translateY(-50px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-close {
+        position: absolute;
+        right: 20px;
+        top: 15px;
+        font-size: 28px;
+        font-weight: bold;
+        color: #95a5a6;
+        cursor: pointer;
+        transition: color 0.3s;
+        background: none;
+        border: none;
+    }
+
+    .modal-close:hover {
+        color: #e74c3c;
+    }
+
+    .modal-header {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #3498db;
+    }
+
+    .modal-header h2 {
+        color: #2c3e50;
+        font-size: 24px;
+    }
+
+    .modal-header p {
+        color: #7f8c8d;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
+    .calc-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    .calc-field {
+        margin-bottom: 5px;
+    }
+
+    .calc-field label {
+        display: block;
+        margin-bottom: 4px;
+        font-weight: 500;
+        color: #34495e;
+        font-size: 13px;
+    }
+
+    .calc-field input,
+    .calc-field select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+    }
+
+    .calc-field input:focus,
+    .calc-field select:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 0 2px rgba(52,152,219,0.2);
+    }
+
+    .calc-field .hint {
+        font-size: 11px;
+        color: #95a5a6;
+        margin-top: 3px;
+    }
+
+    .calc-full {
+        grid-column: span 2;
+    }
+
+    .calc-actions {
+        grid-column: span 2;
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-calc {
+        padding: 10px 30px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 15px;
+        transition: background 0.3s;
+        font-weight: 500;
+    }
+
+    .btn-calc-primary {
+        background: #3498db;
+        color: white;
+    }
+
+    .btn-calc-primary:hover {
+        background: #2980b9;
+    }
+
+    .btn-calc-secondary {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .btn-calc-secondary:hover {
+        background: #7f8c8d;
+    }
+
+    .btn-calc-success {
+        background: #27ae60;
+        color: white;
+    }
+
+    .btn-calc-success:hover {
+        background: #229954;
+    }
+
+    /* Results Styles */
+    .results-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 12px;
+        margin-top: 15px;
+    }
+
+    .result-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid #ecf0f1;
+    }
+
+    .result-card .label {
+        font-size: 12px;
+        color: #7f8c8d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .result-card .value {
+        font-size: 22px;
+        font-weight: bold;
+        margin-top: 5px;
+    }
+
+    .result-card .sub {
+        font-size: 12px;
+        color: #95a5a6;
+        margin-top: 3px;
+    }
+
+    .result-card.primary .value { color: #2c3e50; }
+    .result-card.danger .value { color: #e74c3c; }
+    .result-card.info .value { color: #3498db; }
+    .result-card.success .value { color: #27ae60; }
+
+    .bracket-breakdown {
+        grid-column: span 4;
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #ecf0f1;
+    }
+
+    .bracket-breakdown h4 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+        font-size: 14px;
+    }
+
+    .bracket-items {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 5px;
+    }
+
+    .bracket-item {
+        background: white;
+        padding: 6px 12px;
+        border-radius: 4px;
+        text-align: center;
+        font-size: 12px;
+        border: 1px solid #ecf0f1;
+    }
+
+    .bracket-item .range {
+        color: #7f8c8d;
+    }
+
+    .bracket-item .rate {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .bracket-item .tax {
+        color: #27ae60;
+        font-weight: 500;
+    }
+
+    .summary-row {
+        grid-column: span 4;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 12px;
+    }
+
+    .summary-item {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        text-align: center;
+        border: 1px solid #ecf0f1;
+    }
+
+    .summary-item .label {
+        font-size: 11px;
+        color: #7f8c8d;
+    }
+
+    .summary-item .value {
+        font-size: 16px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-top: 3px;
+    }
+
+    .calc-trigger-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 25px;
+        background: linear-gradient(135deg, #2c3e50, #3498db);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 4px 15px rgba(52,152,219,0.3);
+    }
+
+    .calc-trigger-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(52,152,219,0.4);
+    }
+
+    .calc-trigger-btn .icon {
+        font-size: 20px;
+    }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .year-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        margin-left: 5px;
+        background: #27ae60;
+        color: white;
+    }
+
+    .error-message {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 12px;
+        border-radius: 5px;
+        border: 1px solid #f5c6cb;
+        margin-top: 10px;
+        display: none;
+    }
+
+    .info-note {
+        background: #fff3cd;
+        color: #856404;
+        padding: 10px 15px;
+        border-radius: 5px;
+        border-left: 4px solid #f39c12;
+        margin-top: 10px;
+        font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+        .calc-grid {
+            grid-template-columns: 1fr;
+        }
+        .calc-full, .calc-actions {
+            grid-column: span 1;
+        }
+        .results-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .result-card .value {
+            font-size: 18px;
+        }
+        .summary-row {
+            grid-template-columns: 1fr 1fr;
+        }
+        .bracket-items {
+            grid-template-columns: 1fr 1fr;
+        }
+        .modal-content {
+            margin: 20px auto;
+            padding: 20px;
+            width: 98%;
+        }
+        .modal-header h2 {
+            font-size: 20px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .results-grid {
+            grid-template-columns: 1fr;
+        }
+        .summary-row {
+            grid-template-columns: 1fr;
+        }
+        .bracket-items {
+            grid-template-columns: 1fr;
+        }
+        .bracket-breakdown {
+            grid-column: span 1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header" style="background: linear-gradient(135deg, #2c3e50, #3498db); color: white; padding: 30px; border-radius: 10px; margin-bottom: 30px; text-align: center;">
+        <h1 style="font-size: 2.5em; margin-bottom: 10px;">💼 Payroll Management System</h1>
+        <div style="opacity: 0.9; font-size: 16px;">
+            Multi-Company Progressive Tax Payroll with Year-Specific Rates
+            {% if current_company %}
+                <br><span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; display: inline-block; margin-top: 10px;">
+                    Current: {{ current_company.name }} ({{ current_company.base_currency }})
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tax Calculator Trigger Button -->
+    <div style="text-align: center; margin-bottom: 30px;">
+        <button onclick="openTaxCalculator()" class="calc-trigger-btn">
+            <span class="icon">🧮</span> Quick Tax Calculator
+        </button>
+    </div>
+
+    <div class="grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 20px;">
+        <div class="card" style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: transform 0.3s;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">🏢 Companies</h3>
+            <p style="color: #7f8c8d; margin: 10px 0;">Manage companies and their configurations</p>
+            <p><strong>Total Companies:</strong> {{ companies|length }}</p>
+            <a href="{{ url_for('list_companies') }}" class="btn" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Manage Companies</a>
+        </div>
+
+        <div class="card" style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: transform 0.3s;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">👥 Employees</h3>
+            <p style="color: #7f8c8d; margin: 10px 0;">Manage employee records and information</p>
+            <p><strong>Total Employees:</strong> {{ employees|length }}</p>
+            {% if current_company %}
+                <a href="{{ url_for('list_employees', company_id=current_company.id) }}" class="btn" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">View Employees</a>
+            {% else %}
+                <a href="{{ url_for('list_companies') }}" class="btn" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Select Company</a>
+            {% endif %}
+        </div>
+
+        <div class="card" style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: transform 0.3s;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">💰 Payroll</h3>
+            <p style="color: #7f8c8d; margin: 10px 0;">Process payroll and generate reports</p>
+            <p><strong>Total Payroll Records:</strong> {{ payroll_records|length }}</p>
+            {% if current_company %}
+                <a href="{{ url_for('payroll_dashboard', company_id=current_company.id) }}" class="btn" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Process Payroll</a>
+            {% else %}
+                <a href="{{ url_for('list_companies') }}" class="btn" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Select Company</a>
+            {% endif %}
+        </div>
+
+        <div class="card" style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: transform 0.3s;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px; border-bottom: 2px solid #3498db; padding-bottom: 10px;">📊 Tax Rates</h3>
+            <p style="color: #7f8c8d; margin: 10px 0;">Configure progressive tax rates by year</p>
+            <p><strong>Available Years:</strong>
+                {% set years = [] %}
+                {% for cfg in tax_configs %}
+                    {% if cfg.year not in years %}
+                        {% set _ = years.append(cfg.year) %}
+                    {% endif %}
+                {% endfor %}
+                {{ years|sort|join(', ') }}
+            </p>
+            {% if current_company %}
+                <a href="{{ url_for('manage_tax_config', company_id=current_company.id) }}" class="btn" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Configure Taxes</a>
+            {% else %}
+                <a href="{{ url_for('list_companies') }}" class="btn" style="display: inline-block; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 5px; margin-top: 10px;">Select Company</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="margin-top: 40px; text-align: center; color: #7f8c8d; font-size: 14px; border-top: 1px solid #ddd; padding-top: 20px;">
+        <p>Built with Flask | Progressive Tax System | Year-Specific Rates | Multi-Currency Support</p>
+        <p style="margin-top: 5px; font-size: 12px;">Tax rates automatically adjust for each year</p>
+        {% if current_company %}
+            <p style="margin-top: 10px; font-size: 12px; color: #27ae60;">✓ Currently viewing: {{ current_company.name }}</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Tax Calculator Modal -->
+<div id="taxCalculatorModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeTaxCalculator()">&times;</button>
+
+        <div class="modal-header">
+            <h2>🧮 Tax Calculator</h2>
+            <p id="calc_info_text">Select a company to load its configured tax rates</p>
+        </div>
+
+        <div id="calc_error" class="error-message"></div>
+
+        <form id="taxCalculatorForm">
+            <div class="calc-grid">
+                <div class="calc-field">
+                    <label for="calc_company">Company</label>
+                    <select id="calc_company" name="calc_company" onchange="loadAvailableYears()">
+                        {% for company in all_companies %}
+                            <option value="{{ company.id }}" {% if current_company and current_company.id == company.id %}selected{% endif %}>
+                                {{ company.name }} ({{ company.base_currency }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="hint">Select company to use its tax configuration</div>
+                </div>
+
+                <div class="calc-field">
+                    <label for="calc_year">Tax Year</label>
+                    <select id="calc_year" name="calc_year">
+                        <option value="">Loading years...</option>
+                    </select>
+                    <div class="hint">Available years from company's tax config</div>
+                </div>
+
+                <div class="calc-field">
+                    <label for="calc_income_type">Income Type</label>
+                    <select id="calc_income_type" name="calc_income_type">
+                        <option value="monthly">Monthly Salary</option>
+                        <option value="annual">Annual Salary</option>
+                    </select>
+                </div>
+
+                <div class="calc-field">
+                    <label for="calc_income">Income Amount</label>
+                    <input type="number" step="0.01" id="calc_income" name="calc_income" value="5000">
+                    <div class="hint">Enter the income amount</div>
+                </div>
+
+                <div class="calc-field">
+                    <label for="calc_taxable_allowances">Taxable Allowances (Monthly)</label>
+                    <input type="number" step="0.01" id="calc_taxable_allowances" name="calc_taxable_allowances" value="0">
+                    <div class="hint">Optional - e.g., transport, meal allowances</div>
+                </div>
+
+                <div class="calc-field calc-full" id="calc_status">
+                    <div style="background: #e8f4fd; padding: 12px; border-radius: 5px; border-left: 4px solid #3498db;">
+                        <span style="font-weight: bold; color: #2c3e50;">📌 Using Configured Tax Rates</span>
+                        <span style="color: #7f8c8d; margin-left: 10px; font-size: 13px;">
+                            Tax brackets, Social Security rate, and standard deduction will be loaded from the selected company's Tax Config.
+                        </span>
+                    </div>
+                </div>
+
+                <div class="calc-actions">
+                    <button type="button" onclick="calculateTaxWithConfig()" class="btn-calc btn-calc-primary">
+                        <span id="calc_btn_text">Calculate Tax</span>
+                    </button>
+                    <button type="reset" class="btn-calc btn-calc-secondary">Reset</button>
+                    <button type="button" onclick="closeTaxCalculator()" class="btn-calc btn-calc-secondary">Close</button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Results -->
+        <div id="taxResults" style="display: none; margin-top: 20px;">
+            <div style="border-top: 2px solid #ecf0f1; padding-top: 20px;">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;">📊 Tax Calculation Results</h3>
+                <div id="taxResultContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let availableYears = [];
+
+function openTaxCalculator() {
+    document.getElementById('taxCalculatorModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('taxResults').style.display = 'none';
+    document.getElementById('calc_error').style.display = 'none';
+    loadAvailableYears();
+}
+
+function closeTaxCalculator() {
+    document.getElementById('taxCalculatorModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('taxCalculatorModal');
+    if (event.target == modal) {
+        closeTaxCalculator();
+    }
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeTaxCalculator();
+    }
+});
+
+function showError(message) {
+    const errorDiv = document.getElementById('calc_error');
+    errorDiv.textContent = '❌ ' + message;
+    errorDiv.style.display = 'block';
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 8000);
+}
+
+async function loadAvailableYears() {
+    const companyId = document.getElementById('calc_company').value;
+    const yearSelect = document.getElementById('calc_year');
+
+    yearSelect.innerHTML = '<option value="">Loading years...</option>';
+    yearSelect.disabled = true;
+
+    try {
+        const response = await fetch(`/api/available_years/${companyId}`);
+
+        // Check if response is OK
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('Response error:', text);
+            // Try to parse as JSON if possible
+            try {
+                const errorData = JSON.parse(text);
+                throw new Error(errorData.error || `Server returned ${response.status}`);
+            } catch {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}. Please check if the API endpoint is available.`);
+            }
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+            yearSelect.innerHTML = `<option value="">No years available</option>`;
+            showError(data.error);
+            return;
+        }
+
+        availableYears = data.years;
+
+        if (availableYears.length === 0) {
+            yearSelect.innerHTML = `<option value="">No tax configs found</option>`;
+            return;
+        }
+
+        yearSelect.innerHTML = '';
+        availableYears.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.text = year;
+            if (year === data.active_year) {
+                option.selected = true;
+            }
+            yearSelect.appendChild(option);
+        });
+        yearSelect.disabled = false;
+
+        const companyName = document.getElementById('calc_company').selectedOptions[0].text;
+        document.getElementById('calc_info_text').textContent =
+            `Using tax configuration from ${companyName} (${availableYears.length} years available)`;
+
+    } catch (error) {
+        console.error('Error loading years:', error);
+        yearSelect.innerHTML = `<option value="">Error loading years</option>`;
+        showError('Failed to load available tax years: ' + error.message);
+        yearSelect.disabled = false;
+    }
+}
+
+async function calculateTaxWithConfig() {
+    const companyId = document.getElementById('calc_company').value;
+    const year = document.getElementById('calc_year').value;
+    const incomeType = document.getElementById('calc_income_type').value;
+    const income = parseFloat(document.getElementById('calc_income').value) || 0;
+    const taxableAllowances = parseFloat(document.getElementById('calc_taxable_allowances').value) || 0;
+
+    // Clear previous error
+    document.getElementById('calc_error').style.display = 'none';
+
+    if (!year) {
+        showError('Please select a valid tax year.');
+        return;
+    }
+
+    if (income <= 0) {
+        showError('Please enter a valid income amount greater than zero.');
+        return;
+    }
+
+    const btnText = document.getElementById('calc_btn_text');
+    btnText.innerHTML = '<span class="loading-spinner"></span> Calculating...';
+
+    try {
+        const response = await fetch(`/api/tax_brackets/${companyId}/${year}`);
+
+        // Check if response is OK
+        if (!response.ok) {
+            const text = await response.text();
+            console.error('Response error:', text);
+            // Try to parse as JSON if possible
+            try {
+                const errorData = JSON.parse(text);
+                throw new Error(errorData.error || `Server returned ${response.status}`);
+            } catch {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}. Please check if the tax brackets exist for this year.`);
+            }
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // Validate data
+        if (!data.brackets || data.brackets.length === 0) {
+            throw new Error('No tax brackets found for the selected year.');
+        }
+
+        calculateTax(data, incomeType, income, taxableAllowances);
+
+    } catch (error) {
+        console.error('Error:', error);
+        showError('Error loading tax configuration: ' + error.message);
+    } finally {
+        btnText.innerHTML = 'Calculate Tax';
+    }
+}
+
+function calculateTax(config, incomeType, income, taxableAllowances) {
+    const currency = config.currency || 'GHS';
+    const brackets = config.brackets || [];
+    const ssRate = config.social_security_rate || 5.5;
+    const ssThreshold = config.social_security_threshold || 15000;
+    // For Ghana, standard deduction should be 0
+    const standardDeduction = config.standard_deduction || 0;
+    const country = config.country || 'Ghana';
+
+    if (brackets.length === 0) {
+        showError('No tax brackets available for this configuration.');
+        return;
+    }
+
+    let monthlyIncome = incomeType === 'monthly' ? income : income / 12;
+    let annualIncome = incomeType === 'monthly' ? income * 12 : income;
+
+    let monthlyTaxableAllowances = incomeType === 'monthly' ? taxableAllowances : taxableAllowances / 12;
+    let annualTaxableAllowances = incomeType === 'monthly' ? taxableAllowances * 12 : taxableAllowances;
+
+    // Social Security (monthly cap)
+    let ssTaxableMonthly = Math.min(monthlyIncome, ssThreshold);
+    let monthlySocialSecurity = ssTaxableMonthly * (ssRate / 100);
+    let annualSocialSecurity = monthlySocialSecurity * 12;
+
+    // Taxable income after Social Security
+    let monthlyTaxableIncome = monthlyIncome + monthlyTaxableAllowances - monthlySocialSecurity;
+    let annualTaxableIncome = monthlyTaxableIncome * 12;
+
+    // Apply standard deduction (only if > 0, Ghana has no standard deduction)
+    let taxableAfterDeduction = annualTaxableIncome;
+    if (standardDeduction > 0) {
+        taxableAfterDeduction = Math.max(0, annualTaxableIncome - standardDeduction);
+    }
+
+    // Calculate progressive tax
+    let tax = 0;
+    let remaining = taxableAfterDeduction;
+    let bracketDetails = [];
+
+    // Sort brackets by min
+    const sortedBrackets = brackets.sort((a, b) => a.min - b.min);
+
+    for (let bracket of sortedBrackets) {
+        if (remaining <= 0) break;
+        let bracketAmount = 0;
+        // Check for Infinity (null, undefined, or string 'Infinity')
+        const isInfinity = bracket.max === null ||
+                          bracket.max === undefined ||
+                          bracket.max === 'Infinity' ||
+                          bracket.max === 'inf' ||
+                          bracket.max === Infinity ||
+                          bracket.max === '∞';
+
+        if (isInfinity) {
+            bracketAmount = remaining;
+        } else {
+            bracketAmount = Math.min(remaining, bracket.max - bracket.min);
+        }
+        if (bracketAmount > 0) {
+            let bracketTax = bracketAmount * (bracket.rate / 100);
+            tax += bracketTax;
+            bracketDetails.push({
+                min: bracket.min,
+                max: isInfinity ? '∞' : bracket.max,
+                rate: bracket.rate,
+                amount: bracketAmount,
+                tax: bracketTax
+            });
+            remaining -= bracketAmount;
+        }
+    }
+
+    let annualTax = tax;
+    let monthlyTax = annualTax / 12;
+
+    let effectiveRate = annualTaxableIncome > 0 ? (annualTax / annualTaxableIncome) * 100 : 0;
+
+    // Find marginal rate
+    let marginalRate = 0;
+    for (let b of bracketDetails) {
+        if (b.amount > 0) {
+            marginalRate = b.rate;
+        }
+    }
+
+    let annualNetPay = annualIncome - annualTax - annualSocialSecurity;
+    let monthlyNetPay = annualNetPay / 12;
+
+    // Display results
+    const resultsDiv = document.getElementById('taxResults');
+    const contentDiv = document.getElementById('taxResultContent');
+
+    // Build deduction info based on whether standard deduction exists
+    let deductionInfo = '';
+    if (standardDeduction > 0) {
+        deductionInfo = `
+            <div class="summary-item">
+                <div class="label">Standard Deduction</div>
+                <div class="value">${currency} ${formatNumber(standardDeduction)}</div>
+            </div>
+        `;
+    } else {
+        deductionInfo = `
+            <div class="summary-item" style="background: #fff3cd;">
+                <div class="label">Standard Deduction</div>
+                <div class="value" style="color: #856404;">N/A</div>
+                <div style="font-size: 10px; color: #856404;">(Not applicable for ${country})</div>
+            </div>
+        `;
+    }
+
+    // Country-specific note
+    let countryNote = '';
+    if (country.toUpperCase() === 'GHANA' || standardDeduction === 0) {
+        countryNote = `
+            <div class="info-note">
+                ℹ️ <strong>${country}</strong> does not have a standard deduction.
+                Tax is calculated on the full chargeable income after Social Security deduction.
+            </div>
+        `;
+    }
+
+    contentDiv.innerHTML = `
+        <div class="results-grid">
+            <div class="result-card primary">
+                <div class="label">Gross Salary</div>
+                <div class="value">${currency} ${formatNumber(incomeType === 'monthly' ? income : income)}</div>
+                <div class="sub">${incomeType === 'monthly' ? 'Monthly' : 'Annual'}</div>
+            </div>
+            <div class="result-card danger">
+                <div class="label">Monthly Tax</div>
+                <div class="value">${currency} ${formatNumber(monthlyTax)}</div>
+                <div class="sub">Annual: ${currency} ${formatNumber(annualTax)}</div>
+            </div>
+            <div class="result-card info">
+                <div class="label">Social Security</div>
+                <div class="value">${currency} ${formatNumber(monthlySocialSecurity)}</div>
+                <div class="sub">Monthly</div>
+            </div>
+            <div class="result-card success">
+                <div class="label">Net Pay</div>
+                <div class="value">${currency} ${formatNumber(monthlyNetPay)}</div>
+                <div class="sub">Monthly</div>
+            </div>
+
+            <div class="summary-row">
+                <div class="summary-item">
+                    <div class="label">Effective Tax Rate</div>
+                    <div class="value">${effectiveRate.toFixed(2)}%</div>
+                </div>
+                <div class="summary-item">
+                    <div class="label">Marginal Tax Rate</div>
+                    <div class="value">${marginalRate}%</div>
+                </div>
+                ${deductionInfo}
+                <div class="summary-item">
+                    <div class="label">SS Rate</div>
+                    <div class="value">${ssRate}%</div>
+                </div>
+            </div>
+
+            <div class="bracket-breakdown">
+                <h4>📋 Tax Brackets Applied (${country})</h4>
+                <div class="bracket-items">
+                    ${bracketDetails.map(b => `
+                        <div class="bracket-item">
+                            <div class="range">${formatNumber(b.min)} - ${b.max === '∞' ? '∞' : formatNumber(b.max)}</div>
+                            <div class="rate">${b.rate}%</div>
+                            <div class="tax">${currency} ${formatNumber(b.tax)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                ${countryNote}
+            </div>
+        </div>
+    `;
+
+    resultsDiv.style.display = 'block';
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function formatNumber(num) {
+    return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+</script>
+{% endblock %}
