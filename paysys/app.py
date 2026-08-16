@@ -56,9 +56,10 @@ def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         if IS_PRODUCTION:
-            # PostgreSQL connection
+            # PostgreSQL connection - use cursor_factory for row factory
             db = psycopg2.connect(DATABASE_URL)
-            db.row_factory = psycopg2.extras.RealDictCursor
+            # Set autocommit to True for PostgreSQL
+            db.autocommit = False
         else:
             # SQLite connection
             db = sqlite3.connect(DATABASE)
@@ -66,6 +67,18 @@ def get_db():
         g._database = db
     return db
 
+
+def get_cursor(db=None):
+    """Get a cursor from the database connection"""
+    if db is None:
+        db = get_db()
+
+    if IS_PRODUCTION:
+        # PostgreSQL cursor with RealDictCursor
+        return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        # SQLite cursor
+        return db.cursor()
 
 def get_cursor(db):
     """Get a cursor from the database connection"""
