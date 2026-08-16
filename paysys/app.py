@@ -2694,20 +2694,19 @@ def generate_bulk_payslip_pdf(company_id, year, month):
 # SAMPLE DATA
 # ============================================
 
-def init_sample_data():
-    """Initialize sample data if database is empty"""
-    db = get_db()
-    cursor = get_cursor(db)
+    def init_sample_data():
+        """Initialize sample data if database is empty"""
+        db = get_db()
+        cursor = get_cursor(db)
 
-    cursor.execute("SELECT COUNT(*) FROM companies")
-    count = cursor.fetchone()[0]
+        # For SQLite with row_factory = sqlite3.Row
+        cursor.execute("SELECT COUNT(*) as count FROM companies")
+        row = cursor.fetchone()
+        count = row['count'] if row else 0  # sqlite3.Row supports dict-style access
 
-    if count > 0:
-        print(f"📊 Database already has {count} companies, skipping sample data")
-        return
-
-    print("🆕 No data found, initializing with sample data...")
-
+        if count > 0:
+            print(f"📊 Database already has {count} companies, skipping sample data")
+            return
     # Insert Companies
     companies = [
         (1, 'Tech Solutions Inc.', 'USD', '123 Tech Park, Silicon Valley, CA', 'TAX-78945',
@@ -5895,9 +5894,11 @@ def initialize():
 
 
 # Run initialization when module is first imported
-initialize()
+
 
 if __name__ == '__main__':
+    initialize()
+
     print("=" * 60)
     print("🚀 Payroll Management System")
     print("=" * 60)
