@@ -3134,75 +3134,64 @@ def calculate_employee_deductions(employee_id, year, month, gross_salary):
 
 def get_all_companies():
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM companies ORDER BY id")
     return cursor.fetchall()
 
-
 def get_company(company_id):
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM companies WHERE id = ?", (company_id,))
     return cursor.fetchone()
 
-
 def get_employees_by_company(company_id):
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM employees WHERE company_id = ? ORDER BY id", (company_id,))
     return cursor.fetchall()
 
-
 def get_employee(employee_id):
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM employees WHERE id = ?", (employee_id,))
     return cursor.fetchone()
 
-
 def get_all_employees():
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM employees ORDER BY id")
     return cursor.fetchall()
 
-
 def get_tax_configs_by_company(company_id):
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM tax_configs WHERE company_id = ? ORDER BY year", (company_id,))
     return cursor.fetchall()
 
-
 def get_tax_config(company_id, year):
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM tax_configs WHERE company_id = ? AND year = ?", (company_id, year))
     return cursor.fetchone()
 
-
 def get_active_tax_config(company_id):
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM tax_configs WHERE company_id = ? AND is_active = 1", (company_id,))
     return cursor.fetchone()
 
-
 def get_payroll_records_by_company(company_id, year=None):
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     if year:
-        cursor.execute("SELECT * FROM payroll_records WHERE company_id = ? AND year = ? ORDER BY id",
-                       (company_id, year))
+        cursor.execute("SELECT * FROM payroll_records WHERE company_id = ? AND year = ? ORDER BY id", (company_id, year))
     else:
         cursor.execute("SELECT * FROM payroll_records WHERE company_id = ? ORDER BY id", (company_id,))
     return cursor.fetchall()
 
-
 def get_payroll_by_month(company_id, year, month):
-    """Get payroll records for a specific month"""
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute('''
         SELECT * FROM payroll_records 
         WHERE company_id = ? AND year = ? AND month = ?
@@ -3210,11 +3199,9 @@ def get_payroll_by_month(company_id, year, month):
     ''', (company_id, year, month))
     return cursor.fetchall()
 
-
 def get_processed_months(company_id):
-    """Get all months that have been processed for a company"""
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute('''
         SELECT DISTINCT year, month FROM payroll_records 
         WHERE company_id = ? 
@@ -3222,20 +3209,17 @@ def get_processed_months(company_id):
     ''', (company_id,))
     return cursor.fetchall()
 
-
 def get_all_payroll_records():
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM payroll_records ORDER BY id")
     return cursor.fetchall()
 
-
 def get_all_tax_configs():
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
     cursor.execute("SELECT * FROM tax_configs ORDER BY company_id, year")
     return cursor.fetchall()
-
 
 # ============================================
 # TAX RATES DATABASE - Year Specific
@@ -4097,7 +4081,13 @@ def inject_company_switcher():
         companies = get_all_companies()
         if companies:
             first_company = companies[0]
-            session['current_company_id'] = first_company['id']
+            # Handle both dict and tuple access
+            if hasattr(first_company, 'keys') or isinstance(first_company, dict):
+                # It's a dictionary-like object
+                session['current_company_id'] = first_company['id']
+            else:
+                # It's a tuple, access by index
+                session['current_company_id'] = first_company[0]
             return first_company
         return None
 
