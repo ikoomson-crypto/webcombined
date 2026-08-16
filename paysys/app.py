@@ -54,6 +54,44 @@ else:
     DATABASE = 'payroll.db'
     print(f"✅ Using SQLite database: {DATABASE}")
 
+
+# ============================================
+# DATABASE CURSOR WITH AUTO PARAMETER CONVERSION
+# ============================================
+
+class AutoCursor:
+    """A wrapper class that automatically converts ? to %s for PostgreSQL"""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, query, params=None):
+        """Execute a query, automatically converting ? to %s for PostgreSQL"""
+        if IS_PRODUCTION and params is not None:
+            # Convert ? to %s for PostgreSQL
+            query = query.replace('?', '%s')
+        if params is not None:
+            return self._cursor.execute(query, params)
+        else:
+            return self._cursor.execute(query)
+
+    def __getattr__(self, name):
+        """Forward all other attribute/method calls to the underlying cursor"""
+        return getattr(self._cursor, name)
+
+    def __iter__(self):
+        """Support iteration over cursor results"""
+        return iter(self._cursor)
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def fetchmany(self, size=None):
+        return self._cursor.fetchmany(size)
+
 # ============================================
 # DATABASE HELPERS
 # ============================================
@@ -78,10 +116,15 @@ def get_cursor(db=None):
         db = get_db()
 
     if IS_PRODUCTION:
-        return db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # PostgreSQL - returns dict-like rows
+        raw_cursor = db.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     else:
-        return db.cursor()
+        # SQLite - returns dict-like rows with sqlite3.Row
+        db.row_factory = sqlite3.Row
+        raw_cursor = db.cursor()
 
+    # Wrap the cursor with auto-parameter conversion
+    return AutoCursor(raw_cursor)
 
 @app.teardown_appcontext
 def close_connection(exception):
