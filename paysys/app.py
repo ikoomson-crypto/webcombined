@@ -56,9 +56,8 @@ def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         if IS_PRODUCTION:
-            # PostgreSQL connection - use cursor_factory for row factory
+            # PostgreSQL connection
             db = psycopg2.connect(DATABASE_URL)
-            # Set autocommit to True for PostgreSQL
             db.autocommit = False
         else:
             # SQLite connection
@@ -66,7 +65,6 @@ def get_db():
             db.row_factory = sqlite3.Row
         g._database = db
     return db
-
 
 def get_cursor(db=None):
     """Get a cursor from the database connection"""
@@ -119,6 +117,17 @@ def init_db():
 
     # Check if we're using PostgreSQL
     is_postgres = IS_PRODUCTION
+
+    # Helper function to get the correct ID type
+    def id_type():
+        return "SERIAL" if is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
+
+    # Helper function to get the correct foreign key syntax
+    def fk_ref(table, column="id"):
+        if is_postgres:
+            return f"REFERENCES {table}({column})"
+        else:
+            return f"FOREIGN KEY ({column}) REFERENCES {table}({column})"
 
     # Companies table
     if is_postgres:
