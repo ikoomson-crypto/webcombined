@@ -1558,316 +1558,597 @@ def close_connection(exception):
 
 
 def init_db():
-    """Initialize database with tables"""
+    """Initialize database with tables - works with SQLite and PostgreSQL"""
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
+
+    # Check if we're using PostgreSQL
+    is_postgres = IS_PRODUCTION
 
     # Companies table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS companies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            base_currency TEXT NOT NULL,
-            address TEXT,
-            tax_id TEXT,
-            email TEXT,
-            phone TEXT,
-            created_date TEXT
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS companies (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                base_currency TEXT NOT NULL,
+                address TEXT,
+                tax_id TEXT,
+                email TEXT,
+                phone TEXT,
+                created_date TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS companies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                base_currency TEXT NOT NULL,
+                address TEXT,
+                tax_id TEXT,
+                email TEXT,
+                phone TEXT,
+                created_date TEXT
+            )
+        ''')
 
-    # Employees table with is_tax_exempt and exempt_from_social_security columns
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS employees (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            first_name TEXT NOT NULL,
-            last_name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            position TEXT NOT NULL,
-            department TEXT NOT NULL,
-            base_salary REAL NOT NULL,
-            hire_date TEXT NOT NULL,
-            status TEXT NOT NULL,
-            is_tax_exempt INTEGER DEFAULT 0,
-            exempt_from_social_security INTEGER DEFAULT 0,
-            FOREIGN KEY (company_id) REFERENCES companies(id)
-        )
-    ''')
+    # Employees table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employees (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                first_name TEXT NOT NULL,
+                last_name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                position TEXT NOT NULL,
+                department TEXT NOT NULL,
+                base_salary REAL NOT NULL,
+                hire_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                is_tax_exempt INTEGER DEFAULT 0,
+                exempt_from_social_security INTEGER DEFAULT 0
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                first_name TEXT NOT NULL,
+                last_name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                position TEXT NOT NULL,
+                department TEXT NOT NULL,
+                base_salary REAL NOT NULL,
+                hire_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                is_tax_exempt INTEGER DEFAULT 0,
+                exempt_from_social_security INTEGER DEFAULT 0,
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+            )
+        ''')
 
-    # Monthly Salaries table (for monthly salary changes)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS monthly_salaries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER NOT NULL,
-            year INTEGER NOT NULL,
-            month INTEGER NOT NULL,
-            salary REAL NOT NULL,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            UNIQUE(employee_id, year, month)
-        )
-    ''')
+    # Monthly Salaries table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS monthly_salaries (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                salary REAL NOT NULL,
+                UNIQUE(employee_id, year, month)
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS monthly_salaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                salary REAL NOT NULL,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                UNIQUE(employee_id, year, month)
+            )
+        ''')
 
-    # Tax Configs table (with social security threshold)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS tax_configs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            year INTEGER NOT NULL,
-            country TEXT NOT NULL,
-            standard_deduction REAL NOT NULL,
-            social_security_rate REAL NOT NULL,
-            social_security_threshold REAL NOT NULL,
-            brackets TEXT NOT NULL,
-            is_active INTEGER DEFAULT 0,
-            created_date TEXT,
-            FOREIGN KEY (company_id) REFERENCES companies(id)
-        )
-    ''')
+    # Tax Configs table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tax_configs (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                year INTEGER NOT NULL,
+                country TEXT NOT NULL,
+                standard_deduction REAL NOT NULL,
+                social_security_rate REAL NOT NULL,
+                social_security_threshold REAL NOT NULL,
+                brackets TEXT NOT NULL,
+                is_active INTEGER DEFAULT 0,
+                created_date TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tax_configs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                country TEXT NOT NULL,
+                standard_deduction REAL NOT NULL,
+                social_security_rate REAL NOT NULL,
+                social_security_threshold REAL NOT NULL,
+                brackets TEXT NOT NULL,
+                is_active INTEGER DEFAULT 0,
+                created_date TEXT,
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+            )
+        ''')
 
-    # Social Security Threshold History (monthly changes)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS social_security_thresholds (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            year INTEGER NOT NULL,
-            month INTEGER NOT NULL,
-            threshold REAL NOT NULL,
-            created_date TEXT,
-            FOREIGN KEY (company_id) REFERENCES companies(id),
-            UNIQUE(company_id, year, month)
-        )
-    ''')
+    # Social Security Threshold History
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS social_security_thresholds (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                threshold REAL NOT NULL,
+                created_date TEXT,
+                UNIQUE(company_id, year, month)
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS social_security_thresholds (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                threshold REAL NOT NULL,
+                created_date TEXT,
+                FOREIGN KEY (company_id) REFERENCES companies(id),
+                UNIQUE(company_id, year, month)
+            )
+        ''')
 
-    # Bonus Records table with start_date and end_date
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bonus_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER NOT NULL,
-            company_id INTEGER NOT NULL,
-            start_date TEXT NOT NULL,
-            end_date TEXT,
-            bonus_amount REAL NOT NULL,
-            bonus_type TEXT NOT NULL,
-            description TEXT,
-            created_date TEXT,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            FOREIGN KEY (company_id) REFERENCES companies(id)
-        )
-    ''')
+    # Bonus Records table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bonus_records (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                bonus_amount REAL NOT NULL,
+                bonus_type TEXT NOT NULL,
+                description TEXT,
+                created_date TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bonus_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                company_id INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                bonus_amount REAL NOT NULL,
+                bonus_type TEXT NOT NULL,
+                description TEXT,
+                created_date TEXT,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+            )
+        ''')
 
     # Bonus Tax Config table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bonus_tax_configs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            year INTEGER NOT NULL,
-            bonus_threshold_percentage REAL NOT NULL,
-            bonus_tax_rate REAL NOT NULL,
-            created_date TEXT,
-            FOREIGN KEY (company_id) REFERENCES companies(id),
-            UNIQUE(company_id, year)
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bonus_tax_configs (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                year INTEGER NOT NULL,
+                bonus_threshold_percentage REAL NOT NULL,
+                bonus_tax_rate REAL NOT NULL,
+                created_date TEXT,
+                UNIQUE(company_id, year)
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bonus_tax_configs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                bonus_threshold_percentage REAL NOT NULL,
+                bonus_tax_rate REAL NOT NULL,
+                created_date TEXT,
+                FOREIGN KEY (company_id) REFERENCES companies(id),
+                UNIQUE(company_id, year)
+            )
+        ''')
 
     # Benefit-in-Kind Definitions table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS bik_definitions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            default_value REAL NOT NULL,
-            is_taxable INTEGER DEFAULT 1,
-            description TEXT,
-            created_date TEXT,
-            FOREIGN KEY (company_id) REFERENCES companies(id)
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bik_definitions (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                default_value REAL NOT NULL,
+                is_taxable INTEGER DEFAULT 1,
+                description TEXT,
+                created_date TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bik_definitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                default_value REAL NOT NULL,
+                is_taxable INTEGER DEFAULT 1,
+                description TEXT,
+                created_date TEXT,
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+            )
+        ''')
 
-    # Employee Benefit-in-Kind table with start_date and end_date
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS employee_bik (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER NOT NULL,
-            bik_id INTEGER NOT NULL,
-            start_date TEXT NOT NULL,
-            end_date TEXT,
-            value REAL NOT NULL,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            FOREIGN KEY (bik_id) REFERENCES bik_definitions(id)
-        )
-    ''')
+    # Employee Benefit-in-Kind table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employee_bik (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                bik_id INTEGER NOT NULL REFERENCES bik_definitions(id),
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                value REAL NOT NULL
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employee_bik (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                bik_id INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                value REAL NOT NULL,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                FOREIGN KEY (bik_id) REFERENCES bik_definitions(id)
+            )
+        ''')
 
     # Allowance Definitions table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS allowance_definitions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            default_value REAL NOT NULL,
-            is_taxable INTEGER DEFAULT 0,
-            description TEXT,
-            created_date TEXT,
-            FOREIGN KEY (company_id) REFERENCES companies(id)
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS allowance_definitions (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                default_value REAL NOT NULL,
+                is_taxable INTEGER DEFAULT 0,
+                description TEXT,
+                created_date TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS allowance_definitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                default_value REAL NOT NULL,
+                is_taxable INTEGER DEFAULT 0,
+                description TEXT,
+                created_date TEXT,
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+            )
+        ''')
 
-    # Employee Allowances table (current values)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS employee_allowances (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER NOT NULL,
-            allowance_id INTEGER NOT NULL,
-            value REAL NOT NULL,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            FOREIGN KEY (allowance_id) REFERENCES allowance_definitions(id)
-        )
-    ''')
+    # Employee Allowances table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employee_allowances (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                allowance_id INTEGER NOT NULL REFERENCES allowance_definitions(id),
+                value REAL NOT NULL
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employee_allowances (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                allowance_id INTEGER NOT NULL,
+                value REAL NOT NULL,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                FOREIGN KEY (allowance_id) REFERENCES allowance_definitions(id)
+            )
+        ''')
 
-    # Monthly Allowance History table (for monthly allowance changes)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS monthly_allowances (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER NOT NULL,
-            allowance_id INTEGER NOT NULL,
-            year INTEGER NOT NULL,
-            month INTEGER NOT NULL,
-            value REAL NOT NULL,
-            created_date TEXT,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            FOREIGN KEY (allowance_id) REFERENCES allowance_definitions(id),
-            UNIQUE(employee_id, allowance_id, year, month)
-        )
-    ''')
+    # Monthly Allowance History table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS monthly_allowances (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                allowance_id INTEGER NOT NULL REFERENCES allowance_definitions(id),
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                value REAL NOT NULL,
+                created_date TEXT,
+                UNIQUE(employee_id, allowance_id, year, month)
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS monthly_allowances (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                allowance_id INTEGER NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                value REAL NOT NULL,
+                created_date TEXT,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                FOREIGN KEY (allowance_id) REFERENCES allowance_definitions(id),
+                UNIQUE(employee_id, allowance_id, year, month)
+            )
+        ''')
 
-    # Deduction Definitions table (for dynamic deductions)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS deduction_definitions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            default_value REAL NOT NULL,
-            is_percentage INTEGER DEFAULT 0,
-            description TEXT,
-            created_date TEXT,
-            FOREIGN KEY (company_id) REFERENCES companies(id)
-        )
-    ''')
+    # Deduction Definitions table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS deduction_definitions (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                default_value REAL NOT NULL,
+                is_percentage INTEGER DEFAULT 0,
+                description TEXT,
+                created_date TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS deduction_definitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                default_value REAL NOT NULL,
+                is_percentage INTEGER DEFAULT 0,
+                description TEXT,
+                created_date TEXT,
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+            )
+        ''')
 
-    # Employee Deductions table with start_date and end_date
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS employee_deductions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER NOT NULL,
-            deduction_id INTEGER NOT NULL,
-            start_date TEXT NOT NULL,
-            end_date TEXT,
-            value REAL NOT NULL,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            FOREIGN KEY (deduction_id) REFERENCES deduction_definitions(id)
-        )
-    ''')
+    # Employee Deductions table
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employee_deductions (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                deduction_id INTEGER NOT NULL REFERENCES deduction_definitions(id),
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                value REAL NOT NULL
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employee_deductions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                deduction_id INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT,
+                value REAL NOT NULL,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                FOREIGN KEY (deduction_id) REFERENCES deduction_definitions(id)
+            )
+        ''')
 
     # Payroll Records table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS payroll_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            employee_id INTEGER NOT NULL,
-            company_id INTEGER NOT NULL,
-            period TEXT NOT NULL,
-            year INTEGER NOT NULL,
-            month INTEGER NOT NULL,
-            base_salary REAL NOT NULL,
-            allowances_total REAL NOT NULL,
-            allowance_details TEXT,
-            bonus_amount REAL DEFAULT 0,
-            bonus_details TEXT,
-            bik_total REAL DEFAULT 0,
-            bik_details TEXT,
-            deductions_total REAL NOT NULL,
-            deduction_details TEXT,
-            gross_salary REAL NOT NULL,
-            annual_gross REAL NOT NULL,
-            annual_taxable REAL NOT NULL,
-            annual_tax REAL NOT NULL,
-            monthly_tax REAL NOT NULL,
-            bonus_tax_flat REAL DEFAULT 0,
-            total_tax REAL NOT NULL,
-            social_security REAL NOT NULL,
-            social_security_threshold_applied REAL NOT NULL,
-            total_deductions REAL NOT NULL,
-            net_pay REAL NOT NULL,
-            currency TEXT NOT NULL,
-            tax_year INTEGER NOT NULL,
-            tax_config_id INTEGER NOT NULL,
-            processed_date TEXT,
-            is_tax_exempt INTEGER DEFAULT 0,
-            exempt_from_social_security INTEGER DEFAULT 0,
-            FOREIGN KEY (employee_id) REFERENCES employees(id),
-            FOREIGN KEY (company_id) REFERENCES companies(id)
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS payroll_records (
+                id SERIAL PRIMARY KEY,
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                period TEXT NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                base_salary REAL NOT NULL,
+                allowances_total REAL NOT NULL,
+                allowance_details TEXT,
+                bonus_amount REAL DEFAULT 0,
+                bonus_details TEXT,
+                bik_total REAL DEFAULT 0,
+                bik_details TEXT,
+                deductions_total REAL NOT NULL,
+                deduction_details TEXT,
+                gross_salary REAL NOT NULL,
+                annual_gross REAL NOT NULL,
+                annual_taxable REAL NOT NULL,
+                annual_tax REAL NOT NULL,
+                monthly_tax REAL NOT NULL,
+                bonus_tax_flat REAL DEFAULT 0,
+                total_tax REAL NOT NULL,
+                social_security REAL NOT NULL,
+                social_security_threshold_applied REAL NOT NULL,
+                total_deductions REAL NOT NULL,
+                net_pay REAL NOT NULL,
+                currency TEXT NOT NULL,
+                tax_year INTEGER NOT NULL,
+                tax_config_id INTEGER NOT NULL,
+                processed_date TEXT,
+                is_tax_exempt INTEGER DEFAULT 0,
+                exempt_from_social_security INTEGER DEFAULT 0
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS payroll_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_id INTEGER NOT NULL,
+                company_id INTEGER NOT NULL,
+                period TEXT NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                base_salary REAL NOT NULL,
+                allowances_total REAL NOT NULL,
+                allowance_details TEXT,
+                bonus_amount REAL DEFAULT 0,
+                bonus_details TEXT,
+                bik_total REAL DEFAULT 0,
+                bik_details TEXT,
+                deductions_total REAL NOT NULL,
+                deduction_details TEXT,
+                gross_salary REAL NOT NULL,
+                annual_gross REAL NOT NULL,
+                annual_taxable REAL NOT NULL,
+                annual_tax REAL NOT NULL,
+                monthly_tax REAL NOT NULL,
+                bonus_tax_flat REAL DEFAULT 0,
+                total_tax REAL NOT NULL,
+                social_security REAL NOT NULL,
+                social_security_threshold_applied REAL NOT NULL,
+                total_deductions REAL NOT NULL,
+                net_pay REAL NOT NULL,
+                currency TEXT NOT NULL,
+                tax_year INTEGER NOT NULL,
+                tax_config_id INTEGER NOT NULL,
+                processed_date TEXT,
+                is_tax_exempt INTEGER DEFAULT 0,
+                exempt_from_social_security INTEGER DEFAULT 0,
+                FOREIGN KEY (employee_id) REFERENCES employees(id),
+                FOREIGN KEY (company_id) REFERENCES companies(id)
+            )
+        ''')
 
     # Consultant Invoices table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS consultant_invoices (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            company_id INTEGER NOT NULL,
-            employee_id INTEGER NOT NULL,
-            invoice_number TEXT NOT NULL UNIQUE,
-            invoice_date TEXT NOT NULL,
-            due_date TEXT NOT NULL,
-            period_start TEXT NOT NULL,
-            period_end TEXT NOT NULL,
-            description TEXT,
-            hourly_rate REAL NOT NULL,
-            hours_worked REAL NOT NULL,
-            total_amount REAL NOT NULL,
-            tax_amount REAL DEFAULT 0,
-            discount_amount REAL DEFAULT 0,
-            final_amount REAL NOT NULL,
-            status TEXT DEFAULT 'Draft',
-            notes TEXT,
-            created_date TEXT,
-            updated_date TEXT,
-            FOREIGN KEY (company_id) REFERENCES companies(id),
-            FOREIGN KEY (employee_id) REFERENCES employees(id)
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS consultant_invoices (
+                id SERIAL PRIMARY KEY,
+                company_id INTEGER NOT NULL REFERENCES companies(id),
+                employee_id INTEGER NOT NULL REFERENCES employees(id),
+                invoice_number TEXT NOT NULL UNIQUE,
+                invoice_date TEXT NOT NULL,
+                due_date TEXT NOT NULL,
+                period_start TEXT NOT NULL,
+                period_end TEXT NOT NULL,
+                description TEXT,
+                hourly_rate REAL NOT NULL,
+                hours_worked REAL NOT NULL,
+                total_amount REAL NOT NULL,
+                tax_amount REAL DEFAULT 0,
+                discount_amount REAL DEFAULT 0,
+                final_amount REAL NOT NULL,
+                status TEXT DEFAULT 'Draft',
+                notes TEXT,
+                created_date TEXT,
+                updated_date TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS consultant_invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                company_id INTEGER NOT NULL,
+                employee_id INTEGER NOT NULL,
+                invoice_number TEXT NOT NULL UNIQUE,
+                invoice_date TEXT NOT NULL,
+                due_date TEXT NOT NULL,
+                period_start TEXT NOT NULL,
+                period_end TEXT NOT NULL,
+                description TEXT,
+                hourly_rate REAL NOT NULL,
+                hours_worked REAL NOT NULL,
+                total_amount REAL NOT NULL,
+                tax_amount REAL DEFAULT 0,
+                discount_amount REAL DEFAULT 0,
+                final_amount REAL NOT NULL,
+                status TEXT DEFAULT 'Draft',
+                notes TEXT,
+                created_date TEXT,
+                updated_date TEXT,
+                FOREIGN KEY (company_id) REFERENCES companies(id),
+                FOREIGN KEY (employee_id) REFERENCES employees(id)
+            )
+        ''')
 
     # Invoice Items table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS invoice_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            invoice_id INTEGER NOT NULL,
-            description TEXT NOT NULL,
-            quantity REAL NOT NULL,
-            rate REAL NOT NULL,
-            amount REAL NOT NULL,
-            FOREIGN KEY (invoice_id) REFERENCES consultant_invoices(id) ON DELETE CASCADE
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS invoice_items (
+                id SERIAL PRIMARY KEY,
+                invoice_id INTEGER NOT NULL REFERENCES consultant_invoices(id) ON DELETE CASCADE,
+                description TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                rate REAL NOT NULL,
+                amount REAL NOT NULL
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS invoice_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL,
+                description TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                rate REAL NOT NULL,
+                amount REAL NOT NULL,
+                FOREIGN KEY (invoice_id) REFERENCES consultant_invoices(id) ON DELETE CASCADE
+            )
+        ''')
 
     # Invoice Payments table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS invoice_payments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            invoice_id INTEGER NOT NULL,
-            payment_date TEXT NOT NULL,
-            amount REAL NOT NULL,
-            payment_method TEXT NOT NULL,
-            reference TEXT,
-            notes TEXT,
-            FOREIGN KEY (invoice_id) REFERENCES consultant_invoices(id) ON DELETE CASCADE
-        )
-    ''')
+    if is_postgres:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS invoice_payments (
+                id SERIAL PRIMARY KEY,
+                invoice_id INTEGER NOT NULL REFERENCES consultant_invoices(id) ON DELETE CASCADE,
+                payment_date TEXT NOT NULL,
+                amount REAL NOT NULL,
+                payment_method TEXT NOT NULL,
+                reference TEXT,
+                notes TEXT
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS invoice_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL,
+                payment_date TEXT NOT NULL,
+                amount REAL NOT NULL,
+                payment_method TEXT NOT NULL,
+                reference TEXT,
+                notes TEXT,
+                FOREIGN KEY (invoice_id) REFERENCES consultant_invoices(id) ON DELETE CASCADE
+            )
+        ''')
 
     db.commit()
     print("✅ Database initialized successfully")
-
 
 def migrate_to_date_ranges():
     """Migrate employee_deductions, employee_bik, and bonus_records to use start_date and end_date"""
