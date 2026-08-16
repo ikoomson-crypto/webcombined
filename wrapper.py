@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 import os
 import re
 import sqlite3
+import psycopg2
+import psycopg2.extras
 
 from extensions import db, migrate
 
@@ -33,6 +35,10 @@ from app4.app import app as app4
 # Import app5 with its base path (Projects)
 os.environ['BASE_PATH'] = '/app5'
 from app5.app import app as app5
+
+# Import paysys with its base path (Payroll)
+os.environ['BASE_PATH'] = '/paysys'
+from paysys.app import app as paysys
 
 # Reset BASE_PATH to default (optional)
 os.environ['BASE_PATH'] = ''
@@ -74,11 +80,30 @@ AVAILABLE_APPS = {
         'color': 'success',
         'description': 'Project Costing System',
         'route': '/app5/'
+    },
+    'paysys': {
+        'name': 'Payroll',
+        'icon': 'fa-calculator',  # Fixed: Changed from fa-tasks to fa-calculator
+        'color': 'success',
+        'description': 'Payroll System',
+        'route': '/paysys/'
     }
 }
 
 # Get list of app names for easy reference
 APP_NAMES = list(AVAILABLE_APPS.keys())
+
+# ========== DETECT PRODUCTION ENVIRONMENT ==========
+IS_PRODUCTION = bool(os.environ.get('DATABASE_URL'))
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+if IS_PRODUCTION:
+    # Fix for Render's postgres:// vs postgresql://
+    if DATABASE_URL.startswith('postgres://'):
+        DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+    print(f"✅ Running in PRODUCTION mode with PostgreSQL")
+else:
+    print(f"✅ Running in DEVELOPMENT mode with SQLite")
 
 
 # ========== AUTH MODELS ==========
@@ -150,9 +175,9 @@ class UserAppAccess(db.Model):
     )
 
 
-# ========== DATABASE MIGRATION HELPER ==========
-def migrate_database(db_path):
-    """Add missing columns to existing database"""
+# ========== DATABASE MIGRATION HELPERS ==========
+def migrate_sqlite_database(db_path):
+    """Add missing columns to existing SQLite database"""
     if not os.path.exists(db_path):
         return
 
@@ -172,6 +197,43 @@ def migrate_database(db_path):
         conn.close()
     except Exception as e:
         print(f"⚠️ Migration warning: {e}")
+
+
+def migrate_postgres_database():
+    """Add missing columns to existing PostgreSQL database"""
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
+
+        # Check if is_approved column exists
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name='auth_users' AND column_name='is_approved'
+        """)
+        result = cursor.fetchone()
+
+        if not result:
+            print("🔧 Adding is_approved column to auth_users...")
+            cursor.execute("ALTER TABLE auth_users ADD COLUMN is_approved BOOLEAN DEFAULT TRUE")
+            conn.commit()
+            print("✅ is_approved column added successfully!")
+
+        # Check if auth_users table exists
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name='auth_users'
+            )
+        """)
+        table_exists = cursor.fetchone()[0]
+
+        if not table_exists:
+            print("⚠️ auth_users table does not exist. It will be created by SQLAlchemy.")
+
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ PostgreSQL migration warning: {e}")
 
 
 # ========== AUTH DECORATORS ==========
@@ -245,14 +307,17 @@ def create_app():
 
     # ===== DATABASE CONFIGURATION FOR AUTH =====
     # Use the same DATABASE_URL as the apps
-    if os.environ.get('DATABASE_URL'):
-        database_url = os.environ.get('DATABASE_URL')
-        if database_url and database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-        flask_app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        print(f"✅ Auth using shared PostgreSQL database")
+    if IS_PRODUCTION:
+        # PostgreSQL on Render
+        flask_app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+        flask_app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+            'pool_size': 10,
+            'pool_recycle': 300,
+            'pool_pre_ping': True,
+        }
+        print(f"✅ Auth using PostgreSQL database")
     else:
-        # Use SQLite locally
+        # SQLite locally
         db_path = os.path.join(os.path.dirname(__file__), 'auth.db')
         flask_app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
         print(f"✅ Auth using SQLite locally at: {db_path}")
@@ -265,13 +330,17 @@ def create_app():
     migrate.init_app(flask_app, db)
 
     with flask_app.app_context():
-        # Only run SQLite migration for local SQLite database
-        if 'sqlite' in flask_app.config['SQLALCHEMY_DATABASE_URI']:
+        # Run migrations based on database type
+        if IS_PRODUCTION:
+            migrate_postgres_database()
+        else:
             db_path = flask_app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-            migrate_database(db_path)
+            migrate_sqlite_database(db_path)
 
+        # Create tables
         db.create_all()
 
+        # Create admin user if it doesn't exist
         if not User.query.filter_by(username='admin').first():
             admin = User(
                 username='admin',
@@ -294,6 +363,12 @@ def create_app():
             print("👤 Username: admin")
             print("🔑 Password: admin123")
             print("=" * 60)
+
+        # Check if there are users without any app access and show warning
+        users_no_apps = User.query.filter_by(is_admin=False).all()
+        users_no_apps = [u for u in users_no_apps if not u.has_any_app_access()]
+        if users_no_apps:
+            print(f"⚠️ {len(users_no_apps)} user(s) have no app access. They need to be assigned access by an admin.")
 
     return flask_app
 
@@ -626,6 +701,7 @@ application = DispatcherMiddleware(
         "/app3": app3,
         "/app4": app4,
         "/app5": app5,
+        "/paysys": paysys,
     }
 )
 
@@ -639,12 +715,9 @@ if __name__ == "__main__":
     print("=" * 60)
 
     # Show database configuration
-    if os.environ.get('DATABASE_URL'):
-        database_url = os.environ.get('DATABASE_URL')
-        if 'postgres' in database_url:
-            print("📊 Database: PostgreSQL (Production)")
-        else:
-            print("📊 Database: " + database_url)
+    if IS_PRODUCTION:
+        print("📊 Database: PostgreSQL (Production)")
+        print(f"📊 Database URL: {DATABASE_URL[:30]}...")  # Truncate for security
     else:
         print("📊 Database: SQLite (Local)")
 
@@ -654,7 +727,7 @@ if __name__ == "__main__":
     print("📱 Users must be assigned apps by admin to access them")
     print("📁 Apps mounted:")
     for app_id, app_info in AVAILABLE_APPS.items():
-        print(f"   - {app_info['route']} - {app_info['name']}")
+        print(f"   - {app_info['route']} - {app_info['name']} ({app_info['icon']})")
     print("🌐 Access at: http://localhost:5000")
     print("=" * 60)
 
