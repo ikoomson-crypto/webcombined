@@ -3221,6 +3221,16 @@ def get_all_tax_configs():
     cursor.execute("SELECT * FROM tax_configs ORDER BY company_id, year")
     return cursor.fetchall()
 
+def execute_query(cursor, query, params=None):
+    """Execute a query with proper parameter handling for both SQLite and PostgreSQL"""
+    if IS_PRODUCTION:
+        # Replace ? with %s for PostgreSQL
+        query = query.replace('?', '%s')
+    if params:
+        cursor.execute(query, params)
+    else:
+        cursor.execute(query)
+    return cursor
 # ============================================
 # TAX RATES DATABASE - Year Specific
 # ============================================
