@@ -2737,19 +2737,20 @@ def generate_bulk_payslip_pdf(company_id, year, month):
 # SAMPLE DATA
 # ============================================
 
-    def init_sample_data():
-        """Initialize sample data if database is empty"""
-        db = get_db()
-        cursor = get_cursor(db)
+def init_sample_data():
+    """Initialize sample data if database is empty"""
+    db = get_db()
+    cursor = get_cursor(db)
 
-        # For SQLite with row_factory = sqlite3.Row
-        cursor.execute("SELECT COUNT(*) as count FROM companies")
-        row = cursor.fetchone()
-        count = row['count'] if row else 0  # sqlite3.Row supports dict-style access
+    # Check if companies already exist
+    cursor.execute("SELECT COUNT(*) as count FROM companies")
+    row = cursor.fetchone()
+    count = row['count'] if row else 0
 
-        if count > 0:
-            print(f"📊 Database already has {count} companies, skipping sample data")
-            return
+    if count > 0:
+        print(f"📊 Database already has {count} companies, skipping sample data")
+        return
+
     # Insert Companies
     companies = [
         (1, 'Tech Solutions Inc.', 'USD', '123 Tech Park, Silicon Valley, CA', 'TAX-78945',
@@ -2950,7 +2951,6 @@ def generate_bulk_payslip_pdf(company_id, year, month):
 
     db.commit()
     print("✅ Sample data inserted successfully")
-
 
 # ============================================
 # COMPANY SWITCHER CONTEXT PROCESSOR
@@ -5923,7 +5923,8 @@ def test_api():
 def initialize():
     """Initialize the payroll app's database"""
     with app.app_context():
-        if not IS_PRODUCTION:
+        # Create database directory for SQLite
+        if not IS_PRODUCTION and DATABASE:
             os.makedirs(os.path.dirname(DATABASE) or '.', exist_ok=True)
 
         init_db()
@@ -5933,15 +5934,14 @@ def initialize():
         if IS_PRODUCTION:
             print("✅ Payroll app initialized with PostgreSQL")
         else:
-            print("✅ Payroll app initialized with SQLite")
+            print(f"✅ Payroll app initialized with SQLite: {DATABASE}")
 
 
-# Run initialization when module is first imported
+# Initialize the app when module is imported (runs for both direct execution and wrapper)
+initialize()
 
 
 if __name__ == '__main__':
-    initialize()
-
     print("=" * 60)
     print("🚀 Payroll Management System")
     print("=" * 60)
