@@ -3228,22 +3228,96 @@ def add_company():
         db = get_db()
         cursor = get_cursor(db)
 
-        cursor.execute("""
-            INSERT INTO companies (name, base_currency, address, tax_id, email, phone, created_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            request.form['name'],
-            request.form['base_currency'],
-            request.form.get('address', ''),
-            request.form.get('tax_id', ''),
-            request.form.get('email', ''),
-            request.form.get('phone', ''),
-            datetime.datetime.now().strftime('%Y-%m-%d')
-        ))
+        # Check if code column exists
+        if IS_PRODUCTION:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name='companies' AND column_name='code'
+            """)
+            has_code_column = cursor.fetchone() is not None
+        else:
+            cursor.execute("PRAGMA table_info(companies)")
+            columns = [col[1] for col in cursor.fetchall()]
+            has_code_column = 'code' in columns
 
-        company_id = cursor.lastrowid
+        # Insert company with or without code
+        if has_code_column:
+            # Generate optional code from name
+            company_name = request.form['name']
+            company_code = ''.join(word[0].upper() for word in company_name.split())[:10]
+            if not company_code:
+                company_code = company_name[:10].upper()
+
+            if IS_PRODUCTION:
+                cursor.execute("""
+                    INSERT INTO companies (name, code, base_currency, address, tax_id, email, phone, created_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    request.form['name'],
+                    company_code,
+                    request.form['base_currency'],
+                    request.form.get('address', ''),
+                    request.form.get('tax_id', ''),
+                    request.form.get('email', ''),
+                    request.form.get('phone', ''),
+                    datetime.datetime.now().strftime('%Y-%m-%d')
+                ))
+                company_id = cursor.fetchone()[0]
+            else:
+                cursor.execute("""
+                    INSERT INTO companies (name, code, base_currency, address, tax_id, email, phone, created_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    request.form['name'],
+                    company_code,
+                    request.form['base_currency'],
+                    request.form.get('address', ''),
+                    request.form.get('tax_id', ''),
+                    request.form.get('email', ''),
+                    request.form.get('phone', ''),
+                    datetime.datetime.now().strftime('%Y-%m-%d')
+                ))
+                company_id = cursor.lastrowid
+        else:
+            # Insert without code column
+            if IS_PRODUCTION:
+                cursor.execute("""
+                    INSERT INTO companies (name, base_currency, address, tax_id, email, phone, created_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                """, (
+                    request.form['name'],
+                    request.form['base_currency'],
+                    request.form.get('address', ''),
+                    request.form.get('tax_id', ''),
+                    request.form.get('email', ''),
+                    request.form.get('phone', ''),
+                    datetime.datetime.now().strftime('%Y-%m-%d')
+                ))
+                company_id = cursor.fetchone()[0]
+            else:
+                cursor.execute("""
+                    INSERT INTO companies (name, base_currency, address, tax_id, email, phone, created_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    request.form['name'],
+                    request.form['base_currency'],
+                    request.form.get('address', ''),
+                    request.form.get('tax_id', ''),
+                    request.form.get('email', ''),
+                    request.form.get('phone', ''),
+                    datetime.datetime.now().strftime('%Y-%m-%d')
+                ))
+                company_id = cursor.lastrowid
+
         db.commit()
 
+        if not company_id:
+            raise Exception("Failed to get company ID")
+
+        # Create tax configurations (existing code)
         current_year = datetime.datetime.now().year
         is_ghana = request.form['base_currency'] == 'GHS'
 
@@ -3252,26 +3326,49 @@ def add_company():
             brackets_json = json.dumps(rates['brackets'])
             standard_deduction = 0 if is_ghana else rates['standard_deduction'] * 2.5
 
-            cursor.execute("""
-                INSERT INTO tax_configs (company_id, year, country, standard_deduction,
-                                         social_security_rate, social_security_threshold, brackets, is_active, created_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                company_id,
-                year,
-                'Ghana' if is_ghana else 'USA',
-                standard_deduction,
-                rates['social_security_rate'] * 0.887 if is_ghana else rates['social_security_rate'],
-                rates['social_security_threshold'] * 2.5,
-                brackets_json,
-                1 if year == current_year else 0,
-                datetime.datetime.now().strftime('%Y-%m-%d')
-            ))
+            if IS_PRODUCTION:
+                cursor.execute("""
+                    INSERT INTO tax_configs (company_id, year, country, standard_deduction,
+                                             social_security_rate, social_security_threshold, brackets, is_active, created_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    company_id,
+                    year,
+                    'Ghana' if is_ghana else 'USA',
+                    standard_deduction,
+                    rates['social_security_rate'] * 0.887 if is_ghana else rates['social_security_rate'],
+                    rates['social_security_threshold'] * 2.5,
+                    brackets_json,
+                    1 if year == current_year else 0,
+                    datetime.datetime.now().strftime('%Y-%m-%d')
+                ))
+            else:
+                cursor.execute("""
+                    INSERT INTO tax_configs (company_id, year, country, standard_deduction,
+                                             social_security_rate, social_security_threshold, brackets, is_active, created_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    company_id,
+                    year,
+                    'Ghana' if is_ghana else 'USA',
+                    standard_deduction,
+                    rates['social_security_rate'] * 0.887 if is_ghana else rates['social_security_rate'],
+                    rates['social_security_threshold'] * 2.5,
+                    brackets_json,
+                    1 if year == current_year else 0,
+                    datetime.datetime.now().strftime('%Y-%m-%d')
+                ))
 
-            cursor.execute("""
-                INSERT INTO bonus_tax_configs (company_id, year, bonus_threshold_percentage, bonus_tax_rate, created_date)
-                VALUES (?, ?, ?, ?, ?)
-            """, (company_id, year, 15.0, 5.0, datetime.datetime.now().strftime('%Y-%m-%d')))
+            if IS_PRODUCTION:
+                cursor.execute("""
+                    INSERT INTO bonus_tax_configs (company_id, year, bonus_threshold_percentage, bonus_tax_rate, created_date)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (company_id, year, 15.0, 5.0, datetime.datetime.now().strftime('%Y-%m-%d')))
+            else:
+                cursor.execute("""
+                    INSERT INTO bonus_tax_configs (company_id, year, bonus_threshold_percentage, bonus_tax_rate, created_date)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (company_id, year, 15.0, 5.0, datetime.datetime.now().strftime('%Y-%m-%d')))
 
         db.commit()
         session['current_company_id'] = company_id
@@ -3280,7 +3377,6 @@ def add_company():
         return redirect(url_for('list_companies'))
 
     return render_template('company_form.html', company=None, action='Add')
-
 
 @app.route('/companies/edit/<int:company_id>', methods=['GET', 'POST'])
 def edit_company(company_id):
