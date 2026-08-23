@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Journal Entry Details</h2>
+        <a href="{{ url_for('journal_entries') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Journal
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Entry #: {{ entry_number }}</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Date</th>
+                            <th>Account Name</th>
+                            <th>Description</th>
+                            <th class="text-end">Debit ($)</th>
+                            <th class="text-end">Credit ($)</th>
+                            <th>Attachment</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                        <tr>
+                            <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ entry.account.account_code }} - {{ entry.account.account_name }}</td>
+                            <td>{{ entry.description }}</td>
+                            <td class="text-end text-success">
+                                {% if entry.debit > 0 %}
+                                    ${{ "%.2f"|format(entry.debit) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-danger">
+                                {% if entry.credit > 0 %}
+                                    ${{ "%.2f"|format(entry.credit) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if entry.attachment_filename %}
+                                    <a href="{{ url_for('download_attachment', entry_id=entry.id) }}" class="btn btn-sm btn-info" target="_blank">
+                                        <i class="fas fa-download"></i> {{ entry.attachment_original_name }}
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">No file</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-warning">
+                        <tr>
+                            <th colspan="3" class="text-end">Totals:</th>
+                            <th class="text-end">${{ "%.2f"|format(total_debits) }}</th>
+                            <th class="text-end">${{ "%.2f"|format(total_credits) }}</th>
+                            <th></th>
+                        </tr>
+                        {% if total_debits == total_credits %}
+                        <tr class="table-success">
+                            <td colspan="6" class="text-center">
+                                <i class="fas fa-check-circle"></i> ✓ This journal entry is balanced!
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr class="table-danger">
+                            <td colspan="6" class="text-center">
+                                <i class="fas fa-exclamation-triangle"></i> ⚠ This journal entry is NOT balanced!
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

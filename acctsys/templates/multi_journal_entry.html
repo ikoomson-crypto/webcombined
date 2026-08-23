@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">
+                <i class="fas fa-book"></i> Multi-Line Journal Entry
+            </h4>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Double-Entry Accounting:</strong> Total debits must equal total credits. You can add multiple rows.
+                Each row can have either a Debit OR Credit amount (not both).
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" id="journalForm">
+                {{ form.hidden_tag() }}
+
+                <!-- Header Row -->
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="journal-table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="min-width: 120px">Date</th>
+                                <th style="min-width: 250px">Account Name</th>
+                                <th style="min-width: 300px">Description</th>
+                                <th style="min-width: 150px">Debit ($)</th>
+                                <th style="min-width: 150px">Credit ($)</th>
+                                <th style="min-width: 200px">Attach File</th>
+                                <th style="width: 50px">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entries-body">
+                            {% for entry in form.entries %}
+                            <tr class="journal-row">
+                                <td>
+                                    <input type="date" name="entries-{{ loop.index0 }}-date" id="entries-{{ loop.index0 }}-date"
+                                           class="form-control date-input" value="{{ entry.date.data if entry.date.data else '' }}">
+                                </td>
+                                <td>
+                                    <select name="entries-{{ loop.index0 }}-account_id" id="entries-{{ loop.index0 }}-account_id"
+                                            class="form-select account-select">
+                                        <option value="">Select Account</option>
+                                        {% for account in accounts %}
+                                        <option value="{{ account.id }}" {% if entry.account_id.data == account.id %}selected{% endif %}>
+                                            {{ account.account_code }} - {{ account.account_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <textarea name="entries-{{ loop.index0 }}-description" id="entries-{{ loop.index0 }}-description"
+                                              class="form-control description-input" rows="1" placeholder="Description...">{{ entry.description.data or '' }}</textarea>
+                                </td>
+                                <td>
+                                    <input type="number" name="entries-{{ loop.index0 }}-debit" id="entries-{{ loop.index0 }}-debit"
+                                           class="form-control debit-input" step="0.01" value="{{ entry.debit.data or 0 }}" placeholder="0.00">
+                                </td>
+                                <td>
+                                    <input type="number" name="entries-{{ loop.index0 }}-credit" id="entries-{{ loop.index0 }}-credit"
+                                           class="form-control credit-input" step="0.01" value="{{ entry.credit.data or 0 }}" placeholder="0.00">
+                                </td>
+                                <td>
+                                    <input type="file" name="entries-{{ loop.index0 }}-attachment" id="entries-{{ loop.index0 }}-attachment"
+                                           class="form-control attachment-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                                    <small class="text-muted" id="filename-{{ loop.index0 }}"></small>
+                                </td>
+                                <td class="text-center">
+                                    {% if loop.index0 > 0 %}
+                                    <button type="button" class="btn btn-danger btn-sm remove-row">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-info">
+                                <td colspan="3" class="text-end"><strong>Totals:</strong></td>
+                                <td><strong id="total-debits">$0.00</strong></td>
+                                <td><strong id="total-credits">$0.00</strong></td>
+                                <td colspan="2"></td>
+                            </tr>
+                            <tr id="balance-row" class="table-warning">
+                                <td colspan="7" class="text-center" id="balance-message"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <button type="button" class="btn btn-success" id="add-row">
+                            <i class="fas fa-plus"></i> Add Another Entry
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="submit-btn" disabled>
+                            <i class="fas fa-save"></i> Save All Entries
+                        </button>
+                        <a href="{{ url_for('journal_entries') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let rowCount = {{ form.entries|length }};
+    const accountsData = {{ accounts|tojson|safe }};
+
+    function calculateTotals() {
+        let totalDebits = 0;
+        let totalCredits = 0;
+
+        document.querySelectorAll('.journal-row').forEach(row => {
+            const debit = parseFloat(row.querySelector('.debit-input').value) || 0;
+            const credit = parseFloat(row.querySelector('.credit-input').value) || 0;
+            totalDebits += debit;
+            totalCredits += credit;
+        });
+
+        document.getElementById('total-debits').textContent = `$${totalDebits.toFixed(2)}`;
+        document.getElementById('total-credits').textContent = `$${totalCredits.toFixed(2)}`;
+
+        const balanceMsg = document.getElementById('balance-message');
+        const submitBtn = document.getElementById('submit-btn');
+
+        if (totalDebits === totalCredits && totalDebits > 0) {
+            balanceMsg.innerHTML = '<i class="fas fa-check-circle"></i> ✓ In Balance - Debits equal Credits';
+            balanceMsg.style.color = 'green';
+            submitBtn.disabled = false;
+        } else if (totalDebits === 0 && totalCredits === 0) {
+            balanceMsg.innerHTML = '<i class="fas fa-info-circle"></i> Enter at least one debit or credit amount';
+            balanceMsg.style.color = 'orange';
+            submitBtn.disabled = true;
+        } else {
+            const diff = Math.abs(totalDebits - totalCredits);
+            balanceMsg.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Out of Balance - Difference: $${diff.toFixed(2)}`;
+            balanceMsg.style.color = 'red';
+            submitBtn.disabled = true;
+        }
+    }
+
+    function clearOtherField(row) {
+        const debitInput = row.querySelector('.debit-input');
+        const creditInput = row.querySelector('.credit-input');
+
+        debitInput.addEventListener('input', function() {
+            if (parseFloat(this.value) > 0) {
+                creditInput.value = 0;
+                creditInput.readOnly = true;
+                creditInput.classList.add('bg-light');
+            } else {
+                creditInput.readOnly = false;
+                creditInput.classList.remove('bg-light');
+            }
+            calculateTotals();
+        });
+
+        creditInput.addEventListener('input', function() {
+            if (parseFloat(this.value) > 0) {
+                debitInput.value = 0;
+                debitInput.readOnly = true;
+                debitInput.classList.add('bg-light');
+            } else {
+                debitInput.readOnly = false;
+                debitInput.classList.remove('bg-light');
+            }
+            calculateTotals();
+        });
+    }
+
+    function addEventListenersToRow(row) {
+        const removeBtn = row.querySelector('.remove-row');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                row.remove();
+                calculateTotals();
+            });
+        }
+
+        // Handle file attachment display
+        const fileInput = row.querySelector('.attachment-input');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                const filenameSpan = row.querySelector('[id^="filename-"]');
+                if (filenameSpan && this.files[0]) {
+                    filenameSpan.textContent = this.files[0].name;
+                }
+            });
+        }
+
+        clearOtherField(row);
+    }
+
+    // Initialize existing rows
+    document.querySelectorAll('.journal-row').forEach(row => {
+        addEventListenersToRow(row);
+        calculateTotals();
+    });
+
+    // Add new row
+    document.getElementById('add-row').addEventListener('click', function() {
+        const tbody = document.getElementById('entries-body');
+        const newIndex = rowCount;
+
+        // Create account select options
+        let accountOptions = '<option value="">Select Account</option>';
+        accountsData.forEach(account => {
+            accountOptions += `<option value="${account.id}">${account.account_code} - ${account.account_name}</option>`;
+        });
+
+        const newRow = document.createElement('tr');
+        newRow.className = 'journal-row';
+        newRow.innerHTML = `
+            <td>
+                <input type="date" name="entries-${newIndex}-date" id="entries-${newIndex}-date"
+                       class="form-control date-input" value="${new Date().toISOString().split('T')[0]}">
+             </td>
+            <td>
+                <select name="entries-${newIndex}-account_id" id="entries-${newIndex}-account_id"
+                        class="form-select account-select">
+                    ${accountOptions}
+                </select>
+             </td>
+            <td>
+                <textarea name="entries-${newIndex}-description" id="entries-${newIndex}-description"
+                          class="form-control description-input" rows="1" placeholder="Description..."></textarea>
+             </td>
+            <td>
+                <input type="number" name="entries-${newIndex}-debit" id="entries-${newIndex}-debit"
+                       class="form-control debit-input" step="0.01" value="0" placeholder="0.00">
+             </td>
+            <td>
+                <input type="number" name="entries-${newIndex}-credit" id="entries-${newIndex}-credit"
+                       class="form-control credit-input" step="0.01" value="0" placeholder="0.00">
+             </td>
+            <td>
+                <input type="file" name="entries-${newIndex}-attachment" id="entries-${newIndex}-attachment"
+                       class="form-control attachment-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                <small class="text-muted" id="filename-${newIndex}"></small>
+             </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-danger btn-sm remove-row">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(newRow);
+        addEventListenersToRow(newRow);
+        rowCount++;
+        calculateTotals();
+    });
+});
+</script>
+
+<style>
+    .journal-row .form-control, .journal-row .form-select {
+        border-radius: 4px;
+    }
+
+    .journal-row .debit-input:focus, .journal-row .credit-input:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+
+    .bg-light {
+        background-color: #e9ecef !important;
+    }
+
+    @media (max-width: 768px) {
+        .table-responsive {
+            overflow-x: auto;
+        }
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 38px;
+    }
+</style>
+{% endblock %}

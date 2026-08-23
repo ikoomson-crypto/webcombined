@@ -1,0 +1,630 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">
+                <i class="fas fa-book"></i> Journal Entry
+            </h4>
+            <div>
+                <button type="button" class="btn btn-light btn-sm" id="expandAllBtn">
+                    <i class="fas fa-expand-alt"></i> Expand All
+                </button>
+                <button type="button" class="btn btn-light btn-sm" id="collapseAllBtn">
+                    <i class="fas fa-compress-alt"></i> Collapse All
+                </button>
+                <button type="button" class="btn btn-light btn-sm" id="resetColumnsBtn">
+                    <i class="fas fa-sync-alt"></i> Reset Columns
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Double-Entry Accounting:</strong> Each journal entry requires a Debit account and a Credit account with equal amounts.
+                <strong>Tip:</strong> Drag the column borders to resize! Click on description or amount to expand.
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" id="journalForm">
+                <input type="hidden" name="entry_count" id="entry_count" value="{{ entry_count }}">
+
+                <div class="table-responsive" id="table-container">
+                    <table class="table table-bordered table-hover" id="journal-table">
+                        <thead class="table-dark">
+                            <tr id="resizable-header">
+                                <th style="min-width: 100px; width: 100px; position: relative;" class="resizable-column">
+                                    Date
+                                    <div class="resize-handle"></div>
+                                </th>
+                                <th style="min-width: 200px; width: 200px; position: relative;" class="resizable-column">
+                                    Description
+                                    <div class="resize-handle"></div>
+                                </th>
+                                <th style="min-width: 200px; width: 200px; position: relative;" class="resizable-column">
+                                    Account Name (Dr)
+                                    <div class="resize-handle"></div>
+                                </th>
+                                <th style="min-width: 200px; width: 200px; position: relative;" class="resizable-column">
+                                    Account Name (Cr)
+                                    <div class="resize-handle"></div>
+                                </th>
+                                <th style="min-width: 120px; width: 120px; position: relative;" class="resizable-column">
+                                    Amount ($)
+                                    <div class="resize-handle"></div>
+                                </th>
+                                <th style="min-width: 180px; width: 180px; position: relative;" class="resizable-column">
+                                    Attach File
+                                    <div class="resize-handle"></div>
+                                </th>
+                                <th style="min-width: 80px; width: 80px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entries-body">
+                            {% for i in range(entry_count) %}
+                            <tr class="journal-row" data-expanded="false">
+                                <td>
+                                    <input type="date" name="entries-{{ i }}-date" id="entries-{{ i }}-date"
+                                           class="form-control form-control-sm date-input"
+                                           value="{{ datetime.now().strftime('%Y-%m-%d') }}" required>
+                                </td>
+                                <td class="description-cell">
+                                    <div class="description-preview" data-row="{{ i }}">
+                                        <span class="preview-text">Click to add description...</span>
+                                    </div>
+                                    <textarea name="entries-{{ i }}-description" id="entries-{{ i }}-description"
+                                              class="form-control form-control-sm description-input expanded-content"
+                                              rows="2" placeholder="Enter description..." style="display: none;"></textarea>
+                                </td>
+                                <td>
+                                    <select name="entries-{{ i }}-debit_account" id="entries-{{ i }}-debit_account"
+                                            class="form-select form-select-sm debit-account-select" required>
+                                        <option value="">Select Debit Account</option>
+                                        {% for account in accounts %}
+                                        <option value="{{ account.id }}">
+                                            {{ account.account_code }} - {{ account.account_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="entries-{{ i }}-credit_account" id="entries-{{ i }}-credit_account"
+                                            class="form-select form-select-sm credit-account-select" required>
+                                        <option value="">Select Credit Account</option>
+                                        {% for account in accounts %}
+                                        <option value="{{ account.id }}">
+                                            {{ account.account_code }} - {{ account.account_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td class="amount-cell">
+                                    <div class="amount-preview" data-row="{{ i }}">
+                                        <span class="preview-amount">$0.00</span>
+                                    </div>
+                                    <input type="number" name="entries-{{ i }}-amount" id="entries-{{ i }}-amount"
+                                           class="form-control form-control-sm amount-input expanded-content"
+                                           step="0.01" value="0" placeholder="0.00" required style="display: none;">
+                                </td>
+                                <td>
+                                    <input type="file" name="entries-{{ i }}-attachment" id="entries-{{ i }}-attachment"
+                                           class="form-control form-control-sm attachment-input"
+                                           accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                                    <small class="text-muted filename-display" id="filename-{{ i }}"></small>
+                                </td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-primary toggle-row" data-row="{{ i }}" title="Expand/Collapse">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                    {% if i > 0 %}
+                                    <button type="button" class="btn btn-sm btn-danger remove-row" data-row="{{ i }}" title="Remove">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-info">
+                                <td colspan="4" class="text-end"><strong>Total Amount:</strong></td>
+                                <td colspan="2"><strong id="total-amount">$0.00</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <button type="button" class="btn btn-success" id="add-row">
+                            <i class="fas fa-plus"></i> Add Another Entry
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="submit-btn">
+                            <i class="fas fa-save"></i> Save Journal Entry
+                        </button>
+                        <a href="{{ url_for('journal_entries') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let rowCount = {{ entry_count }};
+    const accountsData = {{ accounts_json|tojson|safe }};
+
+    // Column resizing functionality
+    function makeColumnsResizable() {
+        const headers = document.querySelectorAll('#resizable-header .resizable-column');
+        let startX, startWidth, resizingColumn = null;
+
+        headers.forEach(header => {
+            const handle = header.querySelector('.resize-handle');
+            if (!handle) return;
+
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resizingColumn = header;
+                startX = e.pageX;
+                startWidth = header.offsetWidth;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!resizingColumn) return;
+            const diff = e.pageX - startX;
+            let newWidth = startWidth + diff;
+            newWidth = Math.max(80, Math.min(400, newWidth));
+            resizingColumn.style.width = newWidth + 'px';
+            resizingColumn.style.minWidth = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (resizingColumn) {
+                resizingColumn = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                saveColumnWidths();
+            }
+        });
+    }
+
+    function saveColumnWidths() {
+        const columns = document.querySelectorAll('#resizable-header .resizable-column');
+        const widths = {};
+        columns.forEach((col, index) => {
+            widths[index] = col.style.width;
+        });
+        localStorage.setItem('journalColumnWidths', JSON.stringify(widths));
+    }
+
+    function loadColumnWidths() {
+        const savedWidths = localStorage.getItem('journalColumnWidths');
+        if (savedWidths) {
+            const widths = JSON.parse(savedWidths);
+            const columns = document.querySelectorAll('#resizable-header .resizable-column');
+            columns.forEach((col, index) => {
+                if (widths[index]) {
+                    col.style.width = widths[index];
+                    col.style.minWidth = widths[index];
+                }
+            });
+        }
+    }
+
+    function resetColumnWidths() {
+        const defaultWidths = ['100px', '200px', '200px', '200px', '120px', '180px'];
+        const columns = document.querySelectorAll('#resizable-header .resizable-column');
+        columns.forEach((col, index) => {
+            if (defaultWidths[index]) {
+                col.style.width = defaultWidths[index];
+                col.style.minWidth = defaultWidths[index];
+            }
+        });
+        localStorage.removeItem('journalColumnWidths');
+        alert('Column widths reset to default!');
+    }
+
+    // Toggle row expansion
+    function toggleRow(row) {
+        const isExpanded = row.getAttribute('data-expanded') === 'true';
+        const descriptionTextarea = row.querySelector('.description-input');
+        const descriptionPreview = row.querySelector('.description-preview');
+        const amountInput = row.querySelector('.amount-input');
+        const amountPreview = row.querySelector('.amount-preview');
+        const toggleIcon = row.querySelector('.toggle-row i');
+
+        if (isExpanded) {
+            descriptionTextarea.style.display = 'none';
+            descriptionPreview.style.display = 'block';
+            amountInput.style.display = 'none';
+            amountPreview.style.display = 'block';
+            toggleIcon.className = 'fas fa-chevron-down';
+            row.setAttribute('data-expanded', 'false');
+        } else {
+            descriptionTextarea.style.display = 'block';
+            descriptionPreview.style.display = 'none';
+            amountInput.style.display = 'block';
+            amountPreview.style.display = 'none';
+            toggleIcon.className = 'fas fa-chevron-up';
+            row.setAttribute('data-expanded', 'true');
+            descriptionTextarea.focus();
+        }
+    }
+
+    // Update preview text
+    function updateDescriptionPreview(row, textarea) {
+        const previewSpan = row.querySelector('.preview-text');
+        const value = textarea.value.trim();
+
+        if (value) {
+            previewSpan.textContent = value.substring(0, 50) + (value.length > 50 ? '...' : '');
+            previewSpan.style.color = '#333';
+            previewSpan.style.fontStyle = 'normal';
+        } else {
+            previewSpan.textContent = 'Click to add description...';
+            previewSpan.style.color = '#999';
+            previewSpan.style.fontStyle = 'italic';
+        }
+    }
+
+    // Update amount preview
+    function updateAmountPreview(row, amountInput) {
+        const previewSpan = row.querySelector('.preview-amount');
+        const value = parseFloat(amountInput.value) || 0;
+
+        previewSpan.textContent = `$${value.toFixed(2)}`;
+        if (value > 0) {
+            previewSpan.style.color = '#28a745';
+        } else {
+            previewSpan.style.color = '#999';
+        }
+    }
+
+    // Calculate total amount
+    function calculateTotal() {
+        let total = 0;
+        document.querySelectorAll('.amount-input').forEach(input => {
+            total += parseFloat(input.value) || 0;
+        });
+        document.getElementById('total-amount').innerHTML = `$${total.toFixed(2)}`;
+    }
+
+    // Setup row functionality
+    function setupRow(row) {
+        const toggleBtn = row.querySelector('.toggle-row');
+        const descriptionTextarea = row.querySelector('.description-input');
+        const amountInput = row.querySelector('.amount-input');
+        const descriptionPreview = row.querySelector('.description-preview');
+        const amountPreview = row.querySelector('.amount-preview');
+        const debitSelect = row.querySelector('.debit-account-select');
+        const creditSelect = row.querySelector('.credit-account-select');
+        const fileInput = row.querySelector('.attachment-input');
+        const filenameSpan = row.querySelector('.filename-display');
+
+        // Toggle button
+        toggleBtn.addEventListener('click', () => toggleRow(row));
+
+        // Click on preview to expand
+        descriptionPreview.addEventListener('click', () => {
+            if (row.getAttribute('data-expanded') !== 'true') toggleRow(row);
+        });
+        amountPreview.addEventListener('click', () => {
+            if (row.getAttribute('data-expanded') !== 'true') toggleRow(row);
+        });
+
+        // Description input
+        descriptionTextarea.addEventListener('input', () => {
+            updateDescriptionPreview(row, descriptionTextarea);
+        });
+
+        // Amount input
+        amountInput.addEventListener('input', () => {
+            if (amountInput.value < 0) amountInput.value = 0;
+            updateAmountPreview(row, amountInput);
+            calculateTotal();
+        });
+
+        // Account validation
+        debitSelect.addEventListener('change', function() {
+            if (creditSelect.value === this.value && this.value !== "") {
+                alert('Debit and Credit accounts cannot be the same!');
+                this.value = "";
+            }
+        });
+
+        creditSelect.addEventListener('change', function() {
+            if (debitSelect.value === this.value && this.value !== "") {
+                alert('Debit and Credit accounts cannot be the same!');
+                this.value = "";
+            }
+        });
+
+        // File attachment
+        if (fileInput && filenameSpan) {
+            fileInput.addEventListener('change', function() {
+                if (this.files[0]) {
+                    filenameSpan.textContent = this.files[0].name;
+                    filenameSpan.style.color = '#28a745';
+                } else {
+                    filenameSpan.textContent = '';
+                }
+            });
+        }
+
+        // Initialize previews
+        updateDescriptionPreview(row, descriptionTextarea);
+        updateAmountPreview(row, amountInput);
+    }
+
+    // Add new row
+    function addNewRow() {
+        const tbody = document.getElementById('entries-body');
+        const newIndex = rowCount;
+
+        let accountOptions = '<option value="">Select Account</option>';
+        accountsData.forEach(account => {
+            accountOptions += `<option value="${account.id}">${account.account_code} - ${account.account_name}</option>`;
+        });
+
+        const todayDate = new Date().toISOString().split('T')[0];
+
+        const newRow = document.createElement('tr');
+        newRow.className = 'journal-row';
+        newRow.setAttribute('data-expanded', 'false');
+        newRow.innerHTML = `
+            <td>
+                <input type="date" name="entries-${newIndex}-date" id="entries-${newIndex}-date"
+                       class="form-control form-control-sm date-input" value="${todayDate}" required>
+             </td>
+            <td class="description-cell">
+                <div class="description-preview" data-row="${newIndex}">
+                    <span class="preview-text">Click to add description...</span>
+                </div>
+                <textarea name="entries-${newIndex}-description" id="entries-${newIndex}-description"
+                          class="form-control form-control-sm description-input expanded-content"
+                          rows="2" placeholder="Enter description..." style="display: none;"></textarea>
+            </td>
+            <td>
+                <select name="entries-${newIndex}-debit_account" id="entries-${newIndex}-debit_account"
+                        class="form-select form-select-sm debit-account-select" required>
+                    ${accountOptions}
+                </select>
+            </td>
+            <td>
+                <select name="entries-${newIndex}-credit_account" id="entries-${newIndex}-credit_account"
+                        class="form-select form-select-sm credit-account-select" required>
+                    ${accountOptions}
+                </select>
+            </td>
+            <td class="amount-cell">
+                <div class="amount-preview" data-row="${newIndex}">
+                    <span class="preview-amount">$0.00</span>
+                </div>
+                <input type="number" name="entries-${newIndex}-amount" id="entries-${newIndex}-amount"
+                       class="form-control form-control-sm amount-input expanded-content"
+                       step="0.01" value="0" placeholder="0.00" required style="display: none;">
+            </td>
+            <td>
+                <input type="file" name="entries-${newIndex}-attachment" id="entries-${newIndex}-attachment"
+                       class="form-control form-control-sm attachment-input"
+                       accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                <small class="text-muted filename-display" id="filename-${newIndex}"></small>
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-primary toggle-row" data-row="${newIndex}" title="Expand/Collapse">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-danger remove-row" data-row="${newIndex}" title="Remove">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(newRow);
+        setupRow(newRow);
+
+        // Remove row functionality
+        newRow.querySelector('.remove-row').addEventListener('click', function() {
+            newRow.remove();
+            calculateTotal();
+        });
+
+        rowCount++;
+        document.getElementById('entry_count').value = rowCount;
+        calculateTotal();
+    }
+
+    // Expand all rows
+    function expandAllRows() {
+        document.querySelectorAll('.journal-row').forEach(row => {
+            if (row.getAttribute('data-expanded') !== 'true') {
+                toggleRow(row);
+            }
+        });
+    }
+
+    // Collapse all rows
+    function collapseAllRows() {
+        document.querySelectorAll('.journal-row').forEach(row => {
+            if (row.getAttribute('data-expanded') === 'true') {
+                toggleRow(row);
+            }
+        });
+    }
+
+    // Initialize
+    makeColumnsResizable();
+    loadColumnWidths();
+
+    // Setup existing rows
+    document.querySelectorAll('.journal-row').forEach(row => {
+        setupRow(row);
+    });
+
+    // Calculate initial total
+    calculateTotal();
+
+    // Add row button
+    document.getElementById('add-row').addEventListener('click', addNewRow);
+
+    // Remove row buttons for existing rows
+    document.querySelectorAll('.remove-row').forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.closest('tr').remove();
+            calculateTotal();
+        });
+    });
+
+    // Expand/Collapse all buttons
+    document.getElementById('expandAllBtn').addEventListener('click', expandAllRows);
+    document.getElementById('collapseAllBtn').addEventListener('click', collapseAllRows);
+    document.getElementById('resetColumnsBtn').addEventListener('click', resetColumnWidths);
+});
+</script>
+
+<style>
+    .journal-row {
+        transition: all 0.3s ease;
+    }
+
+    .journal-row:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+
+    .description-preview, .amount-preview {
+        cursor: pointer;
+        padding: 6px 8px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        background-color: #fff;
+        transition: all 0.2s ease;
+        min-height: 31px;
+    }
+
+    .description-preview:hover, .amount-preview:hover {
+        border-color: #80bdff;
+        background-color: #f8f9fa;
+    }
+
+    .preview-text {
+        color: #999;
+        font-style: italic;
+    }
+
+    .preview-amount {
+        font-weight: bold;
+        font-size: 13px;
+    }
+
+    .expanded-content {
+        margin-top: 5px;
+    }
+
+    .description-input {
+        width: 100%;
+        resize: vertical;
+    }
+
+    .amount-input {
+        text-align: right;
+    }
+
+    .toggle-row {
+        margin-right: 5px;
+    }
+
+    /* Resizable columns */
+    .resizable-column {
+        position: relative;
+        user-select: none;
+    }
+
+    .resize-handle {
+        position: absolute;
+        top: 0;
+        right: -3px;
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        background-color: transparent;
+        z-index: 10;
+    }
+
+    .resize-handle:hover {
+        background-color: #3498db;
+    }
+
+    .resize-handle:active {
+        background-color: #2980b9;
+    }
+
+    .table th, .table td {
+        vertical-align: middle;
+        padding: 8px;
+    }
+
+    .table-responsive {
+        border-radius: 10px;
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+
+    .form-control-sm, .form-select-sm {
+        font-size: 13px;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    .debit-account-select {
+        border-left: 3px solid #28a745;
+    }
+
+    .credit-account-select {
+        border-left: 3px solid #dc3545;
+    }
+
+    .filename-display {
+        display: block;
+        margin-top: 5px;
+        font-size: 10px;
+        word-break: break-all;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .expanded-content {
+        animation: slideDown 0.3s ease;
+    }
+
+    @media (max-width: 768px) {
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        .table th, .table td {
+            padding: 5px;
+        }
+    }
+</style>
+{% endblock %}

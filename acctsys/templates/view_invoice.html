@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Invoice Details</h2>
+        <div>
+            <a href="{{ url_for('download_invoice', id=invoice.id) }}" class="btn btn-success">
+                <i class="fas fa-download"></i> Download PDF
+            </a>
+            <a href="{{ url_for('invoices') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Invoice Information</h5>
+                    <table class="table table-borderless">
+                        <tr>
+                            <th width="150">Invoice #:</th>
+                            <td>{{ invoice.invoice_number }}</td>
+                        </tr>
+                        <tr>
+                            <th>Customer:</th>
+                            <td>{{ invoice.customer_name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Date:</th>
+                            <td>{{ invoice.date.strftime('%Y-%m-%d') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status:</th>
+                            <td>
+                                <span class="badge bg-{{ 'success' if invoice.status == 'Paid' else 'warning' if invoice.status == 'Pending' else 'danger' }}">
+                                    {{ invoice.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Account:</th>
+                            <td>
+                                {% if invoice.account %}
+                                    {{ invoice.account.account_code }} - {{ invoice.account.account_name }}
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h5>Financial Details</h5>
+                    {% set invoice_total = invoice.lines|sum(attribute='total') %}
+                    <table class="table table-borderless">
+                        <tr>
+                            <th width="150">Amount:</th>
+                            <td><h3 class="text-primary">${{ "%.2f"|format(invoice_total) }}</h3></td>
+                        </tr>
+                        <tr>
+                            <th>Created:</th>
+                            <td>{{ invoice.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Line Items Table -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h5>Invoice Line Items</h5>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th>Description</th>
+                                    <th class="text-end">Qty</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end">Account</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for line in invoice.lines %}
+                                <tr>
+                                    <td>{{ line.description }}</td>
+                                    <td class="text-end">{{ "%.2f"|format(line.quantity) }}</td>
+                                    <td class="text-end">${{ "%.2f"|format(line.unit_price) }}</td>
+                                    <td class="text-end">
+                                        {% if line.account %}
+                                            {{ line.account.account_code }} - {{ line.account.account_name }}
+                                        {% else %}
+                                            <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">${{ "%.2f"|format(line.total) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-info">
+                                    <th colspan="4" class="text-end">Grand Total:</th>
+                                    <th class="text-end">${{ "%.2f"|format(invoice_total) }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if invoice.description %}
+            <div class="row mt-3">
+                <div class="col-12">
+                    <h5>Description</h5>
+                    <p>{{ invoice.description }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

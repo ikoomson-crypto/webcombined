@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-0">Create Multi-Line Journal Entry</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Double-Entry Accounting:</strong> Total debits must equal total credits for each journal entry.
+                    </div>
+
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.entry_number.label(class="form-label") }}
+                                    {{ form.entry_number(class="form-control", placeholder="e.g., JE-2024-001") }}
+                                    {% for error in form.entry_number.errors %}
+                                        <span class="text-danger">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.date.label(class="form-label") }}
+                                    {{ form.date(class="form-control", type="date") }}
+                                    {% for error in form.date.errors %}
+                                        <span class="text-danger">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control", rows=2, placeholder="Describe this journal entry...") }}
+                            {% for error in form.description.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-bordered" id="journal-lines-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Account</th>
+                                        <th width="150">Debit ($)</th>
+                                        <th width="150">Credit ($)</th>
+                                        <th width="50"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for line in form.lines %}
+                                    <tr class="journal-line">
+                                        <tr>
+                                            {{ line.account_id(class="form-select account-select") }}
+                                            {% for error in line.account_id.errors %}
+                                                <span class="text-danger">{{ error }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {{ line.debit(class="form-control debit-input", placeholder="0.00", step="0.01", value="0") }}
+                                            {% for error in line.debit.errors %}
+                                                <span class="text-danger">{{ error }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td>
+                                            {{ line.credit(class="form-control credit-input", placeholder="0.00", step="0.01", value="0") }}
+                                            {% for error in line.credit.errors %}
+                                                <span class="text-danger">{{ error }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td class="text-center">
+                                            {% if loop.index > 2 %}
+                                            <button type="button" class="btn btn-danger btn-sm remove-line">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% else %}
+                                            <span class="text-muted">Required</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-info">
+                                        <td class="text-end"><strong>Totals:</strong></td>
+                                        <td><strong id="total-debits">$0.00</strong></td>
+                                        <td><strong id="total-credits">$0.00</strong></td>
+                                        <td>\n                                        </td>
+                                    </tr>
+                                    <tr id="balance-row" class="table-warning">
+                                        <td colspan="4" class="text-center" id="balance-message">
+                                            <span id="balance-status"></span>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-secondary" id="add-line">
+                                <i class="fas fa-plus"></i> Add Line
+                            </button>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('journal_entries') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            {{ form.submit(class="btn btn-primary", id="submit-btn") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const totalDebitsSpan = document.getElementById('total-debits');
+    const totalCreditsSpan = document.getElementById('total-credits');
+    const balanceStatusSpan = document.getElementById('balance-status');
+    const submitBtn = document.getElementById('submit-btn');
+
+    function calculateTotals() {
+        let totalDebits = 0;
+        let totalCredits = 0;
+
+        document.querySelectorAll('.journal-line').forEach(line => {
+            const debit = parseFloat(line.querySelector('.debit-input').value) || 0;
+            const credit = parseFloat(line.querySelector('.credit-input').value) || 0;
+            totalDebits += debit;
+            totalCredits += credit;
+        });
+
+        totalDebitsSpan.textContent = `$${totalDebits.toFixed(2)}`;
+        totalCreditsSpan.textContent = `$${totalCredits.toFixed(2)}`;
+
+        const difference = Math.abs(totalDebits - totalCredits);
+        if (totalDebits === totalCredits && totalDebits > 0) {
+            balanceStatusSpan.innerHTML = '<i class="fas fa-check-circle"></i> ✓ In Balance - Debits equal Credits';
+            balanceStatusSpan.style.color = 'green';
+            submitBtn.disabled = false;
+        } else if (totalDebits === 0 && totalCredits === 0) {
+            balanceStatusSpan.innerHTML = '<i class="fas fa-info-circle"></i> Enter at least one debit or credit amount';
+            balanceStatusSpan.style.color = 'orange';
+            submitBtn.disabled = true;
+        } else {
+            balanceStatusSpan.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Out of Balance - Difference: $${difference.toFixed(2)}`;
+            balanceStatusSpan.style.color = 'red';
+            submitBtn.disabled = true;
+        }
+    }
+
+    function addEventListeners() {
+        document.querySelectorAll('.debit-input, .credit-input').forEach(input => {
+            input.removeEventListener('input', calculateTotals);
+            input.addEventListener('input', function() {
+                if (this.value < 0) this.value = 0;
+                calculateTotals();
+            });
+        });
+    }
+
+    // Add new line
+    document.getElementById('add-line').addEventListener('click', function() {
+        const tbody = document.querySelector('#journal-lines-table tbody');
+        const newIndex = tbody.children.length;
+
+        // Get the select options from the first row
+        const firstSelect = document.querySelector('.account-select');
+        const selectOptions = firstSelect.innerHTML;
+
+        const newRow = document.createElement('tr');
+        newRow.className = 'journal-line';
+        newRow.innerHTML = `
+            <td>
+                <select class="form-select account-select" name="lines-${newIndex}-account_id" id="lines-${newIndex}-account_id">
+                    ${selectOptions}
+                </select>
+            </td>
+            <td>
+                <input class="form-control debit-input" type="number" step="0.01" name="lines-${newIndex}-debit" id="lines-${newIndex}-debit" value="0" placeholder="0.00">
+            </td>
+            <td>
+                <input class="form-control credit-input" type="number" step="0.01" name="lines-${newIndex}-credit" id="lines-${newIndex}-credit" value="0" placeholder="0.00">
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-danger btn-sm remove-line">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(newRow);
+
+        newRow.querySelector('.remove-line').addEventListener('click', function() {
+            newRow.remove();
+            calculateTotals();
+        });
+
+        addEventListeners();
+        calculateTotals();
+    });
+
+    // Remove line functionality for existing buttons
+    document.querySelectorAll('.remove-line').forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.closest('tr').remove();
+            calculateTotals();
+        });
+    });
+
+    addEventListeners();
+    calculateTotals();
+});
+</script>
+{% endblock %}

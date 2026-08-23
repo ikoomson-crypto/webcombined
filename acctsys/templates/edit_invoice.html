@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">Edit Invoice</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" id="invoiceForm">
+                    {{ form.hidden_tag() }}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.invoice_number.label(class="form-label") }}
+                                {{ form.invoice_number(class="form-control") }}
+                                {% for error in form.invoice_number.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.date.label(class="form-label") }}
+                                {{ form.date(class="form-control", type="date") }}
+                                {% for error in form.date.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.customer_id.label(class="form-label") }}
+                        {{ form.customer_id(class="form-select", id="customerSelect") }}
+                        {% for error in form.customer_id.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                        <small class="text-muted">Select a customer</small>
+                    </div>
+
+                    <!-- REMOVED: Customer Name field - auto-populated from customer selection -->
+
+                    <div class="mb-3">
+                        {{ form.amount.label(class="form-label") }}
+                        {{ form.amount(class="form-control", placeholder="0.00", step="0.01") }}
+                        {% for error in form.amount.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.status.label(class="form-label") }}
+                                {{ form.status(class="form-select") }}
+                                {% for error in form.status.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.account_id.label(class="form-label") }}
+                                {{ form.account_id(class="form-select") }}
+                                {% for error in form.account_id.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                                <small class="text-muted">Select the revenue account for this invoice</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control", rows=3) }}
+                        {% for error in form.description.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+
+                    {{ form.submit(class="btn btn-primary") }}
+                    <a href="{{ url_for('invoices') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const customerSelect = document.getElementById('customerSelect');
+
+    // Auto-populate customer name when customer is selected
+    customerSelect.addEventListener('change', function() {
+        const customerId = this.value;
+
+        if (customerId && customerId !== '0') {
+            // Make AJAX request to get customer details
+            fetch(`/edit_invoice?customer_id=${customerId}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Customer name is auto-populated in the backend and stored
+                console.log('Customer selected:', data.customer_name);
+            })
+            .catch(error => {
+                console.error('Error fetching customer data:', error);
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

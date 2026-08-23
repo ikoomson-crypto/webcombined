@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-shopping-cart"></i> Add Purchase</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="purchaseForm">
+                        {{ form.hidden_tag() }}
+
+                        <!-- ========== PURCHASE HEADER ========== -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                {{ form.purchase_number.label(class="form-label fw-bold") }}
+                                {{ form.purchase_number(class="form-control", readonly=True) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.date.label(class="form-label fw-bold") }}
+                                {{ form.date(class="form-control", type="date") }}
+                                {% for error in form.date.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.status.label(class="form-label fw-bold") }}
+                                {{ form.status(class="form-select") }}
+                                {% for error in form.status.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- ========== SUPPLIER & INVOICE ========== -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.supplier_id.label(class="form-label fw-bold") }}
+                                {{ form.supplier_id(class="form-select") }}
+                                {% for error in form.supplier_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.invoice_number.label(class="form-label fw-bold") }}
+                                {{ form.invoice_number(class="form-control", placeholder="Supplier Invoice #") }}
+                                {% for error in form.invoice_number.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- ========== DUE DATE ========== -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.due_date.label(class="form-label fw-bold") }}
+                                {{ form.due_date(class="form-control", type="date") }}
+                                {% for error in form.due_date.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                <!-- Reserved for future use -->
+                            </div>
+                        </div>
+
+                        <!-- ========== LINE ITEMS TABLE ========== -->
+                        <div class="card mt-4">
+                            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-list"></i> Line Items</span>
+                                <button type="button" class="btn btn-light btn-sm" id="addLineBtn">
+                                    <i class="fas fa-plus"></i> Add Line
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered mb-0" id="linesTable">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th style="width: 30%;">Description</th>
+                                                <th style="width: 12%;">Qty</th>
+                                                <th style="width: 15%;">Unit Price</th>
+                                                <th style="width: 23%;">Account</th>
+                                                <th style="width: 15%;">Total</th>
+                                                <th style="width: 5%;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="lines-tbody">
+                                            {% for line in form.lines %}
+                                            <tr class="line-row">
+                                                <td>
+                                                    <input type="text" name="lines-{{ loop.index0 }}-description"
+                                                           class="form-control form-control-sm"
+                                                           placeholder="Description"
+                                                           value="{{ line.data.description if line.data else '' }}">
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="lines-{{ loop.index0 }}-quantity"
+                                                           class="form-control form-control-sm qty-input"
+                                                           placeholder="1" step="1" min="1" value="1">
+                                                </td>
+                                                <td>
+                                                    <input type="number" name="lines-{{ loop.index0 }}-unit_price"
+                                                           class="form-control form-control-sm price-input"
+                                                           placeholder="0.00" step="0.01" min="0">
+                                                </td>
+                                                <td>
+                                                    <select name="lines-{{ loop.index0 }}-account_id"
+                                                            class="form-select form-select-sm account-select">
+                                                        <option value="">Select Account</option>
+                                                        {% for acc in accounts %}
+                                                        <option value="{{ acc.id }}">
+                                                            {{ acc.account_code }} - {{ acc.account_name }}
+                                                        </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </td>
+                                                <td class="text-end line-total">$0.00</td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-danger remove-line-btn" {% if loop.index == 1 %}disabled{% endif %}>
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-info">
+                                                <td colspan="4" class="text-end fw-bold">Grand Total:</td>
+                                                <td class="text-end fw-bold" id="grandTotal">$0.00</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ========== SUBMIT ========== -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('purchases') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const linesTbody = document.getElementById('lines-tbody');
+    const addLineBtn = document.getElementById('addLineBtn');
+    const grandTotalEl = document.getElementById('grandTotal');
+
+    // ========== CALCULATE LINE TOTAL ==========
+    function calculateLineTotal(row) {
+        const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
+        const price = parseFloat(row.querySelector('.price-input').value) || 0;
+        const total = qty * price;
+        row.querySelector('.line-total').textContent = `$${total.toFixed(2)}`;
+        return total;
+    }
+
+    // ========== CALCULATE GRAND TOTAL ==========
+    function calculateGrandTotal() {
+        let grandTotal = 0;
+        document.querySelectorAll('.line-row').forEach(row => {
+            grandTotal += calculateLineTotal(row);
+        });
+        grandTotalEl.textContent = `$${grandTotal.toFixed(2)}`;
+    }
+
+    // ========== ADD NEW LINE ROW ==========
+    function addLineRow() {
+        const rowCount = linesTbody.children.length;
+        const newRow = document.createElement('tr');
+        newRow.className = 'line-row';
+
+        let accountOptions = '<option value="">Select Account</option>';
+        {% for acc in accounts %}
+        accountOptions += '<option value="{{ acc.id }}">{{ acc.account_code }} - {{ acc.account_name }}</option>';
+        {% endfor %}
+
+        newRow.innerHTML = `
+            <td>
+                <input type="text" name="lines-${rowCount}-description" class="form-control form-control-sm" placeholder="Description">
+            </td>
+            <td>
+                <input type="number" name="lines-${rowCount}-quantity" class="form-control form-control-sm qty-input" placeholder="1" step="1" min="1" value="1">
+            </td>
+            <td>
+                <input type="number" name="lines-${rowCount}-unit_price" class="form-control form-control-sm price-input" placeholder="0.00" step="0.01" min="0">
+            </td>
+            <td>
+                <select name="lines-${rowCount}-account_id" class="form-select form-select-sm account-select">
+                    ${accountOptions}
+                </select>
+            </td>
+            <td class="text-end line-total">$0.00</td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-danger remove-line-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </td>
+        `;
+
+        linesTbody.appendChild(newRow);
+
+        attachLineEvents(newRow);
+        calculateGrandTotal();
+    }
+
+    // ========== ATTACH EVENTS TO A LINE ROW ==========
+    function attachLineEvents(row) {
+        const qtyInput = row.querySelector('.qty-input');
+        const priceInput = row.querySelector('.price-input');
+        const removeBtn = row.querySelector('.remove-line-btn');
+
+        qtyInput.addEventListener('input', calculateGrandTotal);
+        priceInput.addEventListener('input', calculateGrandTotal);
+
+        removeBtn.addEventListener('click', function() {
+            if (linesTbody.children.length > 1) {
+                row.remove();
+                calculateGrandTotal();
+                reindexLines();
+            }
+        });
+    }
+
+    // ========== RE-INDEX LINE FIELDS AFTER REMOVAL ==========
+    function reindexLines() {
+        const rows = linesTbody.querySelectorAll('.line-row');
+        rows.forEach((row, index) => {
+            const inputs = row.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                const name = input.getAttribute('name');
+                if (name) {
+                    input.setAttribute('name', name.replace(/lines-\d+/, `lines-${index}`));
+                }
+            });
+        });
+    }
+
+    // ========== INITIALIZE EXISTING LINES ==========
+    document.querySelectorAll('.line-row').forEach(row => {
+        attachLineEvents(row);
+    });
+
+    // ========== ADD LINE BUTTON ==========
+    addLineBtn.addEventListener('click', addLineRow);
+
+    // ========== INITIAL CALCULATION ==========
+    calculateGrandTotal();
+});
+</script>
+
+<style>
+    .line-total {
+        font-weight: 500;
+    }
+    .remove-line-btn {
+        padding: 2px 8px;
+    }
+    .account-select {
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}

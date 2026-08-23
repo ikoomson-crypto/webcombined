@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">
+                <i class="fas fa-receipt"></i> Payment Voucher
+            </h4>
+            <div>
+                <button type="button" class="btn btn-light btn-sm" id="printBtn">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button type="button" class="btn btn-light btn-sm" id="resetColumnsBtn">
+                    <i class="fas fa-sync-alt"></i> Reset Columns
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Payment Voucher:</strong> Create payment vouchers for supplier payments. WHT and VAT will be automatically calculated.
+                <strong>Tip:</strong> Add multiple rows for different expense allocations.
+            </div>
+
+            <form method="POST" id="paymentVoucherForm" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+                <input type="hidden" name="entry_count" id="entry_count" value="1">
+
+                <div class="row mb-4">
+                    <!-- Supplier Information -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white">
+                                <i class="fas fa-building"></i> Supplier Information
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">{{ form.supplier_id.label }}</label>
+                                    {{ form.supplier_id(class="form-select supplier-select") }}
+                                    {% for error in form.supplier_id.errors %}
+                                        <span class="text-danger small">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">{{ form.currency.label }}</label>
+                                        {{ form.currency(class="form-select currency-select") }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">{{ form.exchange_rate.label }}</label>
+                                        {{ form.exchange_rate(class="form-control exchange-rate", step="0.0001", value="1") }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Voucher Details -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white">
+                                <i class="fas fa-calendar"></i> Voucher Details
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">{{ form.date.label }}</label>
+                                    {{ form.date(class="form-control date-input", type="date") }}
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">{{ form.reference_number.label }}</label>
+                                    {{ form.reference_number(class="form-control", placeholder="Invoice/Reference Number") }}
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">{{ form.attachment.label }}</label>
+                                    {{ form.attachment(class="form-control") }}
+                                    <small class="text-muted">Supported formats: PDF, JPG, PNG, DOC (Max 16MB)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Account Information (Payment Account Only) -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white">
+                                <i class="fas fa-book"></i> Account Information
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">{{ form.payment_account_id.label }}</label>
+                                    {{ form.payment_account_id(class="form-select payment-account-select") }}
+                                    {% for error in form.payment_account_id.errors %}
+                                        <span class="text-danger small">{{ error }}</span>
+                                    {% endfor %}
+                                    <small class="text-muted">Account to be credited (e.g., Cash, Bank account)</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Debit Account (Auto)</label>
+                                    <input type="text" class="form-control" value="Accounts Payable - Trade" readonly disabled>
+                                    <small class="text-muted">The supplier's liability account will be debited automatically</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transaction Details -->
+                <div class="card mt-3">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-table"></i> Transaction Details</span>
+                        <button type="button" class="btn btn-light btn-sm" id="addRowBtn">
+                            <i class="fas fa-plus"></i> Add Row
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive" id="table-container">
+                            <table class="table table-bordered" id="voucher-table">
+                                <thead class="table-dark">
+                                    <tr id="resizable-header">
+                                        <th style="min-width: 250px; width: 250px; position: relative;" class="resizable-column">
+                                            Description
+                                            <div class="resize-handle"></div>
+                                        </th>
+                                        <th style="min-width: 100px; width: 100px; position: relative;" class="resizable-column">
+                                            WHT Rate (%)
+                                            <div class="resize-handle"></div>
+                                        </th>
+                                        <th style="min-width: 100px; width: 100px; position: relative;" class="resizable-column">
+                                            VAT Rate (%)
+                                            <div class="resize-handle"></div>
+                                        </th>
+                                        <th style="min-width: 150px; width: 150px; position: relative;" class="resizable-column">
+                                            Gross Amount
+                                            <div class="resize-handle"></div>
+                                        </th>
+                                        <th style="min-width: 80px; width: 80px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="entries-body">
+                                    <tr class="voucher-row">
+                                        <td class="description-cell">
+                                            <textarea name="entries-0-description" id="entries-0-description"
+                                                      class="form-control form-control-sm description-input"
+                                                      rows="2" placeholder="Enter description..."></textarea>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="entries-0-wht_rate" id="entries-0-wht_rate"
+                                                   class="form-control form-control-sm wht-rate" step="0.01" value="0">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="entries-0-vat_rate" id="entries-0-vat_rate"
+                                                   class="form-control form-control-sm vat-rate" step="0.01" value="0">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="entries-0-gross_amount" id="entries-0-gross_amount"
+                                                   class="form-control form-control-sm gross-amount" step="0.01" placeholder="0.00">
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-danger remove-row" disabled>
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-info">
+                                        <td colspan="3" class="text-end"><strong>Totals:</strong></td>
+                                        <td colspan="2">
+                                            <strong id="total-gross">$0.00</strong>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-warning">
+                                        <td colspan="5">
+                                            <div class="row">
+                                                <div class="col-md-3">
+                                                    <small>Total WHT Amount:</small><br>
+                                                    <strong id="total-wht" class="text-danger">$0.00</strong>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <small>Total VAT Amount:</small><br>
+                                                    <strong id="total-vat" class="text-success">$0.00</strong>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <small>Total Net Amount:</small><br>
+                                                    <strong id="total-net" class="text-primary">$0.00</strong>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <small>Payment Due:</small><br>
+                                                    <strong id="payment-due" class="text-info">$0.00</strong>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-12 text-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Payment Voucher
+                        </button>
+                        <a href="{{ url_for('payment_vouchers') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style media="print">
+    .sidebar, .card-header .btn, .mt-3 .btn, footer, .alert, .remove-row, #addRowBtn, #resetColumnsBtn, #printBtn {
+        display: none !important;
+    }
+    .main-content, .card, .card-body {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .container-fluid {
+        padding: 0 !important;
+    }
+    .table {
+        width: 100% !important;
+    }
+    .btn {
+        display: none !important;
+    }
+    @page {
+        size: landscape;
+        margin: 1cm;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let rowCount = 1;
+
+    function makeColumnsResizable() {
+        const headers = document.querySelectorAll('#resizable-header .resizable-column');
+        let startX, startWidth, resizingColumn = null;
+
+        headers.forEach(header => {
+            const handle = header.querySelector('.resize-handle');
+            if (!handle) return;
+
+            handle.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resizingColumn = header;
+                startX = e.pageX;
+                startWidth = header.offsetWidth;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!resizingColumn) return;
+            const diff = e.pageX - startX;
+            let newWidth = startWidth + diff;
+            newWidth = Math.max(80, Math.min(400, newWidth));
+            resizingColumn.style.width = newWidth + 'px';
+            resizingColumn.style.minWidth = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (resizingColumn) {
+                resizingColumn = null;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                saveColumnWidths();
+            }
+        });
+    }
+
+    function saveColumnWidths() {
+        const columns = document.querySelectorAll('#resizable-header .resizable-column');
+        const widths = {};
+        columns.forEach((col, index) => {
+            widths[index] = col.style.width;
+        });
+        localStorage.setItem('paymentVoucherColumnWidths', JSON.stringify(widths));
+    }
+
+    function loadColumnWidths() {
+        const savedWidths = localStorage.getItem('paymentVoucherColumnWidths');
+        if (savedWidths) {
+            const widths = JSON.parse(savedWidths);
+            const columns = document.querySelectorAll('#resizable-header .resizable-column');
+            columns.forEach((col, index) => {
+                if (widths[index]) {
+                    col.style.width = widths[index];
+                    col.style.minWidth = widths[index];
+                }
+            });
+        }
+    }
+
+    function resetColumnWidths() {
+        const defaultWidths = ['250px', '100px', '100px', '150px'];
+        const columns = document.querySelectorAll('#resizable-header .resizable-column');
+        columns.forEach((col, index) => {
+            if (defaultWidths[index]) {
+                col.style.width = defaultWidths[index];
+                col.style.minWidth = defaultWidths[index];
+            }
+        });
+        localStorage.removeItem('paymentVoucherColumnWidths');
+        alert('Column widths reset to default!');
+    }
+
+    function calculateTotals() {
+        let totalGross = 0;
+        let totalWHT = 0;
+        let totalVAT = 0;
+        let totalNet = 0;
+
+        document.querySelectorAll('.voucher-row').forEach(row => {
+            const grossAmount = parseFloat(row.querySelector('.gross-amount').value) || 0;
+            const whtRate = parseFloat(row.querySelector('.wht-rate').value) || 0;
+            const vatRate = parseFloat(row.querySelector('.vat-rate').value) || 0;
+
+            const whtAmount = (grossAmount * whtRate / 100);
+            const vatAmount = (grossAmount * vatRate / 100);
+            const netAmount = grossAmount - whtAmount + vatAmount;
+
+            totalGross += grossAmount;
+            totalWHT += whtAmount;
+            totalVAT += vatAmount;
+            totalNet += netAmount;
+        });
+
+        document.getElementById('total-gross').innerHTML = `$${totalGross.toFixed(2)}`;
+        document.getElementById('total-wht').innerHTML = `$${totalWHT.toFixed(2)}`;
+        document.getElementById('total-vat').innerHTML = `$${totalVAT.toFixed(2)}`;
+        document.getElementById('total-net').innerHTML = `$${totalNet.toFixed(2)}`;
+        document.getElementById('payment-due').innerHTML = `$${totalNet.toFixed(2)}`;
+    }
+
+    function addNewRow() {
+        const tbody = document.getElementById('entries-body');
+        const newIndex = rowCount;
+
+        const newRow = document.createElement('tr');
+        newRow.className = 'voucher-row';
+        newRow.innerHTML = `
+            <td class="description-cell">
+                <textarea name="entries-${newIndex}-description" id="entries-${newIndex}-description"
+                          class="form-control form-control-sm description-input"
+                          rows="2" placeholder="Enter description..."></textarea>
+            </td>
+            <td>
+                <input type="number" name="entries-${newIndex}-wht_rate" id="entries-${newIndex}-wht_rate"
+                       class="form-control form-control-sm wht-rate" step="0.01" value="0">
+            </td>
+            <td>
+                <input type="number" name="entries-${newIndex}-vat_rate" id="entries-${newIndex}-vat_rate"
+                       class="form-control form-control-sm vat-rate" step="0.01" value="0">
+            </td>
+            <td>
+                <input type="number" name="entries-${newIndex}-gross_amount" id="entries-${newIndex}-gross_amount"
+                       class="form-control form-control-sm gross-amount" step="0.01" placeholder="0.00">
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-danger remove-row">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(newRow);
+        setupRowEvents(newRow);
+        rowCount++;
+        document.getElementById('entry_count').value = rowCount;
+        calculateTotals();
+    }
+
+    function setupRowEvents(row) {
+        const whtInput = row.querySelector('.wht-rate');
+        const vatInput = row.querySelector('.vat-rate');
+        const grossInput = row.querySelector('.gross-amount');
+        const removeBtn = row.querySelector('.remove-row');
+
+        if (whtInput) whtInput.addEventListener('input', calculateTotals);
+        if (vatInput) vatInput.addEventListener('input', calculateTotals);
+        if (grossInput) grossInput.addEventListener('input', calculateTotals);
+
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                if (document.querySelectorAll('.voucher-row').length > 1) {
+                    row.remove();
+                    calculateTotals();
+                } else {
+                    alert('At least one row is required!');
+                }
+            });
+        }
+    }
+
+    function printVoucher() {
+        window.print();
+    }
+
+    document.querySelectorAll('.voucher-row').forEach(row => {
+        setupRowEvents(row);
+    });
+
+    document.getElementById('addRowBtn').addEventListener('click', addNewRow);
+    document.getElementById('printBtn').addEventListener('click', printVoucher);
+
+    makeColumnsResizable();
+    loadColumnWidths();
+    calculateTotals();
+
+    document.getElementById('resetColumnsBtn').addEventListener('click', resetColumnWidths);
+
+    const exchangeRateInput = document.querySelector('.exchange-rate');
+    if (exchangeRateInput) {
+        exchangeRateInput.addEventListener('input', calculateTotals);
+    }
+});
+</script>
+
+<style>
+    .voucher-row .form-control, .voucher-row .form-select {
+        border-radius: 4px;
+    }
+
+    .resizable-column {
+        position: relative;
+        user-select: none;
+    }
+
+    .resize-handle {
+        position: absolute;
+        top: 0;
+        right: -3px;
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        background-color: transparent;
+        z-index: 10;
+    }
+
+    .resize-handle:hover {
+        background-color: #3498db;
+    }
+
+    .table th, .table td {
+        vertical-align: middle;
+        padding: 8px;
+    }
+
+    .table-responsive {
+        border-radius: 10px;
+        overflow-x: auto;
+        overflow-y: visible;
+    }
+
+    .form-control-sm, .form-select-sm {
+        font-size: 13px;
+    }
+
+    .payment-account-select {
+        border-left: 3px solid #007bff;
+    }
+
+    .supplier-select {
+        border-left: 3px solid #007bff;
+    }
+
+    .card-header {
+        font-weight: 500;
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 38px;
+    }
+
+    @media (max-width: 768px) {
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        .row.mb-4 > div {
+            margin-bottom: 15px;
+        }
+    }
+</style>
+{% endblock %}

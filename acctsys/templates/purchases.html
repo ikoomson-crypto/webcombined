@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Purchases</h2>
+        <a href="{{ url_for('add_purchase') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Purchase
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Purchase List</h5>
+            <div id="bulk-actions" style="display: none;">
+                <button type="button" class="btn btn-danger btn-sm" id="deleteSelectedBtn">
+                    <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="deselectAllBtn">
+                    <i class="fas fa-times"></i> Deselect All
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped" id="purchasesTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAll" class="form-check-input">
+                            </th>
+                            <th>Purchase #</th>
+                            <th>Supplier</th>
+                            <th>Invoice #</th>
+                            <th>Amount</th>
+                            <th>Date</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                            <th>Account</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for purchase in purchases %}
+                        <tr class="purchase-row" data-purchase-id="{{ purchase.id }}">
+                            <td>
+                                <input type="checkbox" class="form-check-input purchase-checkbox" data-purchase-id="{{ purchase.id }}">
+                            </td>
+                            <td>{{ purchase.purchase_number }}</td>
+                            <td>{{ purchase.supplier.name if purchase.supplier else 'N/A' }}</td>
+                            <td>{{ purchase.invoice_number or 'N/A' }}</td>
+                            <td>${{ "%.2f"|format(purchase.amount) }}</td>
+                            <td>{{ purchase.date.strftime('%Y-%m-%d') }}</td>
+                            <td>{{ purchase.due_date.strftime('%Y-%m-%d') if purchase.due_date else 'N/A' }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'success' if purchase.status == 'Paid' else 'warning' if purchase.status == 'Pending' else 'danger' }}">
+                                    {{ purchase.status }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if purchase.account %}
+                                    {{ purchase.account.account_code }} - {{ purchase.account.account_name }}
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('edit_purchase', id=purchase.id) }}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-danger delete-single"
+                                            data-purchase-id="{{ purchase.id }}"
+                                            data-purchase-number="{{ purchase.purchase_number }}"
+                                            title="Delete Purchase">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center">No purchases found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle"></i> Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteMessage">Are you sure you want to delete the selected purchase(s)?</p>
+                <p class="text-danger"><strong>This action cannot be undone!</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden input for delete URL -->
+<input type="hidden" id="deletePurchasesUrl" value="{{ url_for('delete_purchases') }}">
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const purchaseCheckboxes = document.querySelectorAll('.purchase-checkbox');
+    const bulkActions = document.getElementById('bulk-actions');
+    const selectedCount = document.getElementById('selectedCount');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    let deleteTargets = [];
+    const deleteUrl = document.getElementById('deletePurchasesUrl').value;
+
+    function updateBulkActions() {
+        const checked = document.querySelectorAll('.purchase-checkbox:checked');
+        const count = checked.length;
+        selectedCount.textContent = count;
+
+        if (count > 0) {
+            bulkActions.style.display = 'block';
+        } else {
+            bulkActions.style.display = 'none';
+        }
+
+        const total = purchaseCheckboxes.length;
+        if (total > 0) {
+            selectAllCheckbox.checked = count === total;
+            selectAllCheckbox.indeterminate = count > 0 && count < total;
+        }
+    }
+
+    selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
+        purchaseCheckboxes.forEach(cb => cb.checked = isChecked);
+        updateBulkActions();
+    });
+
+    purchaseCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateBulkActions);
+    });
+
+    deselectAllBtn.addEventListener('click', function() {
+        purchaseCheckboxes.forEach(cb => cb.checked = false);
+        selectAllCheckbox.checked = false;
+        updateBulkActions();
+    });
+
+    // Delete Selected
+    deleteSelectedBtn.addEventListener('click', function() {
+        const checked = document.querySelectorAll('.purchase-checkbox:checked');
+        if (checked.length === 0) return;
+
+        deleteTargets = Array.from(checked).map(cb => parseInt(cb.dataset.purchaseId));
+        document.getElementById('deleteMessage').innerHTML =
+            `Are you sure you want to delete <strong>${deleteTargets.length}</strong> purchase(s)?`;
+        deleteModal.show();
+    });
+
+    // Single Delete
+    document.querySelectorAll('.delete-single').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const purchaseId = parseInt(this.dataset.purchaseId);
+            const purchaseNumber = this.dataset.purchaseNumber;
+            deleteTargets = [purchaseId];
+            document.getElementById('deleteMessage').innerHTML =
+                `Are you sure you want to delete purchase <strong>${purchaseNumber}</strong>?`;
+            deleteModal.show();
+        });
+    });
+
+    // Confirm Delete
+    confirmDeleteBtn.addEventListener('click', function() {
+        const purchaseIds = deleteTargets;
+        if (purchaseIds.length === 0) return;
+
+        fetch(deleteUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ purchase_ids: purchaseIds })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove deleted rows
+                if (data.deleted_ids && data.deleted_ids.length > 0) {
+                    data.deleted_ids.forEach(id => {
+                        const row = document.querySelector(`tr[data-purchase-id="${id}"]`);
+                        if (row) row.remove();
+                    });
+                }
+
+                deleteModal.hide();
+                updateBulkActions();
+                showAlert('success', data.message || 'Purchases deleted successfully.');
+            } else {
+                showAlert('danger', data.message || 'Error deleting purchases.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', 'An error occurred while deleting purchases.');
+        })
+        .finally(() => {
+            deleteModal.hide();
+        });
+    });
+
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        const container = document.querySelector('.container.mt-4');
+        container.insertBefore(alertDiv, container.firstChild);
+        setTimeout(() => { alertDiv.remove(); }, 5000);
+    }
+});
+</script>
+
+<style>
+    .purchase-row {
+        transition: background-color 0.3s ease;
+    }
+    .purchase-row:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    .purchase-checkbox {
+        cursor: pointer;
+    }
+    #selectAll {
+        cursor: pointer;
+    }
+    #bulk-actions {
+        animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}

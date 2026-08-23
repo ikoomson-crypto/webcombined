@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-cog"></i> System Settings</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('save_settings') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                        <div class="mb-4">
+                            <h5 class="text-primary"><i class="fas fa-file-invoice"></i> Accounts Receivable (AR)</h5>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">AR Account</label>
+                                <select class="form-select" name="ar_account_id" required>
+                                    <option value="">Select AR Account</option>
+                                    {% for account in asset_accounts %}
+                                    <option value="{{ account.id }}" {% if settings.ar_account_id == account.id %}selected{% endif %}>
+                                        {{ account.account_code }} - {{ account.account_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Used for the Debit side of invoices</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="text-primary"><i class="fas fa-shopping-cart"></i> Accounts Payable (AP)</h5>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">AP Account</label>
+                                <select class="form-select" name="ap_account_id" required>
+                                    <option value="">Select AP Account</option>
+                                    {% for account in liability_accounts %}
+                                    <option value="{{ account.id }}" {% if settings.ap_account_id == account.id %}selected{% endif %}>
+                                        {{ account.account_code }} - {{ account.account_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Used for the Credit side of purchases and payment vouchers</small>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

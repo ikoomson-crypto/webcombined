@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-truck-loading"></i> Add Supplier</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+
+                        <!-- Row 1: Company Name + Contact Person -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.name.label(class="form-label fw-bold") }}
+                                {{ form.name(class="form-control", placeholder="Company Name") }}
+                                {% for error in form.name.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.contact_person.label(class="form-label fw-bold") }}
+                                {{ form.contact_person(class="form-control", placeholder="Contact Person Name") }}
+                                {% for error in form.contact_person.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Email + Phone -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.email.label(class="form-label fw-bold") }}
+                                {{ form.email(class="form-control", placeholder="email@example.com") }}
+                                {% for error in form.email.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.phone.label(class="form-label fw-bold") }}
+                                {{ form.phone(class="form-control", placeholder="Phone Number") }}
+                                {% for error in form.phone.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Address (Full Width) -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                {{ form.address.label(class="form-label fw-bold") }}
+                                {{ form.address(class="form-control", rows=2, placeholder="Full Address") }}
+                                {% for error in form.address.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Row 4: Tax ID + Payment Terms -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.tax_id.label(class="form-label fw-bold") }}
+                                {{ form.tax_id(class="form-control", placeholder="Tax/VAT ID") }}
+                                {% for error in form.tax_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.payment_terms.label(class="form-label fw-bold") }}
+                                {{ form.payment_terms(class="form-select") }}
+                                {% for error in form.payment_terms.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Row 5: Opening Balance -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.opening_balance.label(class="form-label fw-bold") }}
+                                {{ form.opening_balance(class="form-control", placeholder="0.00") }}
+                                {% for error in form.opening_balance.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                <!-- Reserved for future use -->
+                            </div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('suppliers') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

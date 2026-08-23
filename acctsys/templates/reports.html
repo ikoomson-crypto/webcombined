@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">Financial Reports</h2>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Annual Financial Overview</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="annualChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Revenue vs Expenses</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="pieChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Summary Statistics</h5>
+            </div>
+            <div class="card-body" id="summaryStats">
+                <p>Loading statistics...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ✅ Fetch financial data using correct URL with /acctsys prefix
+fetch('/acctsys/api/financial_data?type=monthly')
+    .then(response => response.json())
+    .then(data => {
+        // Line Chart
+        const ctx = document.getElementById('annualChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.month),
+                datasets: [{
+                    label: 'Revenue',
+                    data: data.map(d => d.invoices),
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    borderWidth: 1
+                }, {
+                    label: 'Expenses',
+                    data: data.map(d => d.expenses),
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Pie Chart
+        const totalRevenue = data.reduce((sum, month) => sum + month.invoices, 0);
+        const totalExpenses = data.reduce((sum, month) => sum + month.expenses, 0);
+
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Revenue', 'Expenses'],
+                datasets: [{
+                    data: [totalRevenue, totalExpenses],
+                    backgroundColor: ['rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)']
+                }]
+            }
+        });
+
+        // Summary Statistics
+        const netProfit = totalRevenue - totalExpenses;
+        const profitMargin = (netProfit / totalRevenue * 100).toFixed(2);
+
+        document.getElementById('summaryStats').innerHTML = `
+            <div class="mb-3">
+                <strong>Total Revenue:</strong> $${totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+            <div class="mb-3">
+                <strong>Total Expenses:</strong> $${totalExpenses.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+            <div class="mb-3">
+                <strong>Net Profit:</strong> $${netProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </div>
+            <div class="mb-3">
+                <strong>Profit Margin:</strong> ${profitMargin}%
+            </div>
+        `;
+    })
+    .catch(error => {
+        console.error('Error fetching financial data:', error);
+        document.getElementById('summaryStats').innerHTML = '<p class="text-danger">Error loading statistics.</p>';
+    });
+</script>
+{% endblock %}

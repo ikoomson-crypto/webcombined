@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accounting System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow-x: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Sidebar Styles - Made Scrollable */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Custom Scrollbar for Sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.4);
+            border-radius: 10px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.6);
+        }
+
+        /* Sidebar Content */
+        .sidebar-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .sidebar .nav-link {
+            color: white !important;
+            padding: 12px 20px;
+            margin: 4px 12px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            display: block;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: rgba(255,255,255,0.15);
+            transform: translateX(5px);
+            color: white !important;
+        }
+
+        .sidebar .nav-link.active {
+            background-color: #3498db;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            color: white !important;
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 22px;
+            font-size: 16px;
+        }
+
+        /* User Info Section - Sticky at bottom */
+        .user-info {
+            margin-top: auto;
+            padding: 20px 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .user-info p {
+            margin: 0;
+            font-size: 0.85rem;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            margin-left: 260px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            min-height: 100vh;
+            width: calc(100% - 260px);
+        }
+
+        /* Dashboard Cards */
+        .dashboard-card {
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Badge Styles */
+        .badge-status {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.75rem;
+        }
+
+        /* Table Styles */
+        .table-responsive {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        /* Card Styles */
+        .card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            font-weight: bold;
+        }
+
+        /* Button Styles */
+        .btn {
+            border-radius: 5px;
+            padding: 8px 20px;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 40px;
+            color: #6c757d;
+            border-top: 1px solid #dee2e6;
+        }
+
+        /* Logo Section */
+        .logo-section {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 10px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                height: auto;
+                overflow-y: visible;
+            }
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+
+        /* Alert Styles */
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
+
+        /* Journal Entry Styles */
+        .journal-entry {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+
+        .journal-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        /* Ensure all links are clickable */
+        .sidebar .nav-link {
+            pointer-events: auto;
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    {% if current_user.is_authenticated %}
+    <!-- Sidebar - Scrollable -->
+    <div class="sidebar">
+        <div class="sidebar-content">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <i class="fas fa-calculator fa-3x text-white mb-2"></i>
+                <h4 class="text-white">Accounting Pro</h4>
+                <p class="text-white-50 small mb-0">{{ current_user.username }}</p>
+                <p class="text-white-50 small">{{ current_user.email }}</p>
+            </div>
+
+            <!-- Navigation Links - Will scroll -->
+            <nav class="nav flex-column">
+                <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'chart_of_accounts' %}active{% endif %}" href="{{ url_for('chart_of_accounts') }}">
+                    <i class="fas fa-book"></i> Chart of Accounts
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'account_types' or request.endpoint == 'add_account_type' or request.endpoint == 'edit_account_type' %}active{% endif %}" href="{{ url_for('account_types') }}">
+                    <i class="fas fa-tags"></i> Account Types
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'add_customer' %}active{% endif %}" href="{{ url_for('add_customer') }}">
+                    <i class="fas fa-user-plus"></i> Add Customer
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'add_supplier' %}active{% endif %}" href="{{ url_for('add_supplier') }}">
+                    <i class="fas fa-truck-loading"></i> Add Supplier
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'add_invoice' %}active{% endif %}" href="{{ url_for('add_invoice') }}">
+                    <i class="fas fa-file-invoice"></i> Add Invoice
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'add_purchase' %}active{% endif %}" href="{{ url_for('add_purchase') }}">
+                    <i class="fas fa-shopping-cart"></i> Add Purchase
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'journal_entries' %}active{% endif %}" href="{{ url_for('journal_entries') }}">
+                    <i class="fas fa-book-open"></i> Journal Entries
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'payment_vouchers' %}active{% endif %}" href="{{ url_for('payment_vouchers') }}">
+                    <i class="fas fa-receipt"></i> Payment Vouchers
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}" href="{{ url_for('reports') }}">
+                    <i class="fas fa-chart-pie"></i> Reports
+                </a>
+
+                <a class="nav-link {% if request.endpoint == 'trial_balance' %}active{% endif %}" href="{{ url_for('trial_balance') }}">
+                    <i class="fas fa-balance-scale"></i> Trial Balance
+                </a>
+            </nav>
+
+            <!-- User Info Section - Always at bottom -->
+            <div class="user-info">
+                <i class="fas fa-user-circle text-white mb-2"></i>
+                <p class="text-white-50 small mb-1">{{ current_user.username }}</p>
+                <a href="{{ url_for('logout') }}" class="nav-link text-center mt-2" style="padding: 8px;">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+    {% endif %}
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        <i class="fas fa-{{ 'check-circle' if category == 'success' else 'exclamation-circle' if category == 'danger' else 'info-circle' }} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Content Block -->
+        {% block content %}{% endblock %}
+
+        <!-- Footer -->
+        <footer>
+            <p>&copy; 2024 Accounting Pro System. All rights reserved.</p>
+        </footer>
+
+    {% if current_user.is_authenticated %}
+    </div>
+    {% endif %}
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Auto-dismiss alerts after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+
+        // Add active class to current navigation item
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.sidebar .nav-link');
+
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href && (currentPath === href || (currentPath.startsWith(href) && href !== '/'))) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Log navigation clicks for debugging
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                console.log('Navigating to:', this.getAttribute('href'));
+            });
+        });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

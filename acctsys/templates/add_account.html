@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-plus-circle"></i> Add New Account</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+
+                        <!-- Row 1: Account Code + Account Name -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.account_code.label(class="form-label fw-bold") }}
+                                {{ form.account_code(class="form-control", placeholder="e.g., 1000") }}
+                                {% for error in form.account_code.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.account_name.label(class="form-label fw-bold") }}
+                                {{ form.account_name(class="form-control", placeholder="e.g., Cash - Operating Account") }}
+                                {% for error in form.account_name.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Account Type + Parent Account -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.account_type_id.label(class="form-label fw-bold") }}
+                                {{ form.account_type_id(class="form-select") }}
+                                {% for error in form.account_type_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.parent_id.label(class="form-label fw-bold") }}
+                                {{ form.parent_id(class="form-select") }}
+                                {% for error in form.parent_id.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Row 3: Is Main Account + Opening Balance -->
+                        <div class="row mb-3">
+                            <div class="col-md-6 d-flex align-items-center">
+                                <div class="form-check">
+                                    {{ form.is_main_account(class="form-check-input") }}
+                                    {{ form.is_main_account.label(class="form-check-label fw-bold") }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.opening_balance.label(class="form-label fw-bold") }}
+                                {{ form.opening_balance(class="form-control", placeholder="0.00") }}
+                                {% for error in form.opening_balance.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Row 4: Description -->
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                {{ form.description.label(class="form-label fw-bold") }}
+                                {{ form.description(class="form-control", rows=3, placeholder="Optional description...") }}
+                                {% for error in form.description.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('chart_of_accounts') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

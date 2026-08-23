@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <h1 class="display-4 mb-4">Welcome to Accounting System</h1>
+            <p class="lead mb-4">Manage your finances, track invoices, and monitor expenses with ease.</p>
+
+            {% if not current_user.is_authenticated %}
+            <div class="mt-4">
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg mx-2">Login</a>
+                <a href="{{ url_for('register') }}" class="btn btn-success btn-lg mx-2">Register</a>
+            </div>
+            {% else %}
+            <div class="mt-4">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">Go to Dashboard</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row mt-5 pt-5">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-file-invoice fa-3x mb-3 text-primary"></i>
+                    <h5 class="card-title">Invoice Management</h5>
+                    <p class="card-text">Create, track, and manage all your invoices in one place.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-chart-line fa-3x mb-3 text-success"></i>
+                    <h5 class="card-title">Expense Tracking</h5>
+                    <p class="card-text">Monitor your expenses and keep your finances under control.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="fas fa-chart-pie fa-3x mb-3 text-info"></i>
+                    <h5 class="card-title">Financial Reports</h5>
+                    <p class="card-text">Generate detailed reports and visualize your financial data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

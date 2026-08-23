@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Account Types</h2>
+        <div>
+            <a href="{{ url_for('add_account_type') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Account Type
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Account Types List</h5>
+            <div id="account-type-bulk-actions" style="display: none;">
+                <button type="button" class="btn btn-danger btn-sm" id="deleteAccountTypesBtn">
+                    <i class="fas fa-trash"></i> Delete Selected (<span id="accountTypeSelectedCount">0</span>)
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="deselectAllAccountTypesBtn">
+                    <i class="fas fa-times"></i> Deselect All
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="accountTypesTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAll" class="form-check-input">
+                            </th>
+                            <th>Name</th>
+                            <th>Normal Balance</th>
+                            <th>Code Range</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for type in account_types %}
+                        <tr class="account-type-row" data-account-type-id="{{ type.id }}">
+                            <td>
+                                <input type="checkbox" class="form-check-input account-type-checkbox" data-account-type-id="{{ type.id }}">
+                            </td>
+                            <td><strong>{{ type.name }}</strong></td>
+                            <td>
+                                <span class="badge bg-{{ 'info' if type.normal_balance == 'Debit' else 'warning' }}">
+                                    {{ type.normal_balance }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if type.min_code and type.max_code %}
+                                    {{ type.min_code }} – {{ type.max_code }}
+                                {% else %}
+                                    <span class="text-muted">Not set</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ type.description or '-' }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('edit_account_type', id=type.id) }}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-danger delete-account-type-single"
+                                            data-account-type-id="{{ type.id }}"
+                                            data-account-type-name="{{ type.name }}"
+                                            title="Delete Account Type">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">
+                                No account types found. <a href="{{ url_for('add_account_type') }}">Add your first account type</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteAccountTypesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteAccountTypesMessage">Are you sure you want to delete the selected account type(s)?</p>
+                <p class="text-danger"><strong>This action cannot be undone!</strong></p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle"></i> Warning: Account Types that are being used by existing accounts cannot be deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteAccountTypesBtn">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const accountTypeCheckboxes = document.querySelectorAll('.account-type-checkbox');
+    const accountTypeBulkActions = document.getElementById('account-type-bulk-actions');
+    const accountTypeSelectedCount = document.getElementById('accountTypeSelectedCount');
+    const deleteAccountTypesBtn = document.getElementById('deleteAccountTypesBtn');
+    const deselectAllAccountTypesBtn = document.getElementById('deselectAllAccountTypesBtn');
+    const deleteAccountTypesModal = new bootstrap.Modal(document.getElementById('deleteAccountTypesModal'));
+    const confirmDeleteAccountTypesBtn = document.getElementById('confirmDeleteAccountTypesBtn');
+    let deleteAccountTypeTargets = [];
+
+    const deleteAccountTypesUrl = "{{ url_for('delete_account_types') }}";
+
+    function updateAccountTypeBulkActions() {
+        const checked = document.querySelectorAll('.account-type-checkbox:checked');
+        const count = checked.length;
+        accountTypeSelectedCount.textContent = count;
+
+        if (count > 0) {
+            accountTypeBulkActions.style.display = 'block';
+        } else {
+            accountTypeBulkActions.style.display = 'none';
+        }
+    }
+
+    selectAllCheckbox.addEventListener('change', function() {
+        accountTypeCheckboxes.forEach(cb => cb.checked = this.checked);
+        updateAccountTypeBulkActions();
+    });
+
+    accountTypeCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateAccountTypeBulkActions);
+    });
+
+    deselectAllAccountTypesBtn.addEventListener('click', function() {
+        accountTypeCheckboxes.forEach(cb => cb.checked = false);
+        updateAccountTypeBulkActions();
+    });
+
+    deleteAccountTypesBtn.addEventListener('click', function() {
+        const checked = document.querySelectorAll('.account-type-checkbox:checked');
+        if (checked.length === 0) return;
+
+        deleteAccountTypeTargets = Array.from(checked).map(cb => parseInt(cb.dataset.accountTypeId));
+        document.getElementById('deleteAccountTypesMessage').innerHTML =
+            `Are you sure you want to delete <strong>${deleteAccountTypeTargets.length}</strong> account type(s)?`;
+        deleteAccountTypesModal.show();
+    });
+
+    document.querySelectorAll('.delete-account-type-single').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const accountTypeId = parseInt(this.dataset.accountTypeId);
+            const accountTypeName = this.dataset.accountTypeName;
+            deleteAccountTypeTargets = [accountTypeId];
+            document.getElementById('deleteAccountTypesMessage').innerHTML =
+                `Are you sure you want to delete account type <strong>${accountTypeName}</strong>?`;
+            deleteAccountTypesModal.show();
+        });
+    });
+
+    confirmDeleteAccountTypesBtn.addEventListener('click', function() {
+        const accountTypeIds = deleteAccountTypeTargets;
+        if (accountTypeIds.length === 0) return;
+
+        fetch(deleteAccountTypesUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ account_type_ids: accountTypeIds })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                showAlert('danger', data.message || 'Error deleting account types.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', 'An error occurred while deleting account types.');
+        })
+        .finally(() => {
+            deleteAccountTypesModal.hide();
+        });
+    });
+
+    function showAlert(type, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        document.querySelector('.container.mt-4').insertBefore(alertDiv, document.querySelector('.container.mt-4').firstChild);
+        setTimeout(() => alertDiv.remove(), 5000);
+    }
+});
+</script>
+
+<style>
+    .account-type-row {
+        transition: background-color 0.3s ease;
+    }
+    .account-type-row:hover {
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    .account-type-checkbox {
+        cursor: pointer;
+    }
+    #selectAll {
+        cursor: pointer;
+    }
+    #account-type-bulk-actions {
+        animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock %}

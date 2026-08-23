@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Payment Voucher Details</h2>
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('print_payment_voucher', id=voucher.id) }}" class="btn btn-secondary" target="_blank">
+                <i class="fas fa-print"></i> Print Voucher
+            </a>
+            <a href="{{ url_for('payment_vouchers') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Voucher #: {{ voucher.voucher_number }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="150">Supplier:</th>
+                                    <td>{{ voucher.supplier.name if voucher.supplier else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Date:</th>
+                                    <td>{{ voucher.date.strftime('%Y-%m-%d') }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Currency:</th>
+                                    <td>{{ voucher.currency }} (Rate: {{ voucher.exchange_rate }})</td>
+                                </tr>
+                                <tr>
+                                    <th>Reference #:</th>
+                                    <td>{{ voucher.reference_number or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if voucher.status == 'Paid' else 'warning' if voucher.status == 'Pending' else 'danger' }}">
+                                            {{ voucher.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Support Document:</th>
+                                    <td>
+                                        {% if voucher.attachment_filename %}
+                                            <a href="{{ url_for('download_voucher_attachment', id=voucher.id) }}" class="btn btn-sm btn-warning">
+                                                <i class="fas fa-download"></i> {{ voucher.attachment_original_name }}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">No document attached</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th width="150">Created By:</th>
+                                    <td>{{ voucher.user.username if voucher.user else 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Created At:</th>
+                                    <td>{{ voucher.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Payment Account:</th>
+                                    <td>
+                                        {% if voucher.payment_account %}
+                                            {{ voucher.payment_account.account_code }} - {{ voucher.payment_account.account_name }}
+                                        {% else %}
+                                            <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Debit Account (Auto):</th>
+                                    <td>Accounts Payable - Trade</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <h6>Payment Line Items:</h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped">
+                                    <thead class="table-secondary">
+                                        <tr>
+                                            <th>Description</th>
+                                            <th class="text-end">WHT Rate</th>
+                                            <th class="text-end">VAT Rate</th>
+                                            <th class="text-end">Gross Amount</th>
+                                            <th class="text-end">WHT Amount</th>
+                                            <th class="text-end">VAT Amount</th>
+                                            <th class="text-end">Net Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for line in voucher.lines %}
+                                        <tr>
+                                            <td>{{ line.description }}</td>
+                                            <td class="text-end">{{ "%.2f"|format(line.wht_rate) }}%</td>
+                                            <td class="text-end">{{ "%.2f"|format(line.vat_rate) }}%</td>
+                                            <td class="text-end">{{ voucher.currency }} {{ "%.2f"|format(line.gross_amount) }}</td>
+                                            <td class="text-end text-danger">({{ voucher.currency }} {{ "%.2f"|format(line.wht_amount) }})</td>
+                                            <td class="text-end text-success">{{ voucher.currency }} {{ "%.2f"|format(line.vat_amount) }}</td>
+                                            <td class="text-end text-primary">{{ voucher.currency }} {{ "%.2f"|format(line.net_amount) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-info">
+                                        <tr>
+                                            <th colspan="3" class="text-end">Totals:</th>
+                                            <th class="text-end">{{ voucher.currency }} {{ "%.2f"|format(voucher.gross_amount) }}</th>
+                                            <th class="text-end">({{ voucher.currency }} {{ "%.2f"|format(voucher.wht_amount) }})</th>
+                                            <th class="text-end">{{ voucher.currency }} {{ "%.2f"|format(voucher.vat_amount) }}</th>
+                                            <th class="text-end">{{ voucher.currency }} {{ "%.2f"|format(voucher.net_amount) }}</th>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
