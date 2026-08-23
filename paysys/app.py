@@ -2511,20 +2511,50 @@ def generate_invoice_pdf(invoice_id):
     payroll = cursor.fetchone()
     payroll_dict = dict_from_row(payroll) if payroll else None
 
-    allowance_details = json.loads(payroll_dict['allowance_details']) if payroll_dict and payroll_dict.get('allowance_details') else []
-    deduction_details = json.loads(payroll_dict['deduction_details']) if payroll_dict and payroll_dict.get('deduction_details') else []
+    allowance_details = json.loads(payroll_dict['allowance_details']) if payroll_dict and payroll_dict.get(
+        'allowance_details') else []
+    deduction_details = json.loads(payroll_dict['deduction_details']) if payroll_dict and payroll_dict.get(
+        'deduction_details') else []
 
-    # Invoice Header
+    # Build consultant name - try multiple sources
+    consultant_full_name = f"{invoice.get('first_name', '')} {invoice.get('last_name', '')}".strip()
+    if not consultant_full_name and employee_dict:
+        consultant_full_name = f"{employee_dict.get('first_name', '')} {employee_dict.get('last_name', '')}".strip()
+    if not consultant_full_name:
+        consultant_full_name = f"Consultant #{invoice['employee_id']}"
+
+    # Get consultant position
+    consultant_position_text = invoice.get('position', '')
+    if not consultant_position_text and employee_dict:
+        consultant_position_text = employee_dict.get('position', '')
+
+    # Invoice Header with Consultant Name prominently displayed
     story.append(Paragraph("INVOICE", title_style))
+
+    # Consultant Name - prominently displayed
+    consultant_title_style = ParagraphStyle(
+        'ConsultantTitle',
+        parent=styles['Heading2'],
+        fontSize=20,
+        textColor=colors.HexColor('#2c3e50'),
+        alignment=TA_CENTER,
+        spaceAfter=5,
+        fontName='Helvetica-Bold'
+    )
+    story.append(Paragraph(consultant_full_name, consultant_title_style))
+    if consultant_position_text:
+        story.append(Paragraph(f"<i>{consultant_position_text}</i>", header_style))
+    story.append(Spacer(1, 10))
+
     story.append(Paragraph(f"Invoice #: {invoice['invoice_number']}", header_style))
     story.append(Paragraph(f"Date: {invoice['invoice_date']}", header_style))
     story.append(Spacer(1, 20))
 
-    # Company and Consultant Info
-    consultant_name = Paragraph(f"<b>{invoice['first_name']} {invoice['last_name']}</b>", bold_style)
-    consultant_position = Paragraph(invoice['position'], cell_style)
+    # Company and Consultant Info Table
+    consultant_name_para = Paragraph(f"<b>{consultant_full_name}</b>", bold_style)
+    consultant_position = Paragraph(consultant_position_text, cell_style)
 
-    consultant_details = [consultant_position]
+    consultant_details = [consultant_name_para, consultant_position]
     if employee_dict:
         id_type = employee_dict.get('id_type')
         id_number = employee_dict.get('id_number')
@@ -2546,10 +2576,15 @@ def generate_invoice_pdf(invoice_id):
         [Paragraph('<b>Consultant:</b>', bold_style), Paragraph('<b>Company:</b>', bold_style)],
     ]
 
+    # Create consultant rows with name first
     consultant_rows = []
-    for item in consultant_details:
+    # Add name as first row
+    consultant_rows.append([consultant_name_para, ''])
+    # Add position and other details
+    for item in consultant_details[1:]:  # Skip the name since we already added it
         consultant_rows.append([item, ''])
 
+    # Fill in company details
     for i, item in enumerate(company_details):
         if i < len(consultant_rows):
             consultant_rows[i][1] = item
@@ -2589,7 +2624,8 @@ def generate_invoice_pdf(invoice_id):
     # Consulting Services (Base Salary)
     if payroll_dict:
         desc = Paragraph(f'Consulting services for {consulting_period}', cell_style)
-        amount = Paragraph(f"{invoice['base_currency']} {format_currency(payroll_dict.get('base_salary', 0))}", cell_style)
+        amount = Paragraph(f"{invoice['base_currency']} {format_currency(payroll_dict.get('base_salary', 0))}",
+                           cell_style)
         invoice_data.append([desc, amount])
 
     # Allowances
@@ -2601,13 +2637,15 @@ def generate_invoice_pdf(invoice_id):
     # Bonus
     if payroll_dict and payroll_dict.get('bonus_amount', 0) > 0:
         desc = Paragraph('Bonus', cell_style)
-        amount = Paragraph(f"{invoice['base_currency']} {format_currency(payroll_dict.get('bonus_amount', 0))}", cell_style)
+        amount = Paragraph(f"{invoice['base_currency']} {format_currency(payroll_dict.get('bonus_amount', 0))}",
+                           cell_style)
         invoice_data.append([desc, amount])
 
     # BIK
     if payroll_dict and payroll_dict.get('bik_total', 0) > 0:
         desc = Paragraph('BIK (Non-Cash)', cell_style)
-        amount = Paragraph(f"{invoice['base_currency']} {format_currency(payroll_dict.get('bik_total', 0))}", cell_style)
+        amount = Paragraph(f"{invoice['base_currency']} {format_currency(payroll_dict.get('bik_total', 0))}",
+                           cell_style)
         invoice_data.append([desc, amount])
 
     # Spacer
@@ -2623,19 +2661,22 @@ def generate_invoice_pdf(invoice_id):
     # Income Tax
     if payroll_dict and payroll_dict.get('total_tax', 0) > 0:
         desc = Paragraph('Income Tax', cell_style)
-        amount = Paragraph(f"({invoice['base_currency']} {format_currency(payroll_dict.get('total_tax', 0))})", cell_style)
+        amount = Paragraph(f"({invoice['base_currency']} {format_currency(payroll_dict.get('total_tax', 0))})",
+                           cell_style)
         invoice_data.append([desc, amount])
 
     # Social Security
     if payroll_dict and payroll_dict.get('social_security', 0) > 0:
         desc = Paragraph('Social Security', cell_style)
-        amount = Paragraph(f"({invoice['base_currency']} {format_currency(payroll_dict.get('social_security', 0))})", cell_style)
+        amount = Paragraph(f"({invoice['base_currency']} {format_currency(payroll_dict.get('social_security', 0))})",
+                           cell_style)
         invoice_data.append([desc, amount])
 
     # Bonus Tax
     if payroll_dict and payroll_dict.get('bonus_tax_flat', 0) > 0:
         desc = Paragraph('Bonus Tax', cell_style)
-        amount = Paragraph(f"({invoice['base_currency']} {format_currency(payroll_dict.get('bonus_tax_flat', 0))})", cell_style)
+        amount = Paragraph(f"({invoice['base_currency']} {format_currency(payroll_dict.get('bonus_tax_flat', 0))})",
+                           cell_style)
         invoice_data.append([desc, amount])
 
     # Spacer before Net Amount
@@ -5539,7 +5580,8 @@ def import_employees(company_id):
         if file and file.filename.endswith(('.xlsx', '.xls')):
             try:
                 df = pd.read_excel(file)
-                required_cols = ['first_name', 'last_name', 'email', 'position', 'department', 'base_salary', 'hire_date']
+                required_cols = ['first_name', 'last_name', 'email', 'position', 'department', 'base_salary',
+                                 'hire_date']
 
                 for col in required_cols:
                     if col not in df.columns:
@@ -5549,58 +5591,131 @@ def import_employees(company_id):
                 db = get_db()
                 cursor = get_cursor(db)
                 imported_count = 0
+                errors = []
 
                 allowance_defs = get_allowance_definitions(company_id)
 
-                for _, row in df.iterrows():
-                    is_tax_exempt = 1 if 'is_tax_exempt' in df.columns and pd.notna(row['is_tax_exempt']) and row['is_tax_exempt'] in [1, '1', 'Yes', 'yes', 'TRUE', 'true'] else 0
-                    exempt_from_ss = 1 if 'exempt_from_social_security' in df.columns and pd.notna(row['exempt_from_social_security']) and row['exempt_from_social_security'] in [1, '1', 'Yes', 'yes', 'TRUE', 'true'] else 0
+                for idx, row in df.iterrows():
+                    try:
+                        # Basic required fields
+                        first_name = str(row['first_name']).strip()
+                        last_name = str(row['last_name']).strip()
+                        email = str(row['email']).strip()
+                        position = str(row['position']).strip()
+                        department = str(row['department']).strip()
+                        base_salary = float(row['base_salary'])
+                        hire_date = str(row['hire_date']).strip()
 
-                    cursor.execute("""
-                        INSERT INTO employees (company_id, first_name, last_name, email, position, department,
-                                               base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        company_id,
-                        str(row['first_name']),
-                        str(row['last_name']),
-                        str(row['email']),
-                        str(row['position']),
-                        str(row['department']),
-                        float(row['base_salary']),
-                        str(row['hire_date']),
-                        'Active',
-                        is_tax_exempt,
-                        exempt_from_ss
-                    ))
+                        # Status - default to Active if not provided
+                        status = str(row.get('status', 'Active')).strip()
+                        if status not in ['Active', 'Inactive', 'On Leave', 'Terminated', 'Consultant']:
+                            status = 'Active'
 
-                    employee_id = cursor.lastrowid
+                        # Exemptions - handle Yes/No or 1/0
+                        is_tax_exempt = 0
+                        exempt_from_ss = 0
 
-                    for defn in allowance_defs:
-                        col_name = f'allowance_{defn["name"].lower().replace(" ", "_")}'
-                        if col_name in df.columns and pd.notna(row[col_name]):
-                            value = float(row[col_name])
-                        else:
-                            value = defn['default_value']
+                        tax_exempt_val = row.get('is_tax_exempt', 'No')
+                        if pd.notna(tax_exempt_val):
+                            if str(tax_exempt_val).upper() in ['YES', '1', 'TRUE']:
+                                is_tax_exempt = 1
+
+                        ss_exempt_val = row.get('exempt_from_social_security', 'No')
+                        if pd.notna(ss_exempt_val):
+                            if str(ss_exempt_val).upper() in ['YES', '1', 'TRUE']:
+                                exempt_from_ss = 1
+
+                        # Bank details
+                        bank_name = str(row.get('bank_name', '')).strip() if pd.notna(row.get('bank_name')) else ''
+                        bank_currency = str(row.get('bank_currency', '')).strip() if pd.notna(
+                            row.get('bank_currency')) else ''
+                        bank_account_number = str(row.get('bank_account_number', '')).strip() if pd.notna(
+                            row.get('bank_account_number')) else ''
+                        bank_iban = str(row.get('bank_iban', '')).strip() if pd.notna(row.get('bank_iban')) else ''
+                        bank_account_name = str(row.get('bank_account_name', '')).strip() if pd.notna(
+                            row.get('bank_account_name')) else ''
+                        bank_swift_code = str(row.get('bank_swift_code', '')).strip() if pd.notna(
+                            row.get('bank_swift_code')) else ''
+                        bank_address = str(row.get('bank_address', '')).strip() if pd.notna(
+                            row.get('bank_address')) else ''
+
+                        # ID details
+                        id_type = str(row.get('id_type', '')).strip() if pd.notna(row.get('id_type')) else ''
+                        id_number = str(row.get('id_number', '')).strip() if pd.notna(row.get('id_number')) else ''
+                        street_location = str(row.get('street_location', '')).strip() if pd.notna(
+                            row.get('street_location')) else ''
 
                         cursor.execute("""
-                            INSERT INTO employee_allowances (employee_id, allowance_id, value)
-                            VALUES (?, ?, ?)
-                        """, (employee_id, defn['id'], value))
+                            INSERT INTO employees (
+                                company_id, first_name, last_name, email, position, department,
+                                base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security,
+                                bank_name, bank_currency, bank_account_number, bank_iban,
+                                bank_account_name, bank_swift_code, bank_address,
+                                id_type, id_number, street_location
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            company_id,
+                            first_name,
+                            last_name,
+                            email,
+                            position,
+                            department,
+                            base_salary,
+                            hire_date,
+                            status,
+                            is_tax_exempt,
+                            exempt_from_ss,
+                            bank_name,
+                            bank_currency,
+                            bank_account_number,
+                            bank_iban,
+                            bank_account_name,
+                            bank_swift_code,
+                            bank_address,
+                            id_type,
+                            id_number,
+                            street_location
+                        ))
 
-                    imported_count += 1
+                        employee_id = cursor.lastrowid
+
+                        # Add allowances
+                        for defn in allowance_defs:
+                            col_name = f'allowance_{defn["name"].lower().replace(" ", "_")}'
+                            if col_name in df.columns and pd.notna(row[col_name]):
+                                value = float(row[col_name])
+                            else:
+                                value = defn['default_value']
+
+                            cursor.execute("""
+                                INSERT INTO employee_allowances (employee_id, allowance_id, value)
+                                VALUES (?, ?, ?)
+                            """, (employee_id, defn['id'], value))
+
+                        imported_count += 1
+
+                    except Exception as e:
+                        errors.append(f"Row {idx + 2}: {str(e)}")
 
                 db.commit()
-                flash(f'Successfully imported {imported_count} employees!', 'success')
+
+                if errors:
+                    flash(f'Imported {imported_count} employees with {len(errors)} errors. Check logs for details.',
+                          'warning')
+                    for err in errors[:5]:  # Show first 5 errors
+                        print(f'⚠️ {err}')
+                else:
+                    flash(f'Successfully imported {imported_count} employees!', 'success')
+
             except Exception as e:
                 flash(f'Error importing file: {str(e)}', 'error')
+                traceback.print_exc()
         else:
             flash('Please upload an Excel file (.xlsx or .xls)', 'error')
 
         return redirect(url_for('list_employees', company_id=company_id))
 
     return render_template('import_employees.html', company=company)
-
 
 @app.route('/employees/export/<int:company_id>')
 def export_employees(company_id):
@@ -5615,6 +5730,7 @@ def export_employees(company_id):
     data = []
     for emp in employee_list:
         row = {
+            'id': emp['id'],
             'first_name': emp['first_name'],
             'last_name': emp['last_name'],
             'email': emp['email'],
@@ -5623,8 +5739,20 @@ def export_employees(company_id):
             'base_salary': emp['base_salary'],
             'hire_date': emp['hire_date'],
             'status': emp['status'],
-            'is_tax_exempt': 'Yes' if emp['is_tax_exempt'] else 'No',
-            'exempt_from_social_security': 'Yes' if emp['exempt_from_social_security'] else 'No'
+            'is_tax_exempt': 'Yes' if emp.get('is_tax_exempt') else 'No',
+            'exempt_from_social_security': 'Yes' if emp.get('exempt_from_social_security') else 'No',
+            # Bank Details
+            'bank_name': emp.get('bank_name', ''),
+            'bank_currency': emp.get('bank_currency', ''),
+            'bank_account_number': emp.get('bank_account_number', ''),
+            'bank_iban': emp.get('bank_iban', ''),
+            'bank_account_name': emp.get('bank_account_name', ''),
+            'bank_swift_code': emp.get('bank_swift_code', ''),
+            'bank_address': emp.get('bank_address', ''),
+            # ID Details
+            'id_type': emp.get('id_type', ''),
+            'id_number': emp.get('id_number', ''),
+            'street_location': emp.get('street_location', '')
         }
 
         emp_allow = get_employee_allowance_dict(emp['id'])
@@ -5662,7 +5790,6 @@ def export_employees(company_id):
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
 
-
 @app.route('/employees/download_template/<int:company_id>')
 def download_employee_template(company_id):
     company = get_company(company_id)
@@ -5678,8 +5805,21 @@ def download_employee_template(company_id):
         'department': ['Engineering'],
         'base_salary': [5000.00],
         'hire_date': ['2024-01-01'],
+        'status': ['Active'],
         'is_tax_exempt': ['No'],
-        'exempt_from_social_security': ['No']
+        'exempt_from_social_security': ['No'],
+        # Bank Details
+        'bank_name': ['First Bank'],
+        'bank_currency': ['USD'],
+        'bank_account_number': ['1234567890'],
+        'bank_iban': ['GB29NWBK60161331926819'],
+        'bank_account_name': ['John Doe'],
+        'bank_swift_code': ['FIRSTUS33'],
+        'bank_address': ['123 Main Street, New York, NY 10001'],
+        # ID Details
+        'id_type': ['National ID'],
+        'id_number': ['ID-123456789'],
+        'street_location': ['123 Main Street, Accra']
     }
 
     allowance_defs = get_allowance_definitions(company_id)
@@ -5694,6 +5834,52 @@ def download_employee_template(company_id):
         df.to_excel(writer, sheet_name='Employee_Template', index=False)
 
         worksheet = writer.sheets['Employee_Template']
+
+        # Add column descriptions as comments
+        from openpyxl.comments import Comment
+        from openpyxl.utils import get_column_letter
+
+        comments = {
+            'first_name': 'Employee first name (required)',
+            'last_name': 'Employee last name (required)',
+            'email': 'Employee email address (required)',
+            'position': 'Job position/title (required)',
+            'department': 'Department name (required)',
+            'base_salary': 'Monthly salary in company currency (required)',
+            'hire_date': 'Hire date in YYYY-MM-DD format (required)',
+            'status': 'Status: Active, Inactive, On Leave, Terminated, Consultant',
+            'is_tax_exempt': 'Yes or No - If Yes, no income tax deducted',
+            'exempt_from_social_security': 'Yes or No - If Yes, no Social Security deducted',
+            'bank_name': 'Name of the bank',
+            'bank_currency': 'Currency: USD, EUR, GBP, GHS, NGN, ZAR, KES',
+            'bank_account_number': 'Bank account number',
+            'bank_iban': 'IBAN number (International)',
+            'bank_account_name': 'Name on the bank account',
+            'bank_swift_code': 'SWIFT/BIC code',
+            'bank_address': 'Bank branch address',
+            'id_type': 'ID Type: National ID, Passport, Drivers License, Voter ID, SSNIT Number, Tax ID, Other',
+            'id_number': 'ID number',
+            'street_location': 'Physical address/street location'
+        }
+
+        # Add comments to header row
+        for col_idx, (col_name, comment_text) in enumerate(comments.items(), 1):
+            if col_name in template_data:
+                col_letter = get_column_letter(col_idx)
+                worksheet[f'{col_letter}1'].comment = Comment(comment_text, 'System')
+
+        # Add instructions at the bottom
+        instruction_row = len(template_data) + 2
+        worksheet[f'A{instruction_row}'] = '📌 INSTRUCTIONS:'
+        worksheet[f'A{instruction_row + 1}'] = '1. Fill in employee details - required columns are marked'
+        worksheet[
+            f'A{instruction_row + 2}'] = '2. For allowance columns, use the format: allowance_[name_lowercase_with_underscores]'
+        worksheet[f'A{instruction_row + 3}'] = '3. Date format: YYYY-MM-DD (e.g., 2024-01-15)'
+        worksheet[f'A{instruction_row + 4}'] = '4. For Yes/No columns, use: Yes or No'
+        worksheet[
+            f'A{instruction_row + 5}'] = '5. Bank details and ID details are optional but recommended for invoices'
+
+        # Auto-size columns
         for column in worksheet.columns:
             max_length = 0
             column_letter = column[0].column_letter
@@ -5705,6 +5891,8 @@ def download_employee_template(company_id):
                     pass
             adjusted_width = min(max_length + 2, 50)
             worksheet.column_dimensions[column_letter].width = adjusted_width
+
+        worksheet.freeze_panes = 'A2'
 
     output.seek(0)
 
@@ -5929,7 +6117,7 @@ def initialize():
 
         init_db()
         migrate_database()
-        init_sample_data()
+        # init_sample_data()
 
         if IS_PRODUCTION:
             print("✅ Payroll app initialized with PostgreSQL")
