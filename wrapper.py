@@ -1,3 +1,4 @@
+# wrapper.py
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.middleware.dispatcher import DispatcherMiddleware
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,6 +11,7 @@ import psycopg2
 import psycopg2.extras
 
 from extensions import db, migrate
+from config import Config  # Import the Config class
 
 # ============================================================
 # IMPORTANT: Set BASE_PATH for each app before importing
@@ -40,7 +42,11 @@ from app5.app import app as app5
 os.environ['BASE_PATH'] = '/paysys'
 from paysys.app import app as paysys
 
-# Reset BASE_PATH to default (optional)
+# Import acctsys with its base path (Accounting System)
+os.environ['BASE_PATH'] = '/acctsys'
+from acctsys.app import app as acctsys
+
+# Reset BASE_PATH to default
 os.environ['BASE_PATH'] = ''
 
 # ========== APP CONFIGURATION ==========
@@ -83,10 +89,17 @@ AVAILABLE_APPS = {
     },
     'paysys': {
         'name': 'Payroll',
-        'icon': 'fa-calculator',  # Fixed: Changed from fa-tasks to fa-calculator
+        'icon': 'fa-calculator',
         'color': 'success',
         'description': 'Payroll System',
         'route': '/paysys/'
+    },
+    'acctsys': {
+        'name': 'Accounting System',
+        'icon': 'fa-commission',
+        'color': 'success',
+        'description': 'Accounting System',
+        'route': '/acctsys/'
     }
 }
 
@@ -102,8 +115,10 @@ if IS_PRODUCTION:
     if DATABASE_URL.startswith('postgres://'):
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     print(f"✅ Running in PRODUCTION mode with PostgreSQL")
+    print(f"📊 Database URL: {DATABASE_URL[:50]}...")
 else:
     print(f"✅ Running in DEVELOPMENT mode with SQLite")
+    print(f"📊 Database: sqlite:///combined.db")
 
 
 # ========== AUTH MODELS ==========
@@ -702,6 +717,7 @@ application = DispatcherMiddleware(
         "/app4": app4,
         "/app5": app5,
         "/paysys": paysys,
+        "/acctsys": acctsys,
     }
 )
 

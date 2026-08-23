@@ -1,7 +1,13 @@
+# config.py
 import os
+
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
+
+    # Upload folder configuration
+    UPLOAD_FOLDER = 'uploads/journal_attachments'
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
 
     database_url = os.environ.get("DATABASE_URL")
 
@@ -14,3 +20,7 @@ class Config:
         SQLALCHEMY_DATABASE_URI = "sqlite:///combined.db"
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+
+# Export an instance of Config
+config = Config()
