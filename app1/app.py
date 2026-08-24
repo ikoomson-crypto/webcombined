@@ -188,70 +188,42 @@ class MonthlyLiquidity(db.Model):
     company = db.relationship('Company', backref='liquidity')
 
 
-# ============ SAFE TABLE CREATION ============
+# ============ DATABASE INITIALIZATION ============
 with app.app_context():
-    from sqlalchemy import inspect
-
-    inspector = inspect(db.engine)
+    from sqlalchemy import inspect, text
 
 
-    # Function to check if table exists (works for both SQLite and PostgreSQL)
     def table_exists(table_name):
-        if db.engine.dialect.name == 'postgresql':
-            try:
-                result = db.session.execute(
-                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :table_name)",
-                    {'table_name': table_name}
-                )
-                return result.scalar()
-            except Exception as e:
-                print(f"Error checking table {table_name}: {e}")
-                return False
-        else:
-            return inspector.has_table(table_name)
+        """Check if a table exists in the database"""
+        try:
+            inspector = inspect(db.engine)
+            if inspector.has_table(table_name):
+                return True
+            # For PostgreSQL, try direct query
+            if db.engine.dialect.name == 'postgresql':
+                try:
+                    result = db.session.execute(
+                        text("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :table_name)"),
+                        {'table_name': table_name}
+                    )
+                    return result.scalar()
+                except Exception as e:
+                    print(f"Error checking table {table_name}: {e}")
+                    return False
+            return False
+        except Exception as e:
+            print(f"Error checking table {table_name}: {e}")
+            return False
 
 
-    # Only create tables if they don't exist
-    if not table_exists('company'):
-        print("Creating tables...")
-        db.create_all()
-        print("Tables created successfully!")
+    def create_default_companies():
+        """Create default company records"""
+        try:
+            # Check if companies already exist
+            if Company.query.count() > 0:
+                print("Companies already exist, skipping creation")
+                return
 
-        # Create default companies
-        company_a = Company(
-            name='Company A',
-            address='123 Main Street, Accra, Ghana',
-            telephone='+233 20 123 4567',
-            bank_name='Ghana Commercial Bank',
-            account_number='1234567890',
-            account_name='Company A Ltd',
-            swift_code='GCBKGHAX',
-            bank_address='Accra, Ghana',
-            is_active=True,
-            currency='GHS'
-        )
-        company_b = Company(
-            name='Company B',
-            address='456 Independence Ave, Accra, Ghana',
-            telephone='+233 24 987 6543',
-            bank_name='Stanbic Bank',
-            account_number='0987654321',
-            account_name='Company B Ltd',
-            swift_code='SBICGHAX',
-            bank_address='Accra, Ghana',
-            is_active=False,
-            currency='GHS'
-        )
-        db.session.add(company_a)
-        db.session.add(company_b)
-        db.session.commit()
-        print("Default companies created!")
-    else:
-        print("Tables already exist - skipping creation")
-
-        # Check if companies exist, if not create them
-        if Company.query.count() == 0:
-            print("Creating default companies...")
             company_a = Company(
                 name='Company A',
                 address='123 Main Street, Accra, Ghana',
@@ -279,8 +251,42 @@ with app.app_context():
             db.session.add(company_a)
             db.session.add(company_b)
             db.session.commit()
-            print("Default companies created!")
+            print("Default companies created successfully!")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error creating default companies: {e}")
 
+
+    # Check if tables exist
+    try:
+        tables_exist = table_exists('company')
+    except Exception as e:
+        print(f"Error checking tables: {e}")
+        tables_exist = False
+
+    if not tables_exist:
+        print("Creating tables...")
+        db.create_all()
+        print("Tables created successfully!")
+        create_default_companies()
+    else:
+        print("Tables already exist")
+        # Check if companies exist
+        try:
+            company_count = Company.query.count()
+            print(f"Company count: {company_count}")
+            if company_count == 0:
+                print("No companies found - creating default companies")
+                create_default_companies()
+            else:
+                print(f"Companies already exist ({company_count} found)")
+        except Exception as e:
+            print(f"Error checking companies: {e}")
+            # If we can't query the table, try to create tables
+            print("Attempting to create tables...")
+            db.create_all()
+            if Company.query.count() == 0:
+                create_default_companies()
 
 # ============ ROUTES ============
 @app.route('/')
