@@ -1190,14 +1190,18 @@ def schedule_delete_multiple():
         return redirect(url_for('schedule_list'))
 
     try:
-        # Convert to integers
         ids = [int(id) for id in schedule_ids if id]
 
-        # Delete schedules belonging to the current company
-        deleted_count = PrepaymentSchedule.query.filter(
+        # Load the ORM objects (not a bulk delete) so cascade fires
+        schedules = PrepaymentSchedule.query.filter(
             PrepaymentSchedule.id.in_(ids),
             PrepaymentSchedule.company_id == company_id
-        ).delete(synchronize_session=False)
+        ).all()
+
+        deleted_count = 0
+        for sched in schedules:
+            db.session.delete(sched)   # cascades to amortization_entries
+            deleted_count += 1
 
         db.session.commit()
         flash(f'✅ Successfully deleted {deleted_count} schedules!', 'success')
