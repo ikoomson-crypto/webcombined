@@ -17,18 +17,44 @@
                     <!-- ============================================ -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="debit_account" class="form-label">Debit Account <span class="text-danger">*</span></label>
-                            <input type="text" name="debit_account" id="debit_account" class="form-control"
-                                   placeholder="e.g., 1010"
-                                   value="{{ schedule.debit_account if schedule else '' }}" required>
-                            <small class="text-muted">Enter the account to debit</small>
+                            <label for="debit_account" class="form-label">
+                                Debit Account <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="debit_account" id="debit_account"
+                                   class="form-control"
+                                   placeholder="Type or pick an account…"
+                                   list="debit_account_list"
+                                   autocomplete="off"
+                                   value="{{ schedule.debit_account if schedule else '' }}"
+                                   required>
+                            <datalist id="debit_account_list">
+                                {% for acct in debit_accounts or [] %}
+                                    <option value="{{ acct }}"></option>
+                                {% endfor %}
+                            </datalist>
+                            <small class="text-muted">
+                                Pick a previously used account or type a new one.
+                            </small>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="credit_account" class="form-label">Credit Account <span class="text-danger">*</span></label>
-                            <input type="text" name="credit_account" id="credit_account" class="form-control"
-                                   placeholder="e.g., 2010"
-                                   value="{{ schedule.credit_account if schedule else '' }}" required>
-                            <small class="text-muted">Enter the account to credit</small>
+                            <label for="credit_account" class="form-label">
+                                Credit Account <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" name="credit_account" id="credit_account"
+                                   class="form-control"
+                                   placeholder="Type or pick an account…"
+                                   list="credit_account_list"
+                                   autocomplete="off"
+                                   value="{{ schedule.credit_account if schedule else '' }}"
+                                   required>
+                            <datalist id="credit_account_list">
+                                {% for acct in credit_accounts or [] %}
+                                    <option value="{{ acct }}"></option>
+                                {% endfor %}
+                            </datalist>
+                            <small class="text-muted">
+                                Pick a previously used account or type a new one.
+                            </small>
                         </div>
                     </div>
 
@@ -36,15 +62,22 @@
                     <!-- TRANSACTION DETAILS                          -->
                     <!-- ============================================ -->
                     <div class="mb-3">
-                        <label for="transaction_date" class="form-label">Transaction Date <span class="text-danger">*</span></label>
-                        <input type="date" name="transaction_date" id="transaction_date" class="form-control"
-                               value="{{ schedule.transaction_date.strftime('%Y-%m-%d') if schedule else '' }}" required>
+                        <label for="transaction_date" class="form-label">
+                            Transaction Date <span class="text-danger">*</span>
+                        </label>
+                        <input type="date" name="transaction_date" id="transaction_date"
+                               class="form-control"
+                               value="{{ schedule.transaction_date.strftime('%Y-%m-%d') if schedule else '' }}"
+                               required>
                     </div>
 
                     <div class="mb-3">
-                        <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
-                        <textarea name="description" id="description" class="form-control" rows="3"
-                                  placeholder="Enter description of the prepayment" required>{{ schedule.description if schedule else '' }}</textarea>
+                        <label for="description" class="form-label">
+                            Description <span class="text-danger">*</span>
+                        </label>
+                        <textarea name="description" id="description" class="form-control"
+                                  rows="3" placeholder="Enter description of the prepayment"
+                                  required>{{ schedule.description if schedule else '' }}</textarea>
                     </div>
 
                     <!-- ============================================ -->
@@ -52,22 +85,35 @@
                     <!-- ============================================ -->
                     <div class="row">
                         <div class="col-md-4 mb-3">
-                            <label for="total_cost" class="form-label">Total Cost <span class="text-danger">*</span></label>
-                            <input type="number" step="0.01" min="0.01" name="total_cost" id="total_cost" class="form-control"
-                                   placeholder="0.00"
-                                   value="{{ schedule.total_cost if schedule else '' }}" required>
+                            <label for="total_cost" class="form-label">
+                                Total Cost <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" step="0.01" min="0.01"
+                                   name="total_cost" id="total_cost"
+                                   class="form-control" placeholder="0.00"
+                                   value="{{ schedule.total_cost if schedule else '' }}"
+                                   required>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="period_to_amortize" class="form-label">Period to Amortize <span class="text-danger">*</span></label>
-                            <input type="number" min="1" name="period_to_amortize" id="period_to_amortize" class="form-control"
-                                   placeholder="months"
-                                   value="{{ schedule.period_to_amortize if schedule else '' }}" required>
+                            <label for="period_to_amortize" class="form-label">
+                                Period to Amortize <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" min="1"
+                                   name="period_to_amortize" id="period_to_amortize"
+                                   class="form-control" placeholder="months"
+                                   value="{{ schedule.period_to_amortize if schedule else '' }}"
+                                   required>
                             <small class="text-muted">Number of months to amortize</small>
                         </div>
                         <div class="col-md-4 mb-3">
-                            <label for="amortize_start_period" class="form-label">Amortize Start Period <span class="text-danger">*</span></label>
-                            <input type="date" name="amortize_start_period" id="amortize_start_period" class="form-control"
-                                   value="{{ schedule.amortize_start_period.strftime('%Y-%m-%d') if schedule else '' }}" required>
+                            <label for="amortize_start_period" class="form-label">
+                                Amortize Start Period <span class="text-danger">*</span>
+                            </label>
+                            <input type="date"
+                                   name="amortize_start_period" id="amortize_start_period"
+                                   class="form-control"
+                                   value="{{ schedule.amortize_start_period.strftime('%Y-%m-%d') if schedule else '' }}"
+                                   required>
                         </div>
                     </div>
 
@@ -102,7 +148,8 @@
                             <label for="renewal_notes" class="form-label">
                                 Renewal Notes <small class="text-muted">(optional)</small>
                             </label>
-                            <textarea name="renewal_notes" id="renewal_notes" class="form-control" rows="2"
+                            <textarea name="renewal_notes" id="renewal_notes"
+                                      class="form-control" rows="2"
                                       placeholder="e.g. Renew via Procurement, expected budget impact, contact person…">{{ schedule.renewal_notes if schedule and schedule.renewal_notes else '' }}</textarea>
                             <small class="text-muted">Only visible when the renewal report is generated.</small>
                         </div>

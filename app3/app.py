@@ -233,6 +233,19 @@ def setup_default_company():
             return company
     return None
 
+def get_account_options(company_id):
+    """Return distinct debit and credit accounts already used by this company."""
+    debit_rows = db.session.query(PrepaymentSchedule.debit_account) \
+        .filter(PrepaymentSchedule.company_id == company_id) \
+        .distinct().all()
+    credit_rows = db.session.query(PrepaymentSchedule.credit_account) \
+        .filter(PrepaymentSchedule.company_id == company_id) \
+        .distinct().all()
+
+    debit_accounts = sorted({r[0] for r in debit_rows if r[0]})
+    credit_accounts = sorted({r[0] for r in credit_rows if r[0]})
+    return debit_accounts, credit_accounts
+
 # ============ REPORT HELPER FUNCTIONS ============
 def get_monthly_amortization(schedule, year, month):
     """Get amortization amount for a specific month"""
@@ -967,6 +980,9 @@ def schedule_create():
             session['current_company'] = company.id
             company_id = company.id
 
+    # Fetch distinct account options once — used by every render of the form
+    debit_accounts, credit_accounts = get_account_options(company_id)
+
     if request.method == 'POST':
         try:
             # ---------- Extract form values ----------
@@ -978,7 +994,7 @@ def schedule_create():
             period_to_amortize = request.form.get('period_to_amortize', '').strip()
             amortize_start_period = request.form.get('amortize_start_period', '').strip()
 
-            # NEW: renewal tracking fields
+            # Renewal tracking fields
             is_renewable = request.form.get('is_renewable') == 'on'
             renewal_notes = request.form.get('renewal_notes', '').strip() or None
 
@@ -1020,14 +1036,19 @@ def schedule_create():
                 if not valid:
                     errors.append(msg)
 
-            # NEW: validate renewal notes length (optional field, but bounded)
             if renewal_notes and len(renewal_notes) > 500:
                 errors.append('Renewal Notes must be less than 500 characters')
 
+            # ---------- Re-render form on validation errors ----------
             if errors:
                 for error in errors:
                     flash(f'❌ {error}', 'danger')
-                return render_template('schedule_form.html', action='Create')
+                return render_template(
+                    'schedule_form.html',
+                    action='Create',
+                    debit_accounts=debit_accounts,
+                    credit_accounts=credit_accounts,
+                )
 
             # ---------- Create the schedule ----------
             schedule = PrepaymentSchedule(
@@ -1039,8 +1060,8 @@ def schedule_create():
                 total_cost=float(total_cost),
                 period_to_amortize=int(period_to_amortize),
                 amortize_start_period=datetime.strptime(amortize_start_period, '%Y-%m-%d').date(),
-                is_renewable=is_renewable,        # NEW
-                renewal_notes=renewal_notes,      # NEW
+                is_renewable=is_renewable,
+                renewal_notes=renewal_notes,
                 status='ACTIVE'
             )
             db.session.add(schedule)
@@ -1065,8 +1086,21 @@ def schedule_create():
         except Exception as e:
             flash(f'❌ Error: {str(e)}', 'danger')
             db.session.rollback()
+            # Fall through to the re-render below so the user doesn't lose context
+            return render_template(
+                'schedule_form.html',
+                action='Create',
+                debit_accounts=debit_accounts,
+                credit_accounts=credit_accounts,
+            )
 
-    return render_template('schedule_form.html', action='Create')
+    # ---------- GET: render empty form ----------
+    return render_template(
+        'schedule_form.html',
+        action='Create',
+        debit_accounts=debit_accounts,
+        credit_accounts=credit_accounts,
+    )
 
 @app.route('/schedule/<int:pk>')
 def schedule_detail(pk):
