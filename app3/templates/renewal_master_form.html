@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Renewal Master List{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header" style="background-color: #B85C00; color: white;">
+                <h4 class="mb-0"><i class="fas fa-clipboard-list"></i> Renewal Master List</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('renewal_master_report_view') }}">
+                    <div class="form-check p-3 rounded mb-2"
+                         style="background-color:#fff5e6; border:1px solid #ffd9a8;">
+                        <input type="checkbox" name="renewable_only" id="renewable_only"
+                               class="form-check-input" checked>
+                        <label for="renewable_only" class="form-check-label">
+                            <strong>Renewable prepayments only</strong>
+                            <small class="text-muted d-block">
+                                Show only schedules flagged as Renewable.
+                                Uncheck to see everything.
+                            </small>
+                        </label>
+                    </div>
+
+                    <div class="form-check p-3 rounded mb-3"
+                         style="background-color:#f5f5f5; border:1px solid #e0e0e0;">
+                        <input type="checkbox" name="show_pending_only" id="show_pending_only"
+                               class="form-check-input">
+                        <label for="show_pending_only" class="form-check-label">
+                            <strong>Pending renewals only</strong>
+                            <small class="text-muted d-block">
+                                Hide schedules that are already fully amortized
+                                (remaining balance = 0).
+                            </small>
+                        </label>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn" style="background-color:#B85C00;color:white;">
+                            <i class="fas fa-eye"></i> Generate Report
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+
+                <hr>
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>What this report shows:</strong>
+                    <ul class="mt-2 mb-0">
+                        <li>Every schedule flagged as <strong>Renewable</strong>.</li>
+                        <li>Its amortization end date — the date the prepayment <em>should be renewed</em>.</li>
+                        <li><strong>Days to Renewal</strong>: negative = already overdue.</li>
+                        <li>Color-coded urgency: red (overdue), amber (≤7d), yellow (≤30d), green (≤90d).</li>
+                        <li>Unlike the "Renewal Due" report, this has <strong>no look-ahead window</strong> — everything renewable shows up.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

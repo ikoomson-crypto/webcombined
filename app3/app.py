@@ -1599,6 +1599,176 @@ def download_report_excel():
         flash(f'❌ Error: {str(e)}', 'danger')
         return redirect(url_for('generate_report'))
 
+def generate_renewal_master_excel(rows, renewable_only, show_pending_only):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Renewal Master"
+
+    headers = ['#', 'Debit Account', 'Credit Account', 'Description',
+               'Start', 'Renewal Date', 'Periods',
+               'Total Cost', 'Amortized', 'Remaining',
+               'Days to Renewal', 'Status', 'Renewable']
+
+    title_cols = len(headers)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=title_cols)
+    t = ws.cell(row=1, column=1,
+                value=f"Renewal Master List  |  "
+                      f"{'Renewable only' if renewable_only else 'All schedules'}  |  "
+                      f"{'Pending only' if show_pending_only else 'Including completed'}  |  "
+                      f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    t.font = Font(bold=True, size=13)
+    t.alignment = Alignment(horizontal='center', vertical='center')
+
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=2, column=col, value=h)
+        c.font = Font(bold=True, color='FFFFFF')
+        c.fill = PatternFill(start_color='B85C00', end_color='B85C00', fill_type='solid')
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        ws.column_dimensions[get_column_letter(col)].width = 18
+
+    row_num = 3
+    totals = {'cost': 0.0, 'amortized': 0.0, 'remaining': 0.0}
+
+    for idx, r in enumerate(rows, 1):
+        s = r['schedule']
+        totals['cost'] += r['total_cost']
+        totals['amortized'] += r['amortized']
+        totals['remaining'] += r['remaining_balance']
+
+        ws.cell(row=row_num, column=1, value=idx)
+        ws.cell(row=row_num, column=2, value=s.debit_account)
+        ws.cell(row=row_num, column=3, value=s.credit_account)
+        ws.cell(row=row_num, column=4, value=s.description)
+        ws.cell(row=row_num, column=5, value=s.amortize_start_period.strftime('%Y-%m-%d'))
+        ws.cell(row=row_num, column=6, value=r['end_date'].strftime('%Y-%m-%d'))
+        ws.cell(row=row_num, column=7, value=s.period_to_amortize)
+        ws.cell(row=row_num, column=8, value=round(r['total_cost'], 2))
+        ws.cell(row=row_num, column=9, value=round(r['amortized'], 2))
+        ws.cell(row=row_num, column=10, value=round(r['remaining_balance'], 2))
+        ws.cell(row=row_num, column=11, value=r['days_left'])
+        ws.cell(row=row_num, column=12, value=r['status'])
+        ws.cell(row=row_num, column=13, value='Yes' if r['is_renewable'] else 'No')
+
+        fill = None
+        if r['days_left'] < 0:
+            fill = PatternFill(start_color='F8D7DA', end_color='F8D7DA', fill_type='solid')
+        elif r['days_left'] <= 7:
+            fill = PatternFill(start_color='FCE4D6', end_color='FCE4D6', fill_type='solid')
+        elif r['days_left'] <= 30:
+            fill = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')
+        elif r['days_left'] <= 90:
+            fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
+        if fill:
+            ws.cell(row=row_num, column=11).fill = fill
+            ws.cell(row=row_num, column=12).fill = fill
+
+        row_num += 1
+
+    # Totals row
+    ws.cell(row=row_num, column=1, value='TOTAL')
+    ws.merge_cells(start_row=row_num, start_column=1, end_row=row_num, end_column=7)
+    ws.cell(row=row_num, column=8, value=round(totals['cost'], 2))
+    ws.cell(row=row_num, column=9, value=round(totals['amortized'], 2))
+    ws.cell(row=row_num, column=10, value=round(totals['remaining'], 2))
+    for col in range(1, title_cols + 1):
+        c = ws.cell(row=row_num, column=col)
+        c.font = Font(bold=True)
+        c.fill = PatternFill(start_color='FFC000', end_color='FFC000', fill_type='solid')
+
+    # Borders + number format
+    border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                    top=Side(style='thin'), bottom=Side(style='thin'))
+    for row in ws.iter_rows(min_row=2, max_row=row_num, min_col=1, max_col=title_cols):
+        for cell in row:
+            cell.border = border
+            if cell.column in (8, 9, 10) and isinstance(cell.value, (int, float)):
+                cell.number_format = '#,##0.00'
+                cell.alignment = Alignment(horizontal='right', vertical='center')
+
+    out = BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return out
+
+
+def generate_renewal_master_pdf(rows, renewable_only, show_pending_only):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    styles = getSampleStyleSheet()
+    story = []
+
+    title_style = ParagraphStyle('MTitle', parent=styles['Heading1'], fontSize=15,
+                                 textColor=colors.HexColor('#B85C00'), spaceAfter=8)
+    story.append(Paragraph('Renewal Master List', title_style))
+
+    sub_style = ParagraphStyle('MSub', parent=styles['Normal'], fontSize=9,
+                               textColor=colors.HexColor('#666666'), spaceAfter=10)
+    filters = []
+    filters.append('Renewable only' if renewable_only else 'All schedules')
+    filters.append('Pending only' if show_pending_only else 'Incl. completed')
+    story.append(Paragraph(
+        f"{' · '.join(filters)}  |  Generated: "
+        f"{datetime.now().strftime('%B %d, %Y at %I:%M %p')}", sub_style))
+    story.append(Spacer(1, 8))
+
+    headers = ['#', 'Debit Acct', 'Credit Acct', 'Description',
+               'Renewal Date', 'Remaining', 'Days', 'Status']
+    table_data = [headers]
+
+    for idx, r in enumerate(rows, 1):
+        s = r['schedule']
+        table_data.append([
+            str(idx),
+            s.debit_account[:20],
+            s.credit_account[:20],
+            s.description[:38] + ('…' if len(s.description) > 38 else ''),
+            r['end_date'].strftime('%Y-%m-%d'),
+            format_number(r['remaining_balance']),
+            str(r['days_left']),
+            r['status'],
+        ])
+
+    col_widths = [0.4*inch, 1.3*inch, 1.3*inch, 3.1*inch, 1.0*inch, 1.1*inch, 0.6*inch, 1.1*inch]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#B85C00')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('GRID', (0, 0), (-1, -1), 0.4, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]
+    for i, r in enumerate(rows, start=1):
+        if r['days_left'] < 0:
+            bg = colors.HexColor('#F8D7DA')
+        elif r['days_left'] <= 7:
+            bg = colors.HexColor('#FCE4D6')
+        elif r['days_left'] <= 30:
+            bg = colors.HexColor('#FFF2CC')
+        elif r['days_left'] <= 90:
+            bg = colors.HexColor('#E2EFDA')
+        else:
+            bg = None
+        if bg:
+            style.append(('BACKGROUND', (0, i), (-1, i), bg))
+    for i in range(len(table_data)):
+        style.append(('ALIGN', (5, i), (5, i), 'RIGHT'))
+        style.append(('ALIGN', (6, i), (6, i), 'CENTER'))
+        style.append(('ALIGN', (7, i), (7, i), 'CENTER'))
+    table.setStyle(TableStyle(style))
+    story.append(table)
+
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(f'Total records: {len(rows)}', sub_style))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 # ============ RENEWAL REPORT HELPERS ============
 
 def get_amortization_end_date(schedule):
@@ -1617,6 +1787,67 @@ def get_amortization_end_date(schedule):
                 d = d.replace(month=d.month + 1)
         return d
     return None
+
+def get_renewal_master_list(company_id, renewable_only=True,
+                            show_pending_only=False):
+    """
+    Return every renewable schedule with its renewal date and status.
+
+    Args:
+        renewable_only:    if True, only schedules flagged is_renewable=True
+        show_pending_only: if True, only schedules whose amortization is not
+                           yet complete (remaining_balance > 0)
+    """
+    today = date.today()
+
+    query = PrepaymentSchedule.query.filter_by(company_id=company_id)
+    if renewable_only:
+        query = query.filter(PrepaymentSchedule.is_renewable.is_(True))
+
+    rows = []
+    for sched in query.all():
+        # Skip anything that isn't active
+        if (sched.status or '').upper() not in ('ACTIVE', 'PENDING'):
+            continue
+
+        remaining = float(sched.remaining_balance)
+        if show_pending_only and remaining <= 0:
+            continue
+
+        end_date = get_amortization_end_date(sched)
+        if not end_date:
+            continue
+
+        days_left = (end_date - today).days
+
+        if days_left < 0:
+            status = 'OVERDUE'
+        elif days_left == 0:
+            status = 'DUE TODAY'
+        elif days_left <= 7:
+            status = 'DUE THIS WEEK'
+        elif days_left <= 30:
+            status = 'DUE THIS MONTH'
+        elif days_left <= 90:
+            status = 'DUE WITHIN 90 DAYS'
+        else:
+            status = 'UPCOMING'
+
+        total_cost = float(sched.total_cost)
+        rows.append({
+            'schedule': sched,
+            'end_date': end_date,
+            'days_left': days_left,
+            'status': status,
+            'total_cost': total_cost,
+            'amortized': total_cost - remaining,
+            'remaining_balance': remaining,
+            'is_renewable': sched.is_renewable,
+        })
+
+    # Most urgent first
+    rows.sort(key=lambda r: r['days_left'])
+    return rows
 
 def get_renewal_schedules(company_id, window_days=90, include_overdue=True,
                           include_expired=False, renewable_only=True):
@@ -3224,6 +3455,120 @@ def download_renewal_report_pdf():
     response = make_response(send_file(pdf_file, mimetype='application/pdf'))
     response.headers['Content-Disposition'] = \
         f'attachment; filename=renewal_due_report_{date.today()}.pdf'
+    return response
+
+@app.route('/report/renewal-master', methods=['GET'])
+def renewal_master_report():
+    """Display the renewal master list form."""
+    company_id = session.get('current_company')
+    if not company_id:
+        company = Company.query.first()
+        if company:
+            session['current_company'] = company.id
+            company_id = company.id
+    return render_template('renewal_master_form.html')
+
+
+@app.route('/report/renewal-master/view', methods=['GET', 'POST'])
+def renewal_master_report_view():
+    """Show every renewable prepayment with renewal status."""
+    company_id = session.get('current_company')
+    if not company_id:
+        company = Company.query.first()
+        if company:
+            session['current_company'] = company.id
+            company_id = company.id
+
+    # Read params (form or query string)
+    if request.method == 'POST':
+        renewable_only = request.form.get('renewable_only', 'on') == 'on'
+        show_pending_only = request.form.get('show_pending_only') == 'on'
+    else:
+        renewable_only = request.args.get('renewable_only', 'on') == 'on'
+        show_pending_only = request.args.get('show_pending_only') == 'on'
+
+    rows = get_renewal_master_list(
+        company_id,
+        renewable_only=renewable_only,
+        show_pending_only=show_pending_only,
+    )
+
+    # Persist for exports
+    session['master_renewable_only'] = renewable_only
+    session['master_show_pending_only'] = show_pending_only
+
+    summary = {
+        'total': len(rows),
+        'overdue': sum(1 for r in rows if r['days_left'] < 0),
+        'due_30': sum(1 for r in rows if 0 <= r['days_left'] <= 30),
+        'due_90': sum(1 for r in rows if 30 < r['days_left'] <= 90),
+        'upcoming': sum(1 for r in rows if r['days_left'] > 90),
+        'total_remaining': sum(r['remaining_balance'] for r in rows),
+        'total_cost': sum(r['total_cost'] for r in rows),
+        'renewable_count': sum(1 for r in rows if r['is_renewable']),
+        'non_renewable_count': sum(1 for r in rows if not r['is_renewable']),
+    }
+
+    company = Company.query.get(company_id)
+    currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
+    return render_template(
+        'renewal_master_results.html',
+        rows=rows,
+        renewable_only=renewable_only,
+        show_pending_only=show_pending_only,
+        summary=summary,
+        generated_on=datetime.now(),
+        currency_symbol=currency_symbol,
+        format_number=format_number,
+    )
+
+
+@app.route('/report/renewal-master/download/excel')
+def download_renewal_master_excel():
+    company_id = session.get('current_company')
+    if not company_id:
+        flash('Please generate the report first.', 'warning')
+        return redirect(url_for('renewal_master_report'))
+
+    renewable_only = session.get('master_renewable_only', True)
+    show_pending_only = session.get('master_show_pending_only', False)
+
+    rows = get_renewal_master_list(company_id, renewable_only=renewable_only,
+                                   show_pending_only=show_pending_only)
+    if not rows:
+        flash('No schedules found for this report.', 'warning')
+        return redirect(url_for('renewal_master_report'))
+
+    excel_file = generate_renewal_master_excel(rows, renewable_only, show_pending_only)
+    response = make_response(send_file(
+        excel_file,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))
+    response.headers['Content-Disposition'] = \
+        f'attachment; filename=renewal_master_{date.today()}.xlsx'
+    return response
+
+
+@app.route('/report/renewal-master/download/pdf')
+def download_renewal_master_pdf():
+    company_id = session.get('current_company')
+    if not company_id:
+        flash('Please generate the report first.', 'warning')
+        return redirect(url_for('renewal_master_report'))
+
+    renewable_only = session.get('master_renewable_only', True)
+    show_pending_only = session.get('master_show_pending_only', False)
+
+    rows = get_renewal_master_list(company_id, renewable_only=renewable_only,
+                                   show_pending_only=show_pending_only)
+    if not rows:
+        flash('No schedules found for this report.', 'warning')
+        return redirect(url_for('renewal_master_report'))
+
+    pdf_file = generate_renewal_master_pdf(rows, renewable_only, show_pending_only)
+    response = make_response(send_file(pdf_file, mimetype='application/pdf'))
+    response.headers['Content-Disposition'] = \
+        f'attachment; filename=renewal_master_{date.today()}.pdf'
     return response
 
 # ============ RUN APP ============
