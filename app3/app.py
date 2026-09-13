@@ -2,7 +2,7 @@ import os
 import tempfile
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, make_response
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -893,9 +893,21 @@ def dashboard():
     ).limit(10).all()
 
     company = Company.query.get(company_id)
-
-    # Get currency symbol for the company
     currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
+    # ---- Renewal alerts ----
+    renewal_alerts = get_renewal_schedules(
+        company_id,
+        window_days=30,          # change to 60/90 if you prefer a wider window
+        include_overdue=True,
+        include_expired=False,
+    )
+    renewal_summary = {
+        'total': len(renewal_alerts),
+        'overdue': sum(1 for r in renewal_alerts if r['days_left'] < 0),
+        'due_7': sum(1 for r in renewal_alerts if 0 <= r['days_left'] <= 7),
+        'due_30': sum(1 for r in renewal_alerts if 7 < r['days_left'] <= 30),
+    }
 
     return render_template('dashboard.html',
                            total_schedules=len(schedules),
@@ -904,7 +916,9 @@ def dashboard():
                            upcoming_entries=upcoming,
                            recent_schedules=recent,
                            company_name=company.name if company else 'No Company',
-                           currency_symbol=currency_symbol)
+                           currency_symbol=currency_symbol,
+                           renewal_alerts=renewal_alerts[:10],   # show top 10 on dashboard
+                           renewal_summary=renewal_summary)
 
 @app.route('/schedules')
 def schedule_list():
@@ -955,6 +969,7 @@ def schedule_create():
 
     if request.method == 'POST':
         try:
+            # ---------- Extract form values ----------
             debit_account = request.form.get('debit_account', '').strip()
             credit_account = request.form.get('credit_account', '').strip()
             transaction_date = request.form.get('transaction_date', '').strip()
@@ -963,6 +978,11 @@ def schedule_create():
             period_to_amortize = request.form.get('period_to_amortize', '').strip()
             amortize_start_period = request.form.get('amortize_start_period', '').strip()
 
+            # NEW: renewal tracking fields
+            is_renewable = request.form.get('is_renewable') == 'on'
+            renewal_notes = request.form.get('renewal_notes', '').strip() or None
+
+            # ---------- Validation ----------
             errors = []
 
             valid, msg = validate_account_number(debit_account, 'Debit Account')
@@ -1000,11 +1020,16 @@ def schedule_create():
                 if not valid:
                     errors.append(msg)
 
+            # NEW: validate renewal notes length (optional field, but bounded)
+            if renewal_notes and len(renewal_notes) > 500:
+                errors.append('Renewal Notes must be less than 500 characters')
+
             if errors:
                 for error in errors:
                     flash(f'❌ {error}', 'danger')
                 return render_template('schedule_form.html', action='Create')
 
+            # ---------- Create the schedule ----------
             schedule = PrepaymentSchedule(
                 company_id=company_id,
                 debit_account=debit_account,
@@ -1014,11 +1039,14 @@ def schedule_create():
                 total_cost=float(total_cost),
                 period_to_amortize=int(period_to_amortize),
                 amortize_start_period=datetime.strptime(amortize_start_period, '%Y-%m-%d').date(),
+                is_renewable=is_renewable,        # NEW
+                renewal_notes=renewal_notes,      # NEW
                 status='ACTIVE'
             )
             db.session.add(schedule)
-            db.session.flush()
+            db.session.flush()  # assigns schedule.id
 
+            # ---------- Generate amortization entries ----------
             for entry_data in schedule.get_amortization_schedule():
                 entry = AmortizationEntry(
                     schedule_id=schedule.id,
@@ -1073,6 +1101,7 @@ def schedule_update(pk):
 
     if request.method == 'POST':
         try:
+            # ---------- Extract form values ----------
             debit_account = request.form.get('debit_account', '').strip()
             credit_account = request.form.get('credit_account', '').strip()
             transaction_date = request.form.get('transaction_date', '').strip()
@@ -1081,6 +1110,11 @@ def schedule_update(pk):
             period_to_amortize = request.form.get('period_to_amortize', '').strip()
             amortize_start_period = request.form.get('amortize_start_period', '').strip()
 
+            # NEW: renewal tracking fields
+            is_renewable = request.form.get('is_renewable') == 'on'
+            renewal_notes = request.form.get('renewal_notes', '').strip() or None
+
+            # ---------- Validation ----------
             errors = []
 
             valid, msg = validate_account_number(debit_account, 'Debit Account')
@@ -1118,11 +1152,16 @@ def schedule_update(pk):
                 if not valid:
                     errors.append(msg)
 
+            # NEW: validate renewal notes length
+            if renewal_notes and len(renewal_notes) > 500:
+                errors.append('Renewal Notes must be less than 500 characters')
+
             if errors:
                 for error in errors:
                     flash(f'❌ {error}', 'danger')
                 return render_template('schedule_form.html', schedule=schedule, action='Update')
 
+            # ---------- Apply updates ----------
             schedule.debit_account = debit_account
             schedule.credit_account = credit_account
             schedule.transaction_date = datetime.strptime(transaction_date, '%Y-%m-%d').date()
@@ -1130,7 +1169,10 @@ def schedule_update(pk):
             schedule.total_cost = float(total_cost)
             schedule.period_to_amortize = int(period_to_amortize)
             schedule.amortize_start_period = datetime.strptime(amortize_start_period, '%Y-%m-%d').date()
+            schedule.is_renewable = is_renewable        # NEW
+            schedule.renewal_notes = renewal_notes      # NEW
 
+            # ---------- Regenerate amortization entries ----------
             AmortizationEntry.query.filter_by(schedule_id=schedule.id).delete()
 
             for entry_data in schedule.get_amortization_schedule():
@@ -1174,6 +1216,36 @@ def schedule_delete(pk):
         flash(f'❌ Error deleting: {str(e)}', 'danger')
         db.session.rollback()
     return redirect(url_for('schedule_list'))
+
+@app.route('/schedule/<int:pk>/toggle-renewable', methods=['POST'])
+def schedule_toggle_renewable(pk):
+    """Toggle the is_renewable flag for a single schedule."""
+    company_id = session.get('current_company')
+    if not company_id:
+        company = Company.query.first()
+        if company:
+            session['current_company'] = company.id
+            company_id = company.id
+
+    schedule = PrepaymentSchedule.query.filter_by(id=pk, company_id=company_id).first_or_404()
+
+    try:
+        schedule.is_renewable = not schedule.is_renewable
+        db.session.commit()
+        label = 'Renewable' if schedule.is_renewable else 'Non-Renewable'
+        flash(f'✅ Schedule #{schedule.id} marked as {label}.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Error updating schedule: {str(e)}', 'danger')
+
+    # Preserve search + page so the user stays where they were
+    redirect_params = {}
+    if request.form.get('search'):
+        redirect_params['search'] = request.form.get('search')
+    if request.form.get('page'):
+        redirect_params['page'] = request.form.get('page')
+
+    return redirect(url_for('schedule_list', **redirect_params))
 
 @app.route('/schedule/delete-multiple', methods=['POST'])
 def schedule_delete_multiple():
@@ -1492,6 +1564,302 @@ def download_report_excel():
     except Exception as e:
         flash(f'❌ Error: {str(e)}', 'danger')
         return redirect(url_for('generate_report'))
+
+# ============ RENEWAL REPORT HELPERS ============
+
+def get_amortization_end_date(schedule):
+    """Return the final amortization due date for a schedule, or None."""
+    last_entry = AmortizationEntry.query.filter_by(schedule_id=schedule.id) \
+        .order_by(AmortizationEntry.due_date.desc()).first()
+    if last_entry:
+        return last_entry.due_date
+    # Fallback: compute from start period + periods if no entries exist
+    if schedule.period_to_amortize and schedule.amortize_start_period:
+        d = schedule.amortize_start_period
+        for _ in range(int(schedule.period_to_amortize) - 1):
+            if d.month == 12:
+                d = d.replace(year=d.year + 1, month=1)
+            else:
+                d = d.replace(month=d.month + 1)
+        return d
+    return None
+
+def get_renewal_schedules(company_id, window_days=90, include_overdue=True,
+                          include_expired=False, renewable_only=True):
+    """
+    Return schedules whose amortization end date falls within the renewal window.
+
+    Args:
+        company_id:      ID of the company whose schedules to scan.
+        window_days:     Number of days from today to consider "due for renewal".
+        include_overdue: Include schedules whose end date already passed
+                         but are still within the look-back window.
+        include_expired: Include everything whose end date is <= cutoff,
+                         regardless of how long ago it ended.
+        renewable_only:  If True (default), only include schedules flagged as
+                         is_renewable=True. Set False to include one-offs.
+
+    Returns:
+        A list of dicts, sorted by days_left ascending (most overdue first):
+        [
+            {
+                'schedule': PrepaymentSchedule,
+                'end_date': date,
+                'days_left': int,              # negative = overdue
+                'status': str,                 # OVERDUE / DUE TODAY / etc.
+                'remaining_balance': float,
+                'total_cost': float,
+                'amortized': float,
+            },
+            ...
+        ]
+    """
+    today = date.today()
+    cutoff = today + timedelta(days=window_days)
+
+    # Base query, optionally restricted to renewable prepayments only
+    query = PrepaymentSchedule.query.filter_by(company_id=company_id)
+    if renewable_only:
+        query = query.filter(PrepaymentSchedule.is_renewable.is_(True))
+
+    all_schedules = query.all()
+    results = []
+
+    for schedule in all_schedules:
+        # Skip anything that isn't still being amortized
+        if (schedule.status or '').upper() not in ('ACTIVE', 'PENDING'):
+            continue
+
+        end_date = get_amortization_end_date(schedule)
+        if not end_date:
+            continue
+
+        days_left = (end_date - today).days
+
+        # Decide whether this schedule qualifies for the report
+        qualifies = False
+        if include_expired:
+            # Show everything whose end date is on or before the cutoff,
+            # no matter how far in the past it is.
+            qualifies = end_date <= cutoff
+        elif include_overdue:
+            # Show future renewals inside the window, plus anything that
+            # ended within the last `window_days` days.
+            qualifies = end_date <= cutoff and days_left >= -window_days
+        else:
+            # Only show renewals that are still in the future and inside
+            # the window.
+            qualifies = today <= end_date <= cutoff
+
+        if not qualifies:
+            continue
+
+        # Human-readable status label
+        if days_left < 0:
+            status = 'OVERDUE'
+        elif days_left == 0:
+            status = 'DUE TODAY'
+        elif days_left <= 7:
+            status = 'DUE THIS WEEK'
+        elif days_left <= 30:
+            status = 'DUE THIS MONTH'
+        else:
+            status = 'UPCOMING'
+
+        total_cost = float(schedule.total_cost)
+        remaining_balance = float(schedule.remaining_balance)
+
+        results.append({
+            'schedule': schedule,
+            'end_date': end_date,
+            'days_left': days_left,
+            'status': status,
+            'remaining_balance': remaining_balance,
+            'total_cost': total_cost,
+            'amortized': total_cost - remaining_balance,
+        })
+
+    # Most urgent first: negative days (overdue) come first, then soonest future
+    results.sort(key=lambda r: r['days_left'])
+    return results
+
+def generate_renewal_report_excel(rows, window_days):
+    """Generate Excel export of the renewal due report."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Renewals Due"
+
+    headers = ['#', 'Debit Account', 'Credit Account', 'Description',
+               'Transaction Date', 'Amortize Start', 'End Date',
+               'Total Cost', 'Amortized', 'Remaining Balance',
+               'Days Left', 'Status']
+
+    title_cols = len(headers)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=title_cols)
+    title_cell = ws.cell(row=1, column=1,
+                         value=f"Prepayment Renewal Due Report  |  Window: next {window_days} days  |  Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    title_cell.font = Font(bold=True, size=13)
+    title_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=col, value=header)
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = PatternFill(start_color='B85C00', end_color='B85C00', fill_type='solid')
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.column_dimensions[get_column_letter(col)].width = 20
+
+    row_num = 3
+    totals = {'total': 0.0, 'amortized': 0.0, 'remaining': 0.0}
+
+    for idx, r in enumerate(rows, 1):
+        s = r['schedule']
+        totals['total'] += r['total_cost']
+        totals['amortized'] += r['amortized']
+        totals['remaining'] += r['remaining_balance']
+
+        ws.cell(row=row_num, column=1, value=idx)
+        ws.cell(row=row_num, column=2, value=s.debit_account)
+        ws.cell(row=row_num, column=3, value=s.credit_account)
+        ws.cell(row=row_num, column=4, value=s.description)
+        ws.cell(row=row_num, column=5, value=s.transaction_date.strftime('%Y-%m-%d'))
+        ws.cell(row=row_num, column=6, value=s.amortize_start_period.strftime('%Y-%m-%d'))
+        ws.cell(row=row_num, column=7, value=r['end_date'].strftime('%Y-%m-%d'))
+        ws.cell(row=row_num, column=8, value=round(r['total_cost'], 2))
+        ws.cell(row=row_num, column=9, value=round(r['amortized'], 2))
+        ws.cell(row=row_num, column=10, value=round(r['remaining_balance'], 2))
+        ws.cell(row=row_num, column=11, value=r['days_left'])
+        ws.cell(row=row_num, column=12, value=r['status'])
+
+        # Color coding for days left / status
+        status_cell = ws.cell(row=row_num, column=12)
+        days_cell = ws.cell(row=row_num, column=11)
+        if r['days_left'] < 0:
+            fill = PatternFill(start_color='F8D7DA', end_color='F8D7DA', fill_type='solid')
+        elif r['days_left'] <= 7:
+            fill = PatternFill(start_color='FCE4D6', end_color='FCE4D6', fill_type='solid')
+        elif r['days_left'] <= 30:
+            fill = PatternFill(start_color='FFF2CC', end_color='FFF2CC', fill_type='solid')
+        else:
+            fill = PatternFill(start_color='E2EFDA', end_color='E2EFDA', fill_type='solid')
+        status_cell.fill = fill
+        days_cell.fill = fill
+
+        row_num += 1
+
+    # Totals row
+    ws.cell(row=row_num, column=1, value='TOTAL')
+    ws.merge_cells(start_row=row_num, start_column=1, end_row=row_num, end_column=7)
+    ws.cell(row=row_num, column=8, value=round(totals['total'], 2))
+    ws.cell(row=row_num, column=9, value=round(totals['amortized'], 2))
+    ws.cell(row=row_num, column=10, value=round(totals['remaining'], 2))
+
+    for col in range(1, title_cols + 1):
+        c = ws.cell(row=row_num, column=col)
+        c.font = Font(bold=True)
+        c.fill = PatternFill(start_color='FFC000', end_color='FFC000', fill_type='solid')
+
+    # Borders + number formats
+    border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                    top=Side(style='thin'), bottom=Side(style='thin'))
+    for row in ws.iter_rows(min_row=2, max_row=row_num, min_col=1, max_col=title_cols):
+        for cell in row:
+            cell.border = border
+            if cell.column in (8, 9, 10) and isinstance(cell.value, (int, float)):
+                cell.number_format = '#,##0.00'
+                cell.alignment = Alignment(horizontal='right', vertical='center')
+
+    excel_file = BytesIO()
+    wb.save(excel_file)
+    excel_file.seek(0)
+    return excel_file
+
+def generate_renewal_report_pdf(rows, window_days):
+    """Generate PDF export of the renewal due report."""
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    styles = getSampleStyleSheet()
+    story = []
+
+    title_style = ParagraphStyle('RenewalTitle', parent=styles['Heading1'], fontSize=16,
+                                 textColor=colors.HexColor('#B85C00'), spaceAfter=12)
+    story.append(Paragraph('Prepayment Renewal Due Report', title_style))
+
+    info_style = ParagraphStyle('RenewalInfo', parent=styles['Normal'], fontSize=10,
+                                textColor=colors.HexColor('#666666'), spaceAfter=10)
+    story.append(Paragraph(
+        f'Window: next {window_days} days  |  Generated: {datetime.now().strftime("%B %d, %Y at %I:%M %p")}',
+        info_style))
+    story.append(Spacer(1, 10))
+
+    headers = ['#', 'Debit Acct', 'Credit Acct', 'Description',
+               'End Date', 'Remaining', 'Days Left', 'Status']
+    table_data = [headers]
+
+    totals_remaining = 0.0
+    for idx, r in enumerate(rows, 1):
+        s = r['schedule']
+        totals_remaining += r['remaining_balance']
+        table_data.append([
+            str(idx),
+            s.debit_account[:20],
+            s.credit_account[:20],
+            s.description[:35] + ('...' if len(s.description) > 35 else ''),
+            r['end_date'].strftime('%Y-%m-%d'),
+            format_number(r['remaining_balance']),
+            str(r['days_left']),
+            r['status'],
+        ])
+
+    table_data.append(['', '', '', '', 'TOTAL', format_number(totals_remaining), '', ''])
+
+    col_widths = [0.4*inch, 1.3*inch, 1.3*inch, 3.0*inch, 1.0*inch, 1.2*inch, 0.8*inch, 1.0*inch]
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#B85C00')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]
+
+    # Color-code rows by status
+    for i, r in enumerate(rows, start=1):
+        if r['days_left'] < 0:
+            bg = colors.HexColor('#F8D7DA')
+        elif r['days_left'] <= 7:
+            bg = colors.HexColor('#FCE4D6')
+        elif r['days_left'] <= 30:
+            bg = colors.HexColor('#FFF2CC')
+        else:
+            bg = colors.HexColor('#E2EFDA')
+        style.append(('BACKGROUND', (0, i), (-1, i), bg))
+
+    # Bold totals row
+    last_row = len(table_data) - 1
+    style.append(('BACKGROUND', (0, last_row), (-1, last_row), colors.HexColor('#FFC000')))
+    style.append(('FONTNAME', (0, last_row), (-1, last_row), 'Helvetica-Bold'))
+
+    # Right-align numbers
+    for i in range(len(table_data)):
+        style.append(('ALIGN', (5, i), (6, i), 'RIGHT'))
+        style.append(('ALIGN', (4, i), (4, i), 'CENTER'))
+
+    table.setStyle(TableStyle(style))
+    story.append(table)
+
+    story.append(Spacer(1, 12))
+    footer_style = ParagraphStyle('RenewalFooter', parent=styles['Normal'], fontSize=8,
+                                  textColor=colors.HexColor('#666666'))
+    story.append(Paragraph(f'Total records: {len(rows)}', footer_style))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 # ============ CREDIT ACCOUNT REPORT HELPER FUNCTIONS ============
 def get_schedules_by_credit_account(schedules):
@@ -2681,6 +3049,148 @@ def switch_company():
     return render_template('company_switch.html',
                            companies=companies,
                            current_company_id=current_company_id)
+
+# ============ RENEWAL DUE REPORT ROUTES ============
+
+@app.route('/report/renewals', methods=['GET', 'POST'])
+def renewal_report():
+    """Display the renewal due report form."""
+    company_id = session.get('current_company')
+    if not company_id:
+        company = Company.query.first()
+        if company:
+            session['current_company'] = company.id
+            company_id = company.id
+
+    return render_template('renewal_report_form.html')
+
+@app.route('/report/renewals/view', methods=['GET', 'POST'])
+def renewal_report_view():
+    """View the renewal due report."""
+    company_id = session.get('current_company')
+    if not company_id:
+        company = Company.query.first()
+        if company:
+            session['current_company'] = company.id
+            company_id = company.id
+
+    # ---------- Read form / query params ----------
+    if request.method == 'POST':
+        window_days_str = request.form.get('window_days', '90')
+        include_overdue = request.form.get('include_overdue') == 'on'
+        include_expired = request.form.get('include_expired') == 'on'
+        renewable_only = request.form.get('renewable_only', 'on') == 'on'
+    else:
+        window_days_str = request.args.get('window_days', '90')
+        include_overdue = request.args.get('include_overdue') == 'on'
+        include_expired = request.args.get('include_expired') == 'on'
+        # Default to True if the arg is absent entirely; only False if explicitly '0'/'false'
+        renewable_arg = request.args.get('renewable_only')
+        renewable_only = True if renewable_arg is None else (renewable_arg == 'on')
+
+    # ---------- Validate window ----------
+    try:
+        window_days = int(window_days_str)
+        if window_days < 1 or window_days > 3650:
+            raise ValueError
+    except (ValueError, TypeError):
+        flash('Window must be a number between 1 and 3650 days.', 'danger')
+        return redirect(url_for('renewal_report'))
+
+    # ---------- Fetch rows ----------
+    rows = get_renewal_schedules(
+        company_id,
+        window_days=window_days,
+        include_overdue=include_overdue,
+        include_expired=include_expired,
+        renewable_only=renewable_only,
+    )
+
+    # ---------- Persist for download endpoints ----------
+    session['renewal_window_days'] = window_days
+    session['renewal_include_overdue'] = include_overdue
+    session['renewal_include_expired'] = include_expired
+    session['renewal_renewable_only'] = renewable_only
+
+    # ---------- Summary ----------
+    summary = {
+        'total': len(rows),
+        'overdue': sum(1 for r in rows if r['days_left'] < 0),
+        'due_7': sum(1 for r in rows if 0 <= r['days_left'] <= 7),
+        'due_30': sum(1 for r in rows if 7 < r['days_left'] <= 30),
+        'upcoming': sum(1 for r in rows if r['days_left'] > 30),
+        'total_remaining': sum(r['remaining_balance'] for r in rows),
+        # NEW: split so the template can show how many non-renewables were included
+        'renewable_count': sum(1 for r in rows if r['schedule'].is_renewable),
+        'non_renewable_count': sum(1 for r in rows if not r['schedule'].is_renewable),
+    }
+
+    company = Company.query.get(company_id)
+    currency_symbol = company.currency_symbol if company and company.currency_symbol else '$'
+
+    return render_template('renewal_report_results.html',
+                           rows=rows,
+                           window_days=window_days,
+                           include_overdue=include_overdue,
+                           include_expired=include_expired,
+                           renewable_only=renewable_only,
+                           summary=summary,
+                           generated_on=datetime.now(),
+                           currency_symbol=currency_symbol,
+                           format_number=format_number)
+
+@app.route('/report/renewals/download/excel')
+def download_renewal_report_excel():
+    company_id = session.get('current_company')
+    window_days = session.get('renewal_window_days', 90)
+    include_overdue = session.get('renewal_include_overdue', True)
+    include_expired = session.get('renewal_include_expired', False)
+
+    if not company_id:
+        flash('Please generate the report first.', 'warning')
+        return redirect(url_for('renewal_report'))
+
+    rows = get_renewal_schedules(company_id, window_days=window_days,
+                                 include_overdue=include_overdue,
+                                 include_expired=include_expired)
+
+    if not rows:
+        flash('No schedules found for this report.', 'warning')
+        return redirect(url_for('renewal_report'))
+
+    excel_file = generate_renewal_report_excel(rows, window_days)
+    response = make_response(send_file(
+        excel_file,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))
+    response.headers['Content-Disposition'] = \
+        f'attachment; filename=renewal_due_report_{date.today()}.xlsx'
+    return response
+
+
+@app.route('/report/renewals/download/pdf')
+def download_renewal_report_pdf():
+    company_id = session.get('current_company')
+    window_days = session.get('renewal_window_days', 90)
+    include_overdue = session.get('renewal_include_overdue', True)
+    include_expired = session.get('renewal_include_expired', False)
+
+    if not company_id:
+        flash('Please generate the report first.', 'warning')
+        return redirect(url_for('renewal_report'))
+
+    rows = get_renewal_schedules(company_id, window_days=window_days,
+                                 include_overdue=include_overdue,
+                                 include_expired=include_expired)
+
+    if not rows:
+        flash('No schedules found for this report.', 'warning')
+        return redirect(url_for('renewal_report'))
+
+    pdf_file = generate_renewal_report_pdf(rows, window_days)
+    response = make_response(send_file(pdf_file, mimetype='application/pdf'))
+    response.headers['Content-Disposition'] = \
+        f'attachment; filename=renewal_due_report_{date.today()}.pdf'
+    return response
 
 # ============ RUN APP ============
 if __name__ == '__main__':

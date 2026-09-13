@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Renewal Due Report{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header" style="background-color: #B85C00; color: white;">
+                <h4 class="mb-0"><i class="fas fa-sync-alt"></i> Prepayment Renewal Due Report</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('renewal_report_view') }}">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="window_days" class="form-label fw-bold">
+                                Look-ahead Window (days) <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" name="window_days" id="window_days"
+                                   class="form-control" min="1" max="3650" value="90" required>
+                            <small class="text-muted">
+                                Show prepayments whose amortization ends within this many days.
+                                Common values: 30, 60, 90, 180.
+                            </small>
+                        </div>
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div class="w-100">
+                                <div class="form-check">
+                                    <input type="checkbox" name="include_overdue"
+                                           id="include_overdue" class="form-check-input" checked>
+                                    <label for="include_overdue" class="form-check-label">
+                                        Include overdue (already ended, within window)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="include_expired"
+                                           id="include_expired" class="form-check-input">
+                                    <label for="include_expired" class="form-check-label">
+                                        Include everything already expired
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 d-flex gap-2">
+                        <button type="submit" class="btn" style="background-color: #B85C00; color: white;">
+                            <i class="fas fa-eye"></i> Generate Report
+                        </button>
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
+                    </div>
+                </form>
+
+                <hr>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>What this report shows:</strong>
+                    <ul class="mt-2 mb-0">
+                        <li>Prepayments whose <strong>final amortization date</strong> is approaching.</li>
+                        <li><strong>Days Left</strong> = end date − today (negative = already overdue).</li>
+                        <li><strong>Status</strong> is color-coded: Overdue, Due This Week, Due This Month, Upcoming.</li>
+                        <li>Sorted so the most urgent renewals appear first.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

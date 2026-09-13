@@ -57,6 +57,10 @@ class PrepaymentSchedule(db.Model):
     period_to_amortize = db.Column(db.Integer, nullable=False)
     amortize_start_period = db.Column(db.Date, nullable=False)
 
+    # >>> NEW: Renewal tracking <<<
+    is_renewable = db.Column(db.Boolean, nullable=False, default=True, server_default='true')
+    renewal_notes = db.Column(db.String(500))
+
     # Status and timestamps
     status = db.Column(db.String(50), default='ACTIVE')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

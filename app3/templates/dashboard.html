@@ -6,6 +6,53 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- RENEWAL ALERT BANNER                                          -->
+<!-- ============================================================ -->
+{% if renewal_summary and renewal_summary.total > 0 %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center shadow-sm"
+             role="alert" style="border-left: 6px solid #B85C00;">
+            <i class="fas fa-bell fa-2x me-3 text-warning"></i>
+            <div class="flex-grow-1">
+                <strong class="fs-5">
+                    {{ renewal_summary.total }} prepayment{{ 's' if renewal_summary.total != 1 else '' }}
+                    due for renewal within 30 days
+                </strong>
+                <div class="mt-1">
+                    {% if renewal_summary.overdue > 0 %}
+                        <span class="badge bg-danger me-2">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            {{ renewal_summary.overdue }} overdue
+                        </span>
+                    {% endif %}
+                    {% if renewal_summary.due_7 > 0 %}
+                        <span class="badge bg-warning text-dark me-2">
+                            <i class="fas fa-hourglass-half"></i>
+                            {{ renewal_summary.due_7 }} due in 7 days
+                        </span>
+                    {% endif %}
+                    {% if renewal_summary.due_30 > 0 %}
+                        <span class="badge bg-info text-dark me-2">
+                            <i class="fas fa-calendar-day"></i>
+                            {{ renewal_summary.due_30 }} due in 8–30 days
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{{ url_for('renewal_report') }}" class="btn btn-warning btn-sm ms-3">
+                <i class="fas fa-sync-alt"></i> View Full Report
+            </a>
+            <button type="button" class="btn-close ms-2" data-bs-dismiss="alert"></button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- TOP STATS CARDS                                              -->
+<!-- ============================================================ -->
 <div class="row mb-4">
     <div class="col-xl-3 col-md-6 mb-3">
         <div class="card bg-primary text-white h-100">
@@ -52,20 +99,118 @@
         </div>
     </div>
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card bg-info text-white h-100">
+        <div class="card {% if renewal_summary and renewal_summary.total > 0 %}bg-danger{% else %}bg-info{% endif %} text-white h-100">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="card-title">Upcoming Entries</h5>
-                        <h2 class="display-5">{{ upcoming_entries|length }}</h2>
+                        <h5 class="card-title">
+                            {% if renewal_summary and renewal_summary.overdue > 0 %}
+                                Overdue Renewals
+                            {% else %}
+                                Renewals Due (30d)
+                            {% endif %}
+                        </h5>
+                        <h2 class="display-5">
+                            {% if renewal_summary and renewal_summary.overdue > 0 %}
+                                {{ renewal_summary.overdue }}
+                            {% elif renewal_summary %}
+                                {{ renewal_summary.total }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </h2>
                     </div>
-                    <i class="fas fa-calendar-alt fa-3x opacity-50"></i>
+                    <i class="fas fa-sync-alt fa-3x opacity-50"></i>
                 </div>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="{{ url_for('renewal_report') }}" class="text-white text-decoration-none">
+                    View Renewals <i class="fas fa-arrow-right"></i>
+                </a>
             </div>
         </div>
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- RENEWALS DUE LIST                                            -->
+<!-- ============================================================ -->
+{% if renewal_alerts %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card border-warning shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center"
+                 style="background-color: #B85C00; color: white;">
+                <h5 class="mb-0"><i class="fas fa-sync-alt"></i> Renewals Due — Next 30 Days</h5>
+                <a href="{{ url_for('renewal_report') }}" class="btn btn-light btn-sm">
+                    <i class="fas fa-external-link-alt"></i> Full Report
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Description</th>
+                                <th>Debit Account</th>
+                                <th>End Date</th>
+                                <th class="text-end">Remaining</th>
+                                <th class="text-center">Days Left</th>
+                                <th class="text-center">Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in renewal_alerts %}
+                            <tr class="
+                                {% if r.days_left < 0 %}table-danger
+                                {% elif r.days_left <= 7 %}table-warning
+                                {% else %}table-info{% endif %}">
+                                <td>{{ loop.index }}</td>
+                                <td>{{ r.schedule.description[:50] }}{% if r.schedule.description|length > 50 %}…{% endif %}</td>
+                                <td>{{ r.schedule.debit_account }}</td>
+                                <td>{{ r.end_date.strftime('%Y-%m-%d') }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ format_number(r.remaining_balance) }}</td>
+                                <td class="text-center fw-bold">
+                                    {% if r.days_left < 0 %}
+                                        {{ r.days_left }} <small>(overdue)</small>
+                                    {% else %}
+                                        {{ r.days_left }}
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge
+                                        {% if r.days_left < 0 %}bg-danger
+                                        {% elif r.days_left <= 7 %}bg-warning text-dark
+                                        {% else %}bg-info text-dark{% endif %}">
+                                        {{ r.status }}
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    <a href="{{ url_for('schedule_detail', pk=r.schedule.id) }}"
+                                       class="btn btn-sm btn-outline-primary" title="View schedule">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted small">
+                Showing top {{ renewal_alerts|length }} of {{ renewal_summary.total }} renewals due.
+                Sorted by urgency (most overdue first).
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- RECENT SCHEDULES + UPCOMING AMORTIZATIONS                    -->
+<!-- ============================================================ -->
 <div class="row">
     <div class="col-md-6">
         <div class="card">
@@ -119,6 +264,9 @@
     </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- QUICK ACTIONS                                                -->
+<!-- ============================================================ -->
 <div class="row mt-3">
     <div class="col-md-12">
         <div class="card">
@@ -143,8 +291,9 @@
                         </a>
                     </div>
                     <div class="col-md-3 col-6">
-                        <a href="{{ url_for('credit_report') }}" class="btn btn-success w-100">
-                            <i class="fas fa-file-alt"></i> Credit Report
+                        <a href="{{ url_for('renewal_report') }}" class="btn w-100 text-white"
+                           style="background-color: #B85C00;">
+                            <i class="fas fa-sync-alt"></i> Renewal Report
                         </a>
                     </div>
                 </div>

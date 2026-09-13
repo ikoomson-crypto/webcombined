@@ -12,6 +12,9 @@
                     <a href="{{ url_for('schedule_list') }}" class="btn btn-secondary">Back to List</a>
                 {% else %}
                 <form method="post">
+                    <!-- ============================================ -->
+                    <!-- ACCOUNTS                                     -->
+                    <!-- ============================================ -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="debit_account" class="form-label">Debit Account <span class="text-danger">*</span></label>
@@ -28,16 +31,25 @@
                             <small class="text-muted">Enter the account to credit</small>
                         </div>
                     </div>
+
+                    <!-- ============================================ -->
+                    <!-- TRANSACTION DETAILS                          -->
+                    <!-- ============================================ -->
                     <div class="mb-3">
                         <label for="transaction_date" class="form-label">Transaction Date <span class="text-danger">*</span></label>
                         <input type="date" name="transaction_date" id="transaction_date" class="form-control"
                                value="{{ schedule.transaction_date.strftime('%Y-%m-%d') if schedule else '' }}" required>
                     </div>
+
                     <div class="mb-3">
                         <label for="description" class="form-label">Description <span class="text-danger">*</span></label>
                         <textarea name="description" id="description" class="form-control" rows="3"
                                   placeholder="Enter description of the prepayment" required>{{ schedule.description if schedule else '' }}</textarea>
                     </div>
+
+                    <!-- ============================================ -->
+                    <!-- PREPAYMENT DETAILS                           -->
+                    <!-- ============================================ -->
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="total_cost" class="form-label">Total Cost <span class="text-danger">*</span></label>
@@ -58,6 +70,48 @@
                                    value="{{ schedule.amortize_start_period.strftime('%Y-%m-%d') if schedule else '' }}" required>
                         </div>
                     </div>
+
+                    <!-- ============================================ -->
+                    <!-- RENEWAL TRACKING                             -->
+                    <!-- ============================================ -->
+                    <hr>
+                    <h6 class="text-muted mb-3">
+                        <i class="fas fa-sync-alt"></i> Renewal Tracking
+                    </h6>
+
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" name="is_renewable" id="is_renewable"
+                                       class="form-check-input"
+                                       {% if not schedule or schedule.is_renewable %}checked{% endif %}>
+                                <label for="is_renewable" class="form-check-label fw-bold">
+                                    Renewable prepayment
+                                </label>
+                            </div>
+                            <small class="text-muted d-block mt-1">
+                                If checked, this prepayment will appear in the renewal due report and
+                                trigger reminders when its amortization period ends.
+                                Uncheck for one-off prepayments that will not be renewed.
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="renewal_notes" class="form-label">
+                                Renewal Notes <small class="text-muted">(optional)</small>
+                            </label>
+                            <textarea name="renewal_notes" id="renewal_notes" class="form-control" rows="2"
+                                      placeholder="e.g. Renew via Procurement, expected budget impact, contact person…">{{ schedule.renewal_notes if schedule and schedule.renewal_notes else '' }}</textarea>
+                            <small class="text-muted">Only visible when the renewal report is generated.</small>
+                        </div>
+                    </div>
+
+                    <!-- ============================================ -->
+                    <!-- ACTION BUTTONS                               -->
+                    <!-- ============================================ -->
+                    <hr>
                     <div class="mt-3">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save"></i> {{ action }}

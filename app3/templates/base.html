@@ -234,6 +234,12 @@
             <span class="badge-new">NEW</span>
         </a>
 
+        <a class="nav-link {% if request.endpoint in ['renewal_report', 'renewal_report_view'] %}active{% endif %}"
+           href="{{ url_for('renewal_report') }}">
+            <i class="fas fa-sync-alt" style="color: #ffb366;"></i> Renewal Due
+            <span class="badge-new">NEW</span>
+        </a>
+
         <div class="nav-section">Administration</div>
 
         <a class="nav-link {% if request.endpoint == 'company_list' %}active{% endif %}" href="{{ url_for('company_list') }}">

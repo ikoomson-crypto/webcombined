@@ -3,10 +3,24 @@
 <div class="row">
     <div class="col-md-12">
         <div class="card">
-            <div class="card-header">
-                <h4>Schedule #{{ schedule.id }} - {{ schedule.description }}</h4>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Schedule #{{ schedule.id }} - {{ schedule.description }}</h4>
+                <div>
+                    {% if schedule.is_renewable %}
+                        <span class="badge bg-success fs-6" title="Tracked for renewal">
+                            <i class="fas fa-sync-alt"></i> Renewable
+                        </span>
+                    {% else %}
+                        <span class="badge bg-secondary fs-6" title="Not tracked for renewal">
+                            <i class="fas fa-minus-circle"></i> Non-Renewable
+                        </span>
+                    {% endif %}
+                </div>
             </div>
             <div class="card-body">
+                <!-- ============================================ -->
+                <!-- ACCOUNT / TRANSACTION DETAILS                -->
+                <!-- ============================================ -->
                 <div class="row">
                     <div class="col-md-4"><strong>Debit Account:</strong> {{ schedule.debit_account }}</div>
                     <div class="col-md-4"><strong>Credit Account:</strong> {{ schedule.credit_account }}</div>
@@ -20,27 +34,70 @@
                 <div class="row mt-3">
                     <div class="col-md-4"><strong>Remaining:</strong> {{ currency_symbol }}{{ "%.2f"|format(schedule.remaining_balance) }}</div>
                     <div class="col-md-4"><strong>Created:</strong> {{ schedule.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                    <div class="col-md-4"><strong>Status:</strong> {{ schedule.status }}</div>
+                </div>
+
+                <!-- ============================================ -->
+                <!-- RENEWAL TRACKING                             -->
+                <!-- ============================================ -->
+                <hr>
+                <h6 class="text-muted mb-3"><i class="fas fa-sync-alt"></i> Renewal Tracking</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Renewable:</strong>
+                        {% if schedule.is_renewable %}
+                            <span class="badge bg-success"><i class="fas fa-check-circle"></i> Yes</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="fas fa-minus-circle"></i> No</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-8">
+                        <strong>Renewal Notes:</strong>
+                        {% if schedule.renewal_notes %}
+                            {{ schedule.renewal_notes }}
+                        {% else %}
+                            <em class="text-muted">None</em>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- ============================================ -->
+<!-- AMORTIZATION SCHEDULE                        -->
+<!-- ============================================ -->
 <div class="row mt-4">
     <div class="col-md-12">
         <div class="card">
-            <div class="card-header"><h5>Amortization Schedule</h5></div>
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-calendar-alt"></i> Amortization Schedule</h5>
+            </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead><tr><th>Period</th><th>Due Date</th><th>Amount</th><th>Remaining</th><th>Status</th></tr></thead>
+                    <table class="table table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th>Due Date</th>
+                                <th class="text-end">Amount</th>
+                                <th class="text-end">Remaining</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             {% for entry in amortization_schedule %}
                             <tr class="{% if entry.status == 'Completed' %}table-success{% else %}table-warning{% endif %}">
                                 <td>{{ entry.period }}</td>
                                 <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
-                                <td>{{ currency_symbol }}{{ "%.2f"|format(entry.amount) }}</td>
-                                <td>{{ currency_symbol }}{{ "%.2f"|format(entry.remaining_balance) }}</td>
-                                <td>{{ entry.status }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ "%.2f"|format(entry.amount) }}</td>
+                                <td class="text-end">{{ currency_symbol }}{{ "%.2f"|format(entry.remaining_balance) }}</td>
+                                <td class="text-center">{{ entry.status }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-3">No amortization entries.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -50,10 +107,36 @@
         </div>
     </div>
 </div>
+
+<!-- ============================================ -->
+<!-- ACTION BUTTONS                               -->
+<!-- ============================================ -->
 <div class="row mt-3">
     <div class="col-md-12">
-        <a href="{{ url_for('schedule_update', pk=schedule.id) }}" class="btn btn-warning">Edit</a>
-        <a href="{{ url_for('schedule_list') }}" class="btn btn-secondary">Back</a>
+        <a href="{{ url_for('schedule_update', pk=schedule.id) }}" class="btn btn-warning">
+            <i class="fas fa-edit"></i> Edit
+        </a>
+        <a href="{{ url_for('schedule_list') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <a href="{{ url_for('renewal_report') }}" class="btn btn-outline-warning">
+            <i class="fas fa-sync-alt"></i> Renewal Report
+        </a>
+        <button type="button" class="btn btn-danger" onclick="confirmDelete({{ schedule.id }})">
+            <i class="fas fa-trash"></i> Delete
+        </button>
     </div>
 </div>
+
+<script>
+function confirmDelete(id) {
+    if (confirm('Delete this schedule? This action cannot be undone.')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "{{ url_for('schedule_delete', pk=0) }}".replace('0', id);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
 {% endblock %}
