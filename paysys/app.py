@@ -2045,7 +2045,12 @@ def create_invoice_from_payroll(company_id, employee_id, year, month, descriptio
         datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     ))
 
-    invoice_id = cursor.lastrowid
+    if IS_PRODUCTION:
+        cursor.execute("""INSERT INTO consultant_invoices (...) VALUES (...) RETURNING id""", (...))
+        invoice_id = cursor.fetchone()['id']
+    else:
+        cursor.execute("""INSERT INTO consultant_invoices (...) VALUES (...)""", (...))
+        invoice_id = cursor.lastrowid
     db.commit()
 
     return get_invoice(invoice_id)
@@ -3500,7 +3505,12 @@ def add_employee(company_id):
             request.form.get('street_location', '')
         ))
 
-        employee_id = cursor.lastrowid
+        if IS_PRODUCTION:
+            cursor.execute("""INSERT INTO employees (...) VALUES (...) RETURNING id""", (...))
+            employee_id = cursor.fetchone()['id']
+        else:
+            cursor.execute("""INSERT INTO employees (...) VALUES (...)""", (...))
+            employee_id = cursor.lastrowid
         db.commit()
 
         # Add default allowances
@@ -3652,7 +3662,6 @@ def manage_allowances(company_id):
     definitions = get_allowance_definitions(company_id)
     return render_template('allowances.html', company=company, definitions=definitions)
 
-
 @app.route('/allowances/add/<int:company_id>', methods=['GET', 'POST'])
 def add_allowance(company_id):
     company = get_company(company_id)
@@ -3664,20 +3673,38 @@ def add_allowance(company_id):
         db = get_db()
         cursor = get_cursor(db)
 
-        cursor.execute("""
-            INSERT INTO allowance_definitions (company_id, name, type, default_value, is_taxable, description, created_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            company_id,
-            request.form['name'],
-            request.form['type'],
-            float(request.form['default_value']),
-            1 if request.form.get('is_taxable') == 'on' else 0,
-            request.form.get('description', ''),
-            datetime.datetime.now().strftime('%Y-%m-%d')
-        ))
+        if IS_PRODUCTION:
+            # PostgreSQL - use RETURNING id
+            cursor.execute("""
+                INSERT INTO allowance_definitions (company_id, name, type, default_value, is_taxable, description, created_date)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                company_id,
+                request.form['name'],
+                request.form['type'],
+                float(request.form['default_value']),
+                1 if request.form.get('is_taxable') == 'on' else 0,
+                request.form.get('description', ''),
+                datetime.datetime.now().strftime('%Y-%m-%d')
+            ))
+            allowance_id = cursor.fetchone()['id']
+        else:
+            # SQLite - use lastrowid
+            cursor.execute("""
+                INSERT INTO allowance_definitions (company_id, name, type, default_value, is_taxable, description, created_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                company_id,
+                request.form['name'],
+                request.form['type'],
+                float(request.form['default_value']),
+                1 if request.form.get('is_taxable') == 'on' else 0,
+                request.form.get('description', ''),
+                datetime.datetime.now().strftime('%Y-%m-%d')
+            ))
+            allowance_id = cursor.lastrowid
 
-        allowance_id = cursor.lastrowid
         db.commit()
 
         employees = get_employees_by_company(company_id)
@@ -3692,7 +3719,6 @@ def add_allowance(company_id):
         return redirect(url_for('manage_allowances', company_id=company_id))
 
     return render_template('allowance_form.html', company=company, allowance=None, action='Add')
-
 
 @app.route('/allowances/edit/<int:allowance_id>', methods=['GET', 'POST'])
 def edit_allowance(allowance_id):
@@ -3890,7 +3916,12 @@ def add_deduction(company_id):
             datetime.datetime.now().strftime('%Y-%m-%d')
         ))
 
-        deduction_id = cursor.lastrowid
+        if IS_PRODUCTION:
+            cursor.execute("""INSERT INTO deduction_definitions (...) VALUES (...) RETURNING id""", (...))
+            deduction_id = cursor.fetchone()['id']
+        else:
+            cursor.execute("""INSERT INTO deduction_definitions (...) VALUES (...)""", (...))
+            deduction_id = cursor.lastrowid
         db.commit()
 
         flash('Deduction added successfully!', 'success')
@@ -4028,7 +4059,13 @@ def add_bik(company_id):
             datetime.datetime.now().strftime('%Y-%m-%d')
         ))
 
-        bik_id = cursor.lastrowid
+        if IS_PRODUCTION:
+            cursor.execute("""INSERT INTO deduction_definitions (...) VALUES (...) RETURNING id""", (...))
+            bik_id = cursor.fetchone()['id']
+        else:
+            cursor.execute("""INSERT INTO deduction_definitions (...) VALUES (...)""", (...))
+            bik_id = cursor.lastrowid
+
         db.commit()
 
         flash('Benefit-in-Kind added successfully!', 'success')
@@ -5246,11 +5283,12 @@ def bulk_import(company_id):
 
                     while copy_year < end_year or (copy_year == end_year and copy_month <= end_month):
                         cursor.execute("""
-                            SELECT COUNT(*) FROM monthly_salaries 
+                            SELECT COUNT(*) as count FROM monthly_salaries 
                             WHERE employee_id IN (SELECT id FROM employees WHERE company_id = ?)
                             AND year = ? AND month = ?
                         """, (company_id, copy_year, copy_month))
-                        count = cursor.fetchone()[0]
+                        result = cursor.fetchone()
+                        count = result['count'] if result else 0  # ✅ Works on both
 
                         if count == 0:
                             prev_year = copy_year
