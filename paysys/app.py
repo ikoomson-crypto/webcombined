@@ -5693,7 +5693,6 @@ def delete_payroll(company_id):
 # ============================================
 # ROUTES - Employee Import/Export
 # ============================================
-
 @app.route('/employees/import/<int:company_id>', methods=['GET', 'POST'])
 def import_employees(company_id):
     company = get_company(company_id)
@@ -5714,8 +5713,8 @@ def import_employees(company_id):
         if file and file.filename.endswith(('.xlsx', '.xls')):
             try:
                 df = pd.read_excel(file)
-                required_cols = ['first_name', 'last_name', 'email', 'position', 'department', 'base_salary',
-                                 'hire_date']
+                required_cols = ['first_name', 'last_name', 'email', 'position',
+                                 'department', 'base_salary', 'hire_date']
 
                 for col in required_cols:
                     if col not in df.columns:
@@ -5730,6 +5729,10 @@ def import_employees(company_id):
                 allowance_defs = get_allowance_definitions(company_id)
 
                 for idx, row in df.iterrows():
+                    # ⚠️ Wrap each row in a SAVEPOINT so a failure on one row
+                    # doesn't abort the whole transaction (PostgreSQL behavior)
+                    if IS_PRODUCTION:
+                        cursor.execute("SAVEPOINT row_import")
                     try:
                         # Basic required fields
                         first_name = str(row['first_name']).strip()
@@ -5740,12 +5743,12 @@ def import_employees(company_id):
                         base_salary = float(row['base_salary'])
                         hire_date = str(row['hire_date']).strip()
 
-                        # Status - default to Active if not provided
+                        # Status
                         status = str(row.get('status', 'Active')).strip()
                         if status not in ['Active', 'Inactive', 'On Leave', 'Terminated', 'Consultant']:
                             status = 'Active'
 
-                        # Exemptions - handle Yes/No or 1/0
+                        # Exemptions
                         is_tax_exempt = 0
                         exempt_from_ss = 0
 
@@ -5761,57 +5764,58 @@ def import_employees(company_id):
 
                         # Bank details
                         bank_name = str(row.get('bank_name', '')).strip() if pd.notna(row.get('bank_name')) else ''
-                        bank_currency = str(row.get('bank_currency', '')).strip() if pd.notna(
-                            row.get('bank_currency')) else ''
-                        bank_account_number = str(row.get('bank_account_number', '')).strip() if pd.notna(
-                            row.get('bank_account_number')) else ''
+                        bank_currency = str(row.get('bank_currency', '')).strip() if pd.notna(row.get('bank_currency')) else ''
+                        bank_account_number = str(row.get('bank_account_number', '')).strip() if pd.notna(row.get('bank_account_number')) else ''
                         bank_iban = str(row.get('bank_iban', '')).strip() if pd.notna(row.get('bank_iban')) else ''
-                        bank_account_name = str(row.get('bank_account_name', '')).strip() if pd.notna(
-                            row.get('bank_account_name')) else ''
-                        bank_swift_code = str(row.get('bank_swift_code', '')).strip() if pd.notna(
-                            row.get('bank_swift_code')) else ''
-                        bank_address = str(row.get('bank_address', '')).strip() if pd.notna(
-                            row.get('bank_address')) else ''
+                        bank_account_name = str(row.get('bank_account_name', '')).strip() if pd.notna(row.get('bank_account_name')) else ''
+                        bank_swift_code = str(row.get('bank_swift_code', '')).strip() if pd.notna(row.get('bank_swift_code')) else ''
+                        bank_address = str(row.get('bank_address', '')).strip() if pd.notna(row.get('bank_address')) else ''
 
                         # ID details
                         id_type = str(row.get('id_type', '')).strip() if pd.notna(row.get('id_type')) else ''
                         id_number = str(row.get('id_number', '')).strip() if pd.notna(row.get('id_number')) else ''
-                        street_location = str(row.get('street_location', '')).strip() if pd.notna(
-                            row.get('street_location')) else ''
+                        street_location = str(row.get('street_location', '')).strip() if pd.notna(row.get('street_location')) else ''
 
-                        cursor.execute("""
-                            INSERT INTO employees (
+                        # ✅ FIX: Use RETURNING id for PostgreSQL
+                        if IS_PRODUCTION:
+                            cursor.execute("""
+                                INSERT INTO employees (
+                                    company_id, first_name, last_name, email, position, department,
+                                    base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security,
+                                    bank_name, bank_currency, bank_account_number, bank_iban,
+                                    bank_account_name, bank_swift_code, bank_address,
+                                    id_type, id_number, street_location
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                RETURNING id
+                            """, (
                                 company_id, first_name, last_name, email, position, department,
-                                base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security,
+                                base_salary, hire_date, status, is_tax_exempt, exempt_from_ss,
                                 bank_name, bank_currency, bank_account_number, bank_iban,
                                 bank_account_name, bank_swift_code, bank_address,
                                 id_type, id_number, street_location
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            company_id,
-                            first_name,
-                            last_name,
-                            email,
-                            position,
-                            department,
-                            base_salary,
-                            hire_date,
-                            status,
-                            is_tax_exempt,
-                            exempt_from_ss,
-                            bank_name,
-                            bank_currency,
-                            bank_account_number,
-                            bank_iban,
-                            bank_account_name,
-                            bank_swift_code,
-                            bank_address,
-                            id_type,
-                            id_number,
-                            street_location
-                        ))
+                            ))
+                            employee_id = cursor.fetchone()['id']
+                        else:
+                            cursor.execute("""
+                                INSERT INTO employees (
+                                    company_id, first_name, last_name, email, position, department,
+                                    base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security,
+                                    bank_name, bank_currency, bank_account_number, bank_iban,
+                                    bank_account_name, bank_swift_code, bank_address,
+                                    id_type, id_number, street_location
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                company_id, first_name, last_name, email, position, department,
+                                base_salary, hire_date, status, is_tax_exempt, exempt_from_ss,
+                                bank_name, bank_currency, bank_account_number, bank_iban,
+                                bank_account_name, bank_swift_code, bank_address,
+                                id_type, id_number, street_location
+                            ))
+                            employee_id = cursor.lastrowid
 
-                        employee_id = cursor.lastrowid
+                        # Sanity check
+                        if not employee_id:
+                            raise Exception("Failed to obtain new employee ID")
 
                         # Add allowances
                         for defn in allowance_defs:
@@ -5826,9 +5830,16 @@ def import_employees(company_id):
                                 VALUES (?, ?, ?)
                             """, (employee_id, defn['id'], value))
 
+                        # ✅ Release savepoint on success
+                        if IS_PRODUCTION:
+                            cursor.execute("RELEASE SAVEPOINT row_import")
+
                         imported_count += 1
 
                     except Exception as e:
+                        # ✅ Roll back just this row's changes
+                        if IS_PRODUCTION:
+                            cursor.execute("ROLLBACK TO SAVEPOINT row_import")
                         errors.append(f"Row {idx + 2}: {str(e)}")
 
                 db.commit()
@@ -5836,7 +5847,7 @@ def import_employees(company_id):
                 if errors:
                     flash(f'Imported {imported_count} employees with {len(errors)} errors. Check logs for details.',
                           'warning')
-                    for err in errors[:5]:  # Show first 5 errors
+                    for err in errors[:5]:
                         print(f'⚠️ {err}')
                 else:
                     flash(f'Successfully imported {imported_count} employees!', 'success')
