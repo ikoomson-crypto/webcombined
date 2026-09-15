@@ -1171,8 +1171,12 @@ def get_employee_monthly_salary(employee_id, year, month):
     return employee['base_salary'] if employee else 0
 
 
-def set_employee_monthly_salary(employee_id, year, month, salary):
-    """Set employee's salary for a specific month"""
+def set_employee_monthly_salary(employee_id, year, month, salary, commit=True):
+    """Set employee's salary for a specific month.
+
+    When commit=False, the caller controls the transaction, allowing
+    PostgreSQL row-level SAVEPOINT handling.
+    """
     db = get_db()
     cursor = get_cursor(db)
     if IS_PRODUCTION:
@@ -1187,7 +1191,8 @@ def set_employee_monthly_salary(employee_id, year, month, salary):
             INSERT OR REPLACE INTO monthly_salaries (employee_id, year, month, salary)
             VALUES (?, ?, ?, ?)
         """, (employee_id, year, month, salary))
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def get_social_security_threshold(company_id, year, month):
@@ -1320,8 +1325,12 @@ def get_all_employee_monthly_allowances(employee_id, year, month):
     return result
 
 
-def set_employee_monthly_allowance(employee_id, allowance_id, year, month, value):
-    """Set an employee's allowance for a specific month"""
+def set_employee_monthly_allowance(employee_id, allowance_id, year, month, value, commit=True):
+    """Set an employee's allowance for a specific month.
+
+    When commit=False, the caller controls the transaction, allowing
+    PostgreSQL row-level SAVEPOINT handling.
+    """
     db = get_db()
     cursor = get_cursor(db)
 
@@ -1375,7 +1384,8 @@ def set_employee_monthly_allowance(employee_id, allowance_id, year, month, value
                 VALUES (?, ?, ?)
             """, (employee_id, allowance_id, value))
 
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def calculate_employee_allowances(employee_id, year, month):
@@ -3708,14 +3718,41 @@ def add_allowance(company_id):
         db.commit()
 
         employees = get_employees_by_company(company_id)
+        allowance_errors = []
+        allowance_value = float(request.form['default_value'])
+
         for emp in employees:
-            cursor.execute("""
-                INSERT INTO employee_allowances (employee_id, allowance_id, value)
-                VALUES (?, ?, ?)
-            """, (emp['id'], allowance_id, float(request.form['default_value'])))
+            if IS_PRODUCTION:
+                cursor.execute("SAVEPOINT allowance_row")
+
+            try:
+                cursor.execute("""
+                    INSERT INTO employee_allowances (employee_id, allowance_id, value)
+                    VALUES (?, ?, ?)
+                """, (emp['id'], allowance_id, allowance_value))
+
+                if IS_PRODUCTION:
+                    cursor.execute("RELEASE SAVEPOINT allowance_row")
+
+            except Exception as e:
+                if IS_PRODUCTION:
+                    cursor.execute("ROLLBACK TO SAVEPOINT allowance_row")
+                allowance_errors.append(
+                    f"Employee {emp['id']} ({emp['first_name']} {emp['last_name']}): {str(e)}"
+                )
 
         db.commit()
-        flash('Allowance added successfully!', 'success')
+
+        if allowance_errors:
+            flash(
+                f'Allowance created, but {len(allowance_errors)} employee allowance(s) '
+                f'could not be created.',
+                'warning'
+            )
+            for err in allowance_errors[:5]:
+                print(f'⚠️ {err}')
+        else:
+            flash('Allowance added successfully!', 'success')
         return redirect(url_for('manage_allowances', company_id=company_id))
 
     return render_template('allowance_form.html', company=company, allowance=None, action='Add')
@@ -4607,55 +4644,87 @@ def process_payroll(company_id):
     cursor = get_cursor(db)
     processed_count = 0
 
+    errors = []
+
     for emp in employee_list:
-        period = f'{year}-{month:02d}'
-        payroll = calculate_payroll(emp['id'], period, year, month, tax_config)
-        if payroll:
-            cursor.execute("""
-                INSERT INTO payroll_records (
-                    employee_id, company_id, period, year, month, base_salary, allowances_total, allowance_details,
-                    bonus_amount, bonus_details, bik_total, bik_details, deductions_total, deduction_details,
-                    gross_salary, annual_gross, annual_taxable, annual_tax, monthly_tax, bonus_tax_flat, total_tax,
-                    social_security, social_security_threshold_applied, total_deductions, net_pay,
-                    currency, tax_year, tax_config_id, processed_date, is_tax_exempt, exempt_from_social_security
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                payroll['employee_id'],
-                payroll['company_id'],
-                payroll['period'],
-                payroll['year'],
-                payroll['month'],
-                payroll['base_salary'],
-                payroll['allowances_total'],
-                json.dumps(payroll['allowance_details']),
-                payroll['bonus_amount'],
-                json.dumps(payroll['bonus_details']) if payroll['bonus_details'] else None,
-                payroll['bik_total'],
-                json.dumps(payroll['bik_details']),
-                payroll['deductions_total'],
-                json.dumps(payroll['deduction_details']),
-                payroll['gross_salary'],
-                payroll['annual_gross'],
-                payroll['annual_taxable'],
-                payroll['annual_tax'],
-                payroll['monthly_tax'],
-                payroll['bonus_tax_flat'],
-                payroll['total_tax'],
-                payroll['social_security'],
-                payroll['social_security_threshold_applied'],
-                payroll['total_deductions'],
-                payroll['net_pay'],
-                payroll['currency'],
-                payroll['tax_year'],
-                payroll['tax_config_id'],
-                datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                1 if payroll['is_tax_exempt'] else 0,
-                1 if payroll['exempt_from_social_security'] else 0
-            ))
-            processed_count += 1
+        if IS_PRODUCTION:
+            cursor.execute("SAVEPOINT payroll_row")
+
+        try:
+            period = f'{year}-{month:02d}'
+            payroll = calculate_payroll(emp['id'], period, year, month, tax_config)
+
+            if payroll:
+                cursor.execute("""
+                    INSERT INTO payroll_records (
+                        employee_id, company_id, period, year, month, base_salary, allowances_total, allowance_details,
+                        bonus_amount, bonus_details, bik_total, bik_details, deductions_total, deduction_details,
+                        gross_salary, annual_gross, annual_taxable, annual_tax, monthly_tax, bonus_tax_flat, total_tax,
+                        social_security, social_security_threshold_applied, total_deductions, net_pay,
+                        currency, tax_year, tax_config_id, processed_date, is_tax_exempt, exempt_from_social_security
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    payroll['employee_id'],
+                    payroll['company_id'],
+                    payroll['period'],
+                    payroll['year'],
+                    payroll['month'],
+                    payroll['base_salary'],
+                    payroll['allowances_total'],
+                    json.dumps(payroll['allowance_details']),
+                    payroll['bonus_amount'],
+                    json.dumps(payroll['bonus_details']) if payroll['bonus_details'] else None,
+                    payroll['bik_total'],
+                    json.dumps(payroll['bik_details']),
+                    payroll['deductions_total'],
+                    json.dumps(payroll['deduction_details']),
+                    payroll['gross_salary'],
+                    payroll['annual_gross'],
+                    payroll['annual_taxable'],
+                    payroll['annual_tax'],
+                    payroll['monthly_tax'],
+                    payroll['bonus_tax_flat'],
+                    payroll['total_tax'],
+                    payroll['social_security'],
+                    payroll['social_security_threshold_applied'],
+                    payroll['total_deductions'],
+                    payroll['net_pay'],
+                    payroll['currency'],
+                    payroll['tax_year'],
+                    payroll['tax_config_id'],
+                    datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    1 if payroll['is_tax_exempt'] else 0,
+                    1 if payroll['exempt_from_social_security'] else 0
+                ))
+                processed_count += 1
+
+            if IS_PRODUCTION:
+                cursor.execute("RELEASE SAVEPOINT payroll_row")
+
+        except Exception as e:
+            if IS_PRODUCTION:
+                cursor.execute("ROLLBACK TO SAVEPOINT payroll_row")
+            errors.append(
+                f"Employee {emp.get('id')}: "
+                f"{emp.get('first_name', '')} {emp.get('last_name', '')}: {str(e)}"
+            )
 
     db.commit()
-    flash(f'Payroll for {get_month_name(month)} {year} processed successfully for {processed_count} employees!', 'success')
+
+    if errors:
+        flash(
+            f'Payroll for {get_month_name(month)} {year} processed for '
+            f'{processed_count} employees with {len(errors)} error(s).',
+            'warning'
+        )
+        for err in errors[:5]:
+            print(f'⚠️ {err}')
+    else:
+        flash(
+            f'Payroll for {get_month_name(month)} {year} processed successfully '
+            f'for {processed_count} employees!',
+            'success'
+        )
     return redirect(url_for('payroll_dashboard', company_id=company_id, year=year, month=month))
 
 
@@ -5244,34 +5313,51 @@ def bulk_import(company_id):
                 errors = []
 
                 for _, row in df.iterrows():
-                    employee_id = int(row['employee_id'])
+                    if IS_PRODUCTION:
+                        cursor.execute("SAVEPOINT bulk_import_row")
 
-                    employee = get_employee(employee_id)
-                    if not employee:
-                        errors.append(f"Employee ID {employee_id} not found")
-                        continue
+                    try:
+                        employee_id = int(row['employee_id'])
 
-                    if employee['company_id'] != company_id:
-                        errors.append(f"Employee ID {employee_id} does not belong to this company")
-                        continue
+                        employee = get_employee(employee_id)
+                        if not employee:
+                            errors.append(f"Employee ID {employee_id} not found")
+                            if IS_PRODUCTION:
+                                cursor.execute("RELEASE SAVEPOINT bulk_import_row")
+                            continue
 
-                    if pd.notna(row['salary']) and row['salary'] > 0:
-                        try:
+                        if employee['company_id'] != company_id:
+                            errors.append(f"Employee ID {employee_id} does not belong to this company")
+                            if IS_PRODUCTION:
+                                cursor.execute("RELEASE SAVEPOINT bulk_import_row")
+                            continue
+
+                        if pd.notna(row['salary']) and row['salary'] > 0:
                             salary = float(row['salary'])
-                            set_employee_monthly_salary(employee_id, start_year, start_month, salary)
+                            set_employee_monthly_salary(
+                                employee_id, start_year, start_month, salary, commit=False
+                            )
                             total_employees_updated += 1
-                        except Exception as e:
-                            errors.append(f"Error updating salary for employee {employee_id}: {str(e)}")
 
-                    for defn in allowance_defs:
-                        col_name = f'allowance_{defn["name"].lower().replace(" ", "_")}'
-                        if col_name in df.columns and pd.notna(row[col_name]):
-                            try:
+                        for defn in allowance_defs:
+                            col_name = f'allowance_{defn["name"].lower().replace(" ", "_")}'
+                            if col_name in df.columns and pd.notna(row[col_name]):
                                 value = float(row[col_name])
-                                set_employee_monthly_allowance(employee_id, defn['id'], start_year, start_month, value)
+                                set_employee_monthly_allowance(
+                                    employee_id, defn['id'], start_year, start_month, value, commit=False
+                                )
                                 total_allowances_updated += 1
-                            except Exception as e:
-                                errors.append(f"Error updating allowance {defn['name']} for employee {employee_id}: {str(e)}")
+
+                        if IS_PRODUCTION:
+                            cursor.execute("RELEASE SAVEPOINT bulk_import_row")
+
+                    except Exception as e:
+                        if IS_PRODUCTION:
+                            cursor.execute("ROLLBACK TO SAVEPOINT bulk_import_row")
+                        errors.append(
+                            f"Error processing employee row "
+                            f"{employee_id if 'employee_id' in locals() else 'unknown'}: {str(e)}"
+                        )
 
                 if copy_type == 'monthly':
                     month_count = 0
