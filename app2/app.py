@@ -1885,7 +1885,6 @@ def user_asset_report():
         generated_date=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     )
 
-
 @app.route('/api/reports/user-assets')
 def api_user_asset_report():
     """API endpoint for user asset report data"""
@@ -1898,7 +1897,12 @@ def api_user_asset_report():
     # Get all users for the company
     query = User.query.filter_by(company_id=company.id, is_active=True)
     if user_id and user_id != 'all':
-        query = query.filter_by(id=int(user_id))
+        try:
+            query = query.filter_by(id=int(user_id))
+        except (ValueError, TypeError):
+            # user_id is a UUID (from shared auth table) — skip the filter
+            # instead of crashing, fall through with all users
+            pass
 
     users = query.all()
 
@@ -1950,12 +1954,11 @@ def api_user_asset_report():
                     break
 
             # Determine if this user currently has the asset
-            is_current_user = active_assignment and active_assignment.assigned_to == user.full_name
+            is_current_user = bool(active_assignment and active_assignment.assigned_to == user.full_name)
 
             # Determine status for this user
             status_label = 'Not Assigned'
             if is_current_user:
-                # User currently has the asset
                 if active_assignment.expected_return_date:
                     expected_date = active_assignment.expected_return_date
                     if expected_date < datetime.now().date():
@@ -1965,12 +1968,19 @@ def api_user_asset_report():
                 else:
                     status_label = 'Active'
             elif returned_assignment:
-                # User had the asset but returned it
                 status_label = 'Returned'
 
             # Get the actual return date if returned
-            actual_return_date = returned_assignment.actual_return_date.strftime(
-                '%Y-%m-%d') if returned_assignment and returned_assignment.actual_return_date else ''
+            actual_return_date = ''
+            if returned_assignment and returned_assignment.actual_return_date:
+                actual_return_date = returned_assignment.actual_return_date.strftime('%Y-%m-%d')
+
+            # Expected return date
+            expected_return_str = ''
+            if is_current_user and active_assignment and active_assignment.expected_return_date:
+                expected_return_str = active_assignment.expected_return_date.strftime('%Y-%m-%d')
+            elif latest_assignment and latest_assignment.expected_return_date:
+                expected_return_str = latest_assignment.expected_return_date.strftime('%Y-%m-%d')
 
             asset_list.append({
                 'id': asset.id,
@@ -1979,11 +1989,8 @@ def api_user_asset_report():
                 'category': asset.asset_category,
                 'serial_no': asset.serial_no,
                 'condition': asset.condition,
-                'assigned_date': latest_assignment.assigned_date.strftime('%Y-%m-%d') if latest_assignment else '',
-                'expected_return_date': active_assignment.expected_return_date.strftime(
-                    '%Y-%m-%d') if is_current_user and active_assignment and active_assignment.expected_return_date else (
-                    latest_assignment.expected_return_date.strftime(
-                        '%Y-%m-%d') if latest_assignment and latest_assignment.expected_return_date else ''),
+                'assigned_date': latest_assignment.assigned_date.strftime('%Y-%m-%d') if latest_assignment and latest_assignment.assigned_date else '',
+                'expected_return_date': expected_return_str,
                 'actual_return_date': actual_return_date,
                 'status': status_label,
                 'is_current_user': is_current_user
@@ -2014,12 +2021,14 @@ def api_user_asset_report():
             'asset_id': assignment.asset_id,
             'assigned_to': assignment.assigned_to,
             'assigned_date': assignment.assigned_date.strftime('%Y-%m-%d') if assignment.assigned_date else '',
-            'expected_return_date': assignment.expected_return_date.strftime(
-                '%Y-%m-%d') if assignment.expected_return_date else '',
-            'actual_return_date': assignment.actual_return_date.strftime(
-                '%Y-%m-%d') if assignment.actual_return_date else '',
+            'expected_return_date': assignment.expected_return_date.strftime('%Y-%m-%d') if assignment.expected_return_date else '',
+            'actual_return_date': assignment.actual_return_date.strftime('%Y-%m-%d') if assignment.actual_return_date else '',
             'status': assignment.status,
-            'is_overdue': assignment.status == 'Active' and assignment.expected_return_date and assignment.expected_return_date < datetime.now().date()
+            'is_overdue': bool(
+                assignment.status == 'Active'
+                and assignment.expected_return_date
+                and assignment.expected_return_date < datetime.now().date()
+            )
         })
 
     return jsonify({
@@ -2029,7 +2038,6 @@ def api_user_asset_report():
         'company': company.to_dict(),
         'generated_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     })
-
 
 @app.route('/reports/user-assets/export/pdf')
 def export_user_asset_pdf():
