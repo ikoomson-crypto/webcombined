@@ -521,9 +521,12 @@ def get_users_simple():
     if not company:
         return jsonify({'users': []})
 
-    users = User.query.filter_by(company_id=company.id, is_active=True).all()
-    return jsonify({'users': [u.to_dict_simple() for u in users]})
+    users = User.query.filter_by(
+        company_id=company.id,
+        is_active=True
+    ).order_by(User.full_name.asc()).all()
 
+    return jsonify({'users': [u.to_dict_simple() for u in users]})
 
 @app.route('/api/users', methods=['POST'])
 def create_user():
