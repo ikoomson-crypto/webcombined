@@ -9,10 +9,56 @@
     <div class="modal-body"><form id="assetForm"><div class="row g-2"><div class="col-md-6"><label class="form-label required">Asset No.</label><input type="text" class="form-control" id="asset_no" required></div><div class="col-md-6"><label class="form-label required">Category</label><select class="form-control" id="asset_category" required><option value="">Select</option></select></div><div class="col-md-6"><label class="form-label required">Description</label><input type="text" class="form-control" id="description" required></div><div class="col-md-6"><label class="form-label required">User</label><input type="text" class="form-control" id="user" required></div><div class="col-md-6"><label class="form-label">Serial No.</label><input type="text" class="form-control" id="serial_no"></div><div class="col-md-6"><label class="form-label required">Condition</label><select class="form-control" id="condition"><option value="New">New</option><option value="Good">Good</option><option value="Fair">Fair</option><option value="Poor">Poor</option><option value="Damaged">Damaged</option></select></div><div class="col-md-6"><label class="form-label required">Purchase Date</label><input type="date" class="form-control" id="purchase_date" required></div><div class="col-md-6"><label class="form-label required">Depr. Start</label><input type="date" class="form-control" id="depreciation_start_date" required></div><div class="col-md-6"><label class="form-label required">Useful Life (Yrs)</label><input type="number" step="0.1" class="form-control" id="useful_life_yrs" required></div><div class="col-md-6"><label class="form-label">Disposal Date</label><input type="date" class="form-control" id="disposal_date"></div><div class="col-md-6"><label class="form-label required">Initial Cost</label><input type="number" step="0.01" class="form-control" id="initial_cost" required></div><div class="col-md-6"><label class="form-label">Other Cost</label><input type="number" step="0.01" class="form-control" id="other_cost" value="0"></div><div class="col-md-6"><label class="form-label required">Entity</label><input type="text" class="form-control" id="entity" required></div><div class="col-md-6"><label class="form-label required">Currency</label><select class="form-control" id="currency"><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="GHS">GHS</option><option value="NGN">NGN</option></select></div></div><input type="hidden" id="asset_id"></form></div>
     <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" onclick="saveAsset()"><i class="fas fa-save"></i> Save Asset</button></div></div></div></div>
 
-<!-- Assignment Modal -->
-<div class="modal fade" id="assignmentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5><i class="fas fa-user-plus"></i> Assign Asset</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body"><form id="assignmentForm"><div class="mb-3"><label>Asset</label><input type="text" class="form-control" id="assignAssetInfo" readonly><input type="hidden" id="assignAssetId"></div><div class="mb-3"><label class="required">Assign To</label><select class="form-control" id="assignToUser" required><option value="">Select User</option></select></div><div class="mb-3"><label class="required">Assigned Date</label><input type="date" class="form-control" id="assignDate" required></div><div class="mb-3"><label>Expected Return</label><input type="date" class="form-control" id="assignExpectedReturn"></div><div class="mb-3"><label>Notes</label><textarea class="form-control" id="assignNotes" rows="2"></textarea></div></form></div>
-    <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" onclick="saveAssignment()"><i class="fas fa-save"></i> Assign</button></div></div></div></div>
+<!-- ✅ ASSIGNMENT MODAL — the only one on the page -->
+<div class="modal fade" id="assignmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-plus"></i> Assign Asset</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignmentForm">
+                    <div class="mb-3">
+                        <label class="form-label">Asset</label>
+                        <input type="text" class="form-control" id="assignAssetInfo" readonly>
+                        <input type="hidden" id="assignAssetId">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Assign To</label>
+                        <select class="form-select" id="assignTo" required>
+                            <option value="">-- Loading users... --</option>
+                        </select>
+                        <input type="hidden" id="assignedToName">
+                        <small class="text-muted d-block mt-1" id="assignToHelp">
+                            Select a user to assign this asset to.
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Assigned Date</label>
+                        <input type="date" class="form-control" id="assignDate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Expected Return Date</label>
+                        <input type="date" class="form-control" id="assignExpectedReturn">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" id="assignNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveAssignment()">
+                    <i class="fas fa-save"></i> Assign Asset
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Return Modal -->
 <div class="modal fade" id="returnModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5><i class="fas fa-undo-alt"></i> Asset Return</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>

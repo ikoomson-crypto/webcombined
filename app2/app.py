@@ -826,33 +826,89 @@ def create_assignment():
         if not company:
             return jsonify({'success': False, 'error': 'No company selected'}), 400
 
-        data = request.json
-        asset = Asset.query.filter_by(id=data['asset_id'], company_id=company.id).first()
+        data = request.json or {}
+
+        # ---- Resolve the asset ----
+        asset_id = data.get('asset_id')
+        if not asset_id:
+            return jsonify({'success': False, 'error': 'asset_id is required'}), 400
+
+        try:
+            asset_id_int = int(asset_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Invalid asset_id'}), 400
+
+        asset = Asset.query.filter_by(id=asset_id_int, company_id=company.id).first()
         if not asset:
             return jsonify({'success': False, 'error': 'Asset not found'}), 404
 
-        if data.get('user_id'):
-            user = User.query.filter_by(id=data['user_id'], company_id=company.id, is_active=True).first()
-            if not user:
-                return jsonify({'success': False, 'error': 'User not found or inactive'}), 400
-            assigned_to = user.full_name
+        # ---- Resolve the assignee ----
+        # Priority:
+        #   1. user_id (integer, matches User.id in THIS app)  -> use full_name
+        #   2. user_id (UUID or unknown) + assigned_to name    -> use assigned_to
+        #   3. assigned_to name only                            -> use assigned_to
+        assigned_to = ''
+        user_id_raw = data.get('user_id')
+        fallback_name = (data.get('assigned_to') or '').strip()
+
+        if user_id_raw:
+            user = None
+            # Try integer lookup first (normal case)
+            try:
+                uid = int(user_id_raw)
+                user = User.query.filter_by(
+                    id=uid,
+                    company_id=company.id,
+                    is_active=True
+                ).first()
+            except (ValueError, TypeError):
+                # UUID or non-numeric — skip integer lookup
+                user = None
+
+            if user:
+                assigned_to = user.full_name
+            elif fallback_name:
+                # Frontend sent a UUID but also sent the display name — trust the name
+                assigned_to = fallback_name
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid user_id — please select a user from the list'
+                }), 400
         else:
-            assigned_to = data.get('assigned_to', '')
+            assigned_to = fallback_name
 
         if not assigned_to:
-            return jsonify({'success': False, 'error': 'Please specify who to assign the asset to'}), 400
+            return jsonify({
+                'success': False,
+                'error': 'Please specify who to assign the asset to'
+            }), 400
 
-        # Check if asset is already assigned
-        active_assignment = AssetAssignment.query.filter_by(asset_id=data['asset_id'], status='Active').first()
+        # ---- Parse dates ----
+        def parse_date(value):
+            if not value:
+                return None
+            try:
+                return datetime.strptime(value, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return None
+
+        assigned_date = parse_date(data.get('assigned_date')) or datetime.now().date()
+        expected_return_date = parse_date(data.get('expected_return_date'))
+
+        # ---- Auto-return any existing active assignment ----
+        active_assignment = AssetAssignment.query.filter_by(
+            asset_id=asset.id,
+            status='Active'
+        ).first()
+
         if active_assignment:
-            # If asset is already assigned, return it first (automatically)
             active_assignment.status = 'Returned'
             active_assignment.actual_return_date = datetime.now().date()
             active_assignment.returned_condition = 'Good'
             active_assignment.return_notes = 'Auto-returned for reassignment'
 
-            # Also create a return form for the auto-return
-            return_form = AssetReturnForm(
+            auto_return_form = AssetReturnForm(
                 assignment_id=active_assignment.id,
                 asset_id=asset.id,
                 returned_by=active_assignment.assigned_to,
@@ -862,31 +918,32 @@ def create_assignment():
                 maintenance_required=False,
                 notes=f'Asset reassigned to {assigned_to}'
             )
-            db.session.add(return_form)
+            db.session.add(auto_return_form)
 
-        # Create new assignment
+        # ---- Create new assignment ----
         assignment = AssetAssignment(
-            asset_id=data['asset_id'],
+            asset_id=asset.id,
             assigned_to=assigned_to,
-            assigned_by=data.get('assigned_by', 'System'),
-            assigned_date=datetime.strptime(data['assigned_date'], '%Y-%m-%d').date() if data.get(
-                'assigned_date') else datetime.now().date(),
-            expected_return_date=datetime.strptime(data['expected_return_date'], '%Y-%m-%d').date() if data.get(
-                'expected_return_date') else None,
-            notes=data.get('notes', '')
+            assigned_by=data.get('assigned_by') or 'System',
+            assigned_date=assigned_date,
+            expected_return_date=expected_return_date,
+            notes=data.get('notes') or ''
         )
         db.session.add(assignment)
 
-        # CRITICAL: Update the asset's user field to the new user
+        # Keep the denormalized user field on Asset in sync
         asset.user = assigned_to
 
         db.session.commit()
 
-        return jsonify({'success': True, 'assignment': assignment.to_dict()})
+        return jsonify({
+            'success': True,
+            'assignment': assignment.to_dict()
+        })
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
-
 
 @app.route('/api/assignments/<int:assignment_id>/return', methods=['POST'])
 def return_asset(assignment_id):
@@ -2247,28 +2304,67 @@ def update_assignment(assignment_id):
         if not asset:
             return jsonify({'success': False, 'error': 'Asset not found'}), 404
 
-        data = request.json
-        user_id = data.get('user_id')
+        data = request.json or {}
 
-        if user_id:
-            user = User.query.filter_by(id=user_id, company_id=company.id, is_active=True).first()
-            if not user:
-                return jsonify({'success': False, 'error': 'User not found or inactive'}), 400
-            assignment.assigned_to = user.full_name
+        # ---- Resolve new assignee (if provided) ----
+        user_id_raw = data.get('user_id')
+        fallback_name = (data.get('assigned_to') or '').strip()
+        new_assigned_to = None
 
+        if user_id_raw:
+            user = None
+            try:
+                uid = int(user_id_raw)
+                user = User.query.filter_by(
+                    id=uid,
+                    company_id=company.id,
+                    is_active=True
+                ).first()
+            except (ValueError, TypeError):
+                user = None
+
+            if user:
+                new_assigned_to = user.full_name
+            elif fallback_name:
+                new_assigned_to = fallback_name
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid user_id — please select a user from the list'
+                }), 400
+        elif fallback_name:
+            new_assigned_to = fallback_name
+
+        if new_assigned_to:
+            assignment.assigned_to = new_assigned_to
+
+        # ---- Update dates ----
         if data.get('assigned_date'):
-            assignment.assigned_date = datetime.strptime(data['assigned_date'], '%Y-%m-%d').date()
+            try:
+                assignment.assigned_date = datetime.strptime(
+                    data['assigned_date'], '%Y-%m-%d'
+                ).date()
+            except (ValueError, TypeError):
+                pass
 
-        if data.get('expected_return_date'):
-            assignment.expected_return_date = datetime.strptime(data['expected_return_date'], '%Y-%m-%d').date()
-        else:
-            assignment.expected_return_date = None
+        if 'expected_return_date' in data:
+            if data.get('expected_return_date'):
+                try:
+                    assignment.expected_return_date = datetime.strptime(
+                        data['expected_return_date'], '%Y-%m-%d'
+                    ).date()
+                except (ValueError, TypeError):
+                    assignment.expected_return_date = None
+            else:
+                assignment.expected_return_date = None
 
-        assignment.notes = data.get('notes', '')
+        # ---- Notes ----
+        if 'notes' in data:
+            assignment.notes = data.get('notes') or ''
 
-        # Update the asset's user field
-        if user_id:
-            asset.user = assignment.assigned_to
+        # ---- Keep denormalized Asset.user in sync if this is the active assignment ----
+        if assignment.status == 'Active' and new_assigned_to:
+            asset.user = new_assigned_to
 
         db.session.commit()
 
@@ -2277,10 +2373,10 @@ def update_assignment(assignment_id):
             'message': 'Assignment updated successfully',
             'assignment': assignment.to_dict()
         })
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 400
-
 
 @app.route('/api/assignments/<int:assignment_id>', methods=['DELETE'])
 def delete_assignment(assignment_id):
