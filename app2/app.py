@@ -5,6 +5,7 @@ from datetime import datetime
 import pandas as pd
 import os
 from io import BytesIO
+from sqlalchemy import func
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here')
@@ -1873,7 +1874,6 @@ def api_asset_movement_report():
 
 
 # ==================== USER ASSET REPORT ====================
-
 @app.route('/reports/user-assets')
 def user_asset_report():
     """Display user asset report page"""
@@ -1884,8 +1884,11 @@ def user_asset_report():
 
     company_id = company.id
 
-    # Get all users with their assigned assets for this company
-    users = User.query.filter_by(company_id=company_id, is_active=True).all()
+    # Get all users with their assigned assets for this company — sorted alphabetically
+    users = User.query.filter_by(
+        company_id=company_id,
+        is_active=True
+    ).order_by(func.lower(User.full_name).asc()).all()
 
     user_assets = []
     for user in users:
@@ -1954,14 +1957,17 @@ def api_user_asset_report():
 
     user_id = request.args.get('user_id')
 
-    # Get all users for the company
-    query = User.query.filter_by(company_id=company.id, is_active=True)
+    # Get all users for the company — sorted alphabetically (case-insensitive)
+    query = User.query.filter_by(
+        company_id=company.id,
+        is_active=True
+    ).order_by(func.lower(User.full_name).asc())
+
     if user_id and user_id != 'all':
         try:
             query = query.filter_by(id=int(user_id))
         except (ValueError, TypeError):
             # user_id is a UUID (from shared auth table) — skip the filter
-            # instead of crashing, fall through with all users
             pass
 
     users = query.all()
@@ -1975,7 +1981,6 @@ def api_user_asset_report():
             assigned_to=user.full_name
         ).order_by(AssetAssignment.assigned_date.desc()).all()
 
-        # Add to all assignments for return status tracking
         all_assignments.extend(user_assignments)
 
         # Get unique asset IDs from assignments
@@ -1988,35 +1993,26 @@ def api_user_asset_report():
             if asset:
                 assets.append(asset)
 
-        # Calculate total value
         total_value = sum(a.initial_cost + a.other_cost for a in assets)
 
-        # Convert assets to dict with assignment info
         asset_list = []
         for asset in assets:
-            # Find all assignments for this asset and user
             asset_user_assignments = [a for a in user_assignments if a.asset_id == asset.id]
-
-            # Get the most recent assignment for this asset and user
             latest_assignment = asset_user_assignments[0] if asset_user_assignments else None
 
-            # Find if there's any active assignment for this asset (could be assigned to someone else now)
             active_assignment = AssetAssignment.query.filter_by(
                 asset_id=asset.id,
                 status='Active'
             ).first()
 
-            # Find returned assignment for this user
             returned_assignment = None
             for a in asset_user_assignments:
                 if a.status == 'Returned' or a.actual_return_date:
                     returned_assignment = a
                     break
 
-            # Determine if this user currently has the asset
             is_current_user = bool(active_assignment and active_assignment.assigned_to == user.full_name)
 
-            # Determine status for this user
             status_label = 'Not Assigned'
             if is_current_user:
                 if active_assignment.expected_return_date:
@@ -2030,12 +2026,10 @@ def api_user_asset_report():
             elif returned_assignment:
                 status_label = 'Returned'
 
-            # Get the actual return date if returned
             actual_return_date = ''
             if returned_assignment and returned_assignment.actual_return_date:
                 actual_return_date = returned_assignment.actual_return_date.strftime('%Y-%m-%d')
 
-            # Expected return date
             expected_return_str = ''
             if is_current_user and active_assignment and active_assignment.expected_return_date:
                 expected_return_str = active_assignment.expected_return_date.strftime('%Y-%m-%d')
@@ -2056,7 +2050,6 @@ def api_user_asset_report():
                 'is_current_user': is_current_user
             })
 
-        # Calculate active assignments for this user (where they are the current assignee)
         active_count = len([a for a in asset_list if a.get('is_current_user')])
 
         report_data.append({
@@ -2108,8 +2101,12 @@ def export_user_asset_pdf():
 
     user_id = request.args.get('user_id')
 
-    # Get all users for the company
-    query = User.query.filter_by(company_id=company.id, is_active=True)
+    # Get all users for the company — sorted alphabetically
+    query = User.query.filter_by(
+        company_id=company.id,
+        is_active=True
+    ).order_by(func.lower(User.full_name).asc())
+
     if user_id and user_id != 'all':
         query = query.filter_by(id=int(user_id))
 
