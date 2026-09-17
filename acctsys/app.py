@@ -4434,7 +4434,7 @@ def save_settings():
         currency_setting.value_string = base_currency
     else:
         db.session.add(SystemSetting(
-            key='base_currency', value='base_currency',
+            key='base_currency', value=base_currency,
             value_string=base_currency,
             description='System base currency for reporting'
         ))
