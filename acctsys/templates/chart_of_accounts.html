@@ -35,7 +35,7 @@
                             <th>Account Name</th>
                             <th>Account Type</th>
                             <th>Parent Account</th>
-                            <th class="text-end">Balance</th>
+                            <th class="text-end">Balance ({{ base_currency }})</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -66,11 +66,15 @@
                             </td>
                             <td class="text-end">
                                 {% if account.balance > 0 %}
-                                    <span class="text-success">${{ "%.2f"|format(account.balance) }}</span>
+                                    <span class="text-success">
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(account.balance) }}
+                                    </span>
                                 {% elif account.balance < 0 %}
-                                    <span class="text-danger">(${{ "%.2f"|format(account.balance|abs) }})</span>
+                                    <span class="text-danger">
+                                        ({{ base_currency_symbol }}{{ "{:,.2f}".format(account.balance|abs) }})
+                                    </span>
                                 {% else %}
-                                    $0.00
+                                    {{ base_currency_symbol }}0.00
                                 {% endif %}
                             </td>
                             <td>
@@ -132,6 +136,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const CURRENCY_SYMBOL = "{{ base_currency_symbol }}";
     const selectAllCheckbox = document.getElementById('selectAll');
     const accountCheckboxes = document.querySelectorAll('.account-checkbox');
     const bulkActions = document.getElementById('bulk-actions');
@@ -212,7 +217,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = this.closest('tr');
             const iconElement = this.querySelector('i');
 
-            // If already expanded, collapse it
             if (iconElement.dataset.icon === 'collapse') {
                 collapseChildren(accountId);
                 iconElement.className = 'fas fa-plus-circle text-success';
@@ -248,6 +252,16 @@ document.addEventListener('DOMContentLoaded', function() {
             newRow.dataset.accountId = account.id;
             newRow.dataset.parentId = account.parent_id;
             newRow.style.display = 'table-row';
+
+            let balanceHtml;
+            if (account.balance > 0) {
+                balanceHtml = `<span class="text-success">${CURRENCY_SYMBOL}${account.balance.toFixed(2)}</span>`;
+            } else if (account.balance < 0) {
+                balanceHtml = `<span class="text-danger">(${CURRENCY_SYMBOL}${Math.abs(account.balance).toFixed(2)})</span>`;
+            } else {
+                balanceHtml = `${CURRENCY_SYMBOL}0.00`;
+            }
+
             newRow.innerHTML = `
                 <td><input type="checkbox" class="form-check-input account-checkbox" data-account-id="${account.id}"></td>
                 <td style="padding-left: 30px;">
@@ -261,11 +275,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </td>
                 <td>${account.account_type_name || 'N/A'}</td>
                 <td>${account.parent_name ? account.parent_code + ' - ' + account.parent_name : 'None'}</td>
-                <td class="text-end">
-                    ${account.balance > 0 ? '<span class="text-success">$' + account.balance.toFixed(2) + '</span>' :
-                      account.balance < 0 ? '<span class="text-danger">($' + Math.abs(account.balance).toFixed(2) + ')</span>' :
-                      '$0.00'}
-                </td>
+                <td class="text-end">${balanceHtml}</td>
                 <td><span class="badge bg-${account.is_active ? 'success' : 'danger'}">${account.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>
                     <div class="btn-group" role="group">
@@ -277,9 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
             tbody.insertBefore(newRow, insertAfter.nextSibling);
             insertAfter = newRow;
 
-            // Add the new row's checkbox to the bulk actions logic
             newRow.querySelector('.account-checkbox').addEventListener('change', updateBulkActions);
-            // Add delete event to the new row's delete button
             newRow.querySelector('.delete-single').addEventListener('click', function() {
                 deleteTargets = [parseInt(this.dataset.accountId)];
                 document.getElementById('deleteMessage').innerHTML = `Are you sure you want to delete account <strong>${this.dataset.accountName}</strong>?`;
@@ -292,7 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function collapseChildren(parentId) {
         const rows = document.querySelectorAll(`tr.sub-row[data-parent-id="${parentId}"]`);
         rows.forEach(row => {
-            // If a sub-row has its own children, collapse them recursively
             const subIcon = row.querySelector('.toggle-icon');
             if (subIcon) {
                 const subIconElement = subIcon.querySelector('i');

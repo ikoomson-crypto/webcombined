@@ -33,8 +33,8 @@
                         <th>Contact Person</th>
                         <th>Phone</th>
                         <th>Email</th>
-                        <th>Balance</th>
-                        <th>Credit Limit</th>
+                        <th class="text-end">Balance ({{ base_currency }})</th>
+                        <th class="text-end">Credit Limit ({{ base_currency }})</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -50,10 +50,10 @@
                         <td>{{ customer.contact_person or '-' }}</td>
                         <td>{{ customer.phone or '-' }}</td>
                         <td>{{ customer.email or '-' }}</td>
-                        <td class="text-{{ 'danger' if customer.current_balance > 0 else 'success' }}">
-                            ${{ "%.2f"|format(customer.current_balance) }}
+                        <td class="text-end text-{{ 'danger' if customer.current_balance > 0 else 'success' }}">
+                            {{ base_currency_symbol }}{{ "{:,.2f}".format(customer.current_balance) }}
                         </td>
-                        <td>${{ "%.2f"|format(customer.credit_limit) }}</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(customer.credit_limit) }}</td>
                         <td>
                             <span class="badge bg-{{ 'success' if customer.is_active else 'danger' }}">
                                 {{ 'Active' if customer.is_active else 'Inactive' }}
@@ -126,23 +126,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
     let deleteTargets = [];
-
-    // Get URL from Flask
     const deleteCustomersUrl = "{{ url_for('delete_customers') }}";
 
-    // Update bulk actions visibility and count
     function updateBulkActions() {
         const checked = document.querySelectorAll('.customer-checkbox:checked');
         const count = checked.length;
         selectedCount.textContent = count;
+        bulkActions.style.display = count > 0 ? 'block' : 'none';
 
-        if (count > 0) {
-            bulkActions.style.display = 'block';
-        } else {
-            bulkActions.style.display = 'none';
-        }
-
-        // Update select all state
         const total = customerCheckboxes.length;
         if (total > 0) {
             selectAllCheckbox.checked = count === total;
@@ -150,94 +141,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Select/Deselect All
     selectAllCheckbox.addEventListener('change', function() {
-        const isChecked = this.checked;
-        customerCheckboxes.forEach(cb => cb.checked = isChecked);
+        customerCheckboxes.forEach(cb => cb.checked = this.checked);
         updateBulkActions();
     });
 
-    // Individual checkbox change
-    customerCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateBulkActions);
-    });
+    customerCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkActions));
 
-    // Deselect All
     deselectAllBtn.addEventListener('click', function() {
         customerCheckboxes.forEach(cb => cb.checked = false);
         selectAllCheckbox.checked = false;
         updateBulkActions();
     });
 
-    // Delete Selected
     deleteSelectedBtn.addEventListener('click', function() {
         const checked = document.querySelectorAll('.customer-checkbox:checked');
         if (checked.length === 0) return;
-
         deleteTargets = Array.from(checked).map(cb => parseInt(cb.dataset.customerId));
         document.getElementById('deleteMessage').innerHTML =
             `Are you sure you want to delete <strong>${deleteTargets.length}</strong> customer(s)?`;
         deleteModal.show();
     });
 
-    // Single Delete
     document.querySelectorAll('.delete-single').forEach(btn => {
         btn.addEventListener('click', function() {
-            const customerId = parseInt(this.dataset.customerId);
-            const customerName = this.dataset.customerName;
-            deleteTargets = [customerId];
+            deleteTargets = [parseInt(this.dataset.customerId)];
             document.getElementById('deleteMessage').innerHTML =
-                `Are you sure you want to delete customer <strong>${customerName}</strong>?`;
+                `Are you sure you want to delete customer <strong>${this.dataset.customerName}</strong>?`;
             deleteModal.show();
         });
     });
 
-    // Confirm Delete
     confirmDeleteBtn.addEventListener('click', function() {
-        const customerIds = deleteTargets;
-        if (customerIds.length === 0) return;
+        if (deleteTargets.length === 0) return;
 
         fetch(deleteCustomersUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ customer_ids: customerIds })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customer_ids: deleteTargets })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Remove deleted rows from table
                 if (data.deleted_ids && data.deleted_ids.length > 0) {
                     data.deleted_ids.forEach(id => {
                         const row = document.querySelector(`tr[data-customer-id="${id}"]`);
                         if (row) row.remove();
                     });
                 }
-
                 deleteModal.hide();
                 updateBulkActions();
-
-                // Show success message
-                if (data.deleted_count > 0) {
-                    showAlert('success', `Successfully deleted ${data.deleted_count} customer(s).`);
-                }
-
-                // Show skipped customers with reasons
+                if (data.deleted_count > 0) showAlert('success', `Successfully deleted ${data.deleted_count} customer(s).`);
                 if (data.skipped_count > 0) {
                     let errorMsg = `${data.skipped_count} customer(s) could not be deleted:\n`;
-                    if (data.error_messages) {
-                        data.error_messages.forEach(msg => {
-                            errorMsg += `- ${msg}\n`;
-                        });
-                    }
+                    if (data.error_messages) data.error_messages.forEach(msg => { errorMsg += `- ${msg}\n`; });
                     showAlert('warning', errorMsg);
                 }
-
-                // Refresh if no customers left
-                if (document.querySelectorAll('.customer-row').length === 0) {
-                    location.reload();
-                }
+                if (document.querySelectorAll('.customer-row').length === 0) location.reload();
             } else {
                 showAlert('danger', data.message || 'Error deleting customers.');
             }
@@ -246,50 +206,27 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             showAlert('danger', 'An error occurred while deleting customers.');
         })
-        .finally(() => {
-            deleteModal.hide();
-        });
+        .finally(() => deleteModal.hide());
     });
 
-    // Helper function to show alerts
     function showAlert(type, message) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
         alertDiv.role = 'alert';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
+        alertDiv.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
         const container = document.querySelector('.container.mt-4');
         container.insertBefore(alertDiv, container.firstChild);
-
-        // Auto dismiss after 5 seconds
-        setTimeout(() => {
-            alertDiv.remove();
-        }, 5000);
+        setTimeout(() => alertDiv.remove(), 5000);
     }
 });
 </script>
 
 <style>
-    .customer-row {
-        transition: background-color 0.3s ease;
-    }
-    .customer-row:hover {
-        background-color: rgba(0, 123, 255, 0.05);
-    }
-    .customer-checkbox {
-        cursor: pointer;
-    }
-    #selectAll {
-        cursor: pointer;
-    }
-    #bulk-actions {
-        animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+    .customer-row { transition: background-color 0.3s ease; }
+    .customer-row:hover { background-color: rgba(0, 123, 255, 0.05); }
+    .customer-checkbox { cursor: pointer; }
+    #selectAll { cursor: pointer; }
+    #bulk-actions { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 {% endblock %}

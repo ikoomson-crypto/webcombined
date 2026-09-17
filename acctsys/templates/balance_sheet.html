@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Balance Sheet</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info fs-6">
+                <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+            </span>
+            <a href="{{ url_for('balance_sheet_pdf', as_of_date=as_of_date.strftime('%Y-%m-%d')) }}"
+               class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('balance_sheet_excel', as_of_date=as_of_date.strftime('%Y-%m-%d')) }}"
+               class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+            <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- ========== AS-OF DATE FILTER ========== -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">As of Date</label>
+                    <input type="date" class="form-control" name="as_of_date"
+                           value="{{ as_of_date.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-6">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========== ASSETS + LIABILITIES/EQUITY ========== -->
+    <div class="row">
+        <!-- ---------- ASSETS ---------- -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-wallet"></i> ASSETS
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 20%;">Code</th>
+                                <th style="width: 55%;">Account</th>
+                                <th class="text-end" style="width: 25%;">
+                                    Amount ({{ base_currency }})
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in asset_lines %}
+                            <tr>
+                                <td>{{ line.code }}</td>
+                                <td>{{ line.name }}</td>
+                                <td class="text-end">
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    No assets recorded
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-primary">
+                                <td colspan="2" class="text-end">
+                                    <strong>Total Assets</strong>
+                                </td>
+                                <td class="text-end">
+                                    <strong>
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(total_assets) }}
+                                    </strong>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ---------- LIABILITIES + EQUITY ---------- -->
+        <div class="col-md-6">
+            <!-- Liabilities -->
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-hand-holding-usd"></i> LIABILITIES
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 20%;">Code</th>
+                                <th style="width: 55%;">Account</th>
+                                <th class="text-end" style="width: 25%;">
+                                    Amount ({{ base_currency }})
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in liability_lines %}
+                            <tr>
+                                <td>{{ line.code }}</td>
+                                <td>{{ line.name }}</td>
+                                <td class="text-end">
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    No liabilities recorded
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-danger">
+                                <td colspan="2" class="text-end">
+                                    <strong>Total Liabilities</strong>
+                                </td>
+                                <td class="text-end">
+                                    <strong>
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities) }}
+                                    </strong>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Equity -->
+            <div class="card mb-4">
+                <div class="card-header text-white" style="background-color:#8e44ad;">
+                    <h5 class="mb-0">
+                        <i class="fas fa-landmark"></i> EQUITY
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 20%;">Code</th>
+                                <th style="width: 55%;">Account</th>
+                                <th class="text-end" style="width: 25%;">
+                                    Amount ({{ base_currency }})
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in equity_lines %}
+                            <tr>
+                                <td>{{ line.code }}</td>
+                                <td>{{ line.name }}</td>
+                                <td class="text-end">
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <tr>
+                                <td>—</td>
+                                <td>
+                                    Retained Earnings
+                                    <small class="text-muted d-block">
+                                        Cumulative net profit (Revenue − Expenses)
+                                    </small>
+                                </td>
+                                <td class="text-end">
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(retained_earnings) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color:#f4ecf7;">
+                                <td colspan="2" class="text-end">
+                                    <strong>Total Equity</strong>
+                                </td>
+                                <td class="text-end">
+                                    <strong>
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(total_equity) }}
+                                    </strong>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SUMMARY / BALANCE CHECK ========== -->
+    <div class="row mt-2">
+        <div class="col-md-6 offset-md-6">
+            <table class="table table-bordered">
+                <tfoot>
+                    <tr class="table-info">
+                        <th class="text-end">Total Liabilities + Equity</th>
+                        <th class="text-end">
+                            {{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities_and_equity) }}
+                        </th>
+                    </tr>
+                </tfoot>
+            </table>
+
+            {% if is_balanced %}
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i>
+                <strong>Balance Sheet is balanced.</strong>
+                Assets ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_assets) }}) =
+                Liabilities + Equity ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities_and_equity) }})
+            </div>
+            {% else %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <strong>Out of balance by
+                    {{ base_currency_symbol }}{{ "{:,.2f}".format(difference|abs) }}</strong>.
+                Assets ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_assets) }}) ≠
+                Liabilities + Equity ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities_and_equity) }}).
+                Check your journal entries.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>Accounting Equation:</strong> Assets = Liabilities + Equity.
+        Retained Earnings reflect cumulative net profit (Revenue − Expenses) up to the selected date.
+        All amounts shown in <strong>{{ base_currency }}</strong>.
+    </div>
+</div>
+{% endblock %}

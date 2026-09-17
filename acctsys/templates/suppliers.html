@@ -33,7 +33,7 @@
                         <th>Contact Person</th>
                         <th>Phone</th>
                         <th>Email</th>
-                        <th>Balance</th>
+                        <th class="text-end">Balance ({{ base_currency }})</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -49,8 +49,8 @@
                         <td>{{ supplier.contact_person or '-' }}</td>
                         <td>{{ supplier.phone or '-' }}</td>
                         <td>{{ supplier.email or '-' }}</td>
-                        <td class="text-{{ 'danger' if supplier.current_balance > 0 else 'success' }}">
-                            ${{ "%.2f"|format(supplier.current_balance) }}
+                        <td class="text-end text-{{ 'danger' if supplier.current_balance > 0 else 'success' }}">
+                            {{ base_currency_symbol }}{{ "{:,.2f}".format(supplier.current_balance) }}
                         </td>
                         <td>
                             <span class="badge bg-{{ 'success' if supplier.is_active else 'danger' }}">
@@ -76,7 +76,9 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="text-center">No suppliers found. <a href="{{ url_for('add_supplier') }}">Add your first supplier</a></td>
+                        <td colspan="9" class="text-center">
+                            No suppliers found. <a href="{{ url_for('add_supplier') }}">Add your first supplier</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -85,7 +87,6 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -124,23 +125,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
     let deleteTargets = [];
-
-    // Get URL from Flask
     const deleteSuppliersUrl = "{{ url_for('delete_suppliers') }}";
 
-    // Update bulk actions visibility and count
     function updateBulkActions() {
         const checked = document.querySelectorAll('.supplier-checkbox:checked');
         const count = checked.length;
         selectedCount.textContent = count;
+        bulkActions.style.display = count > 0 ? 'block' : 'none';
 
-        if (count > 0) {
-            bulkActions.style.display = 'block';
-        } else {
-            bulkActions.style.display = 'none';
-        }
-
-        // Update select all state
         const total = supplierCheckboxes.length;
         if (total > 0) {
             selectAllCheckbox.checked = count === total;
@@ -148,94 +140,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Select/Deselect All
     selectAllCheckbox.addEventListener('change', function() {
-        const isChecked = this.checked;
-        supplierCheckboxes.forEach(cb => cb.checked = isChecked);
+        supplierCheckboxes.forEach(cb => cb.checked = this.checked);
         updateBulkActions();
     });
 
-    // Individual checkbox change
-    supplierCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateBulkActions);
-    });
+    supplierCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkActions));
 
-    // Deselect All
     deselectAllBtn.addEventListener('click', function() {
         supplierCheckboxes.forEach(cb => cb.checked = false);
         selectAllCheckbox.checked = false;
         updateBulkActions();
     });
 
-    // Delete Selected
     deleteSelectedBtn.addEventListener('click', function() {
         const checked = document.querySelectorAll('.supplier-checkbox:checked');
         if (checked.length === 0) return;
-
         deleteTargets = Array.from(checked).map(cb => parseInt(cb.dataset.supplierId));
         document.getElementById('deleteMessage').innerHTML =
             `Are you sure you want to delete <strong>${deleteTargets.length}</strong> supplier(s)?`;
         deleteModal.show();
     });
 
-    // Single Delete
     document.querySelectorAll('.delete-single').forEach(btn => {
         btn.addEventListener('click', function() {
-            const supplierId = parseInt(this.dataset.supplierId);
-            const supplierName = this.dataset.supplierName;
-            deleteTargets = [supplierId];
+            deleteTargets = [parseInt(this.dataset.supplierId)];
             document.getElementById('deleteMessage').innerHTML =
-                `Are you sure you want to delete supplier <strong>${supplierName}</strong>?`;
+                `Are you sure you want to delete supplier <strong>${this.dataset.supplierName}</strong>?`;
             deleteModal.show();
         });
     });
 
-    // Confirm Delete
     confirmDeleteBtn.addEventListener('click', function() {
-        const supplierIds = deleteTargets;
-        if (supplierIds.length === 0) return;
+        if (deleteTargets.length === 0) return;
 
         fetch(deleteSuppliersUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ supplier_ids: supplierIds })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ supplier_ids: deleteTargets })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Remove deleted rows from table
                 if (data.deleted_ids && data.deleted_ids.length > 0) {
                     data.deleted_ids.forEach(id => {
                         const row = document.querySelector(`tr[data-supplier-id="${id}"]`);
                         if (row) row.remove();
                     });
                 }
-
                 deleteModal.hide();
                 updateBulkActions();
-
-                // Show success message
-                if (data.deleted_count > 0) {
-                    showAlert('success', `Successfully deleted ${data.deleted_count} supplier(s).`);
-                }
-
-                // Show skipped suppliers with reasons
+                if (data.deleted_count > 0) showAlert('success', `Successfully deleted ${data.deleted_count} supplier(s).`);
                 if (data.skipped_count > 0) {
                     let errorMsg = `${data.skipped_count} supplier(s) could not be deleted:\n`;
-                    if (data.error_messages) {
-                        data.error_messages.forEach(msg => {
-                            errorMsg += `- ${msg}\n`;
-                        });
-                    }
+                    if (data.error_messages) data.error_messages.forEach(msg => { errorMsg += `- ${msg}\n`; });
                     showAlert('warning', errorMsg);
                 }
-
-                // Refresh if no suppliers left
-                if (document.querySelectorAll('.supplier-row').length === 0) {
-                    location.reload();
-                }
+                if (document.querySelectorAll('.supplier-row').length === 0) location.reload();
             } else {
                 showAlert('danger', data.message || 'Error deleting suppliers.');
             }
@@ -244,50 +205,27 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             showAlert('danger', 'An error occurred while deleting suppliers.');
         })
-        .finally(() => {
-            deleteModal.hide();
-        });
+        .finally(() => deleteModal.hide());
     });
 
-    // Helper function to show alerts
     function showAlert(type, message) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
         alertDiv.role = 'alert';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
+        alertDiv.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
         const container = document.querySelector('.container.mt-4');
         container.insertBefore(alertDiv, container.firstChild);
-
-        // Auto dismiss after 5 seconds
-        setTimeout(() => {
-            alertDiv.remove();
-        }, 5000);
+        setTimeout(() => alertDiv.remove(), 5000);
     }
 });
 </script>
 
 <style>
-    .supplier-row {
-        transition: background-color 0.3s ease;
-    }
-    .supplier-row:hover {
-        background-color: rgba(0, 123, 255, 0.05);
-    }
-    .supplier-checkbox {
-        cursor: pointer;
-    }
-    #selectAll {
-        cursor: pointer;
-    }
-    #bulk-actions {
-        animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+    .supplier-row { transition: background-color 0.3s ease; }
+    .supplier-row:hover { background-color: rgba(0, 123, 255, 0.05); }
+    .supplier-checkbox { cursor: pointer; }
+    #selectAll { cursor: pointer; }
+    #bulk-actions { animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 {% endblock %}

@@ -5,8 +5,11 @@
     <div class="row">
         <div class="col-md-10 mx-auto">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h4 class="mb-0">Create Multi-Line Journal Entry</h4>
+                    <span class="badge bg-info">
+                        <i class="fas fa-coins"></i> {{ base_currency }}
+                    </span>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info">
@@ -51,15 +54,15 @@
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Account</th>
-                                        <th width="150">Debit ($)</th>
-                                        <th width="150">Credit ($)</th>
+                                        <th width="150">Debit ({{ base_currency }})</th>
+                                        <th width="150">Credit ({{ base_currency }})</th>
                                         <th width="50"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for line in form.lines %}
                                     <tr class="journal-line">
-                                        <tr>
+                                        <td>
                                             {{ line.account_id(class="form-select account-select") }}
                                             {% for error in line.account_id.errors %}
                                                 <span class="text-danger">{{ error }}</span>
@@ -92,9 +95,9 @@
                                 <tfoot>
                                     <tr class="table-info">
                                         <td class="text-end"><strong>Totals:</strong></td>
-                                        <td><strong id="total-debits">$0.00</strong></td>
-                                        <td><strong id="total-credits">$0.00</strong></td>
-                                        <td>\n                                        </td>
+                                        <td><strong id="total-debits">{{ base_currency_symbol }}0.00</strong></td>
+                                        <td><strong id="total-credits">{{ base_currency_symbol }}0.00</strong></td>
+                                        <td></td>
                                     </tr>
                                     <tr id="balance-row" class="table-warning">
                                         <td colspan="4" class="text-center" id="balance-message">
@@ -126,6 +129,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const CURRENCY_SYMBOL = "{{ base_currency_symbol }}";
     const totalDebitsSpan = document.getElementById('total-debits');
     const totalCreditsSpan = document.getElementById('total-credits');
     const balanceStatusSpan = document.getElementById('balance-status');
@@ -142,8 +146,8 @@ document.addEventListener('DOMContentLoaded', function() {
             totalCredits += credit;
         });
 
-        totalDebitsSpan.textContent = `$${totalDebits.toFixed(2)}`;
-        totalCreditsSpan.textContent = `$${totalCredits.toFixed(2)}`;
+        totalDebitsSpan.textContent = `${CURRENCY_SYMBOL}${totalDebits.toFixed(2)}`;
+        totalCreditsSpan.textContent = `${CURRENCY_SYMBOL}${totalCredits.toFixed(2)}`;
 
         const difference = Math.abs(totalDebits - totalCredits);
         if (totalDebits === totalCredits && totalDebits > 0) {
@@ -155,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
             balanceStatusSpan.style.color = 'orange';
             submitBtn.disabled = true;
         } else {
-            balanceStatusSpan.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Out of Balance - Difference: $${difference.toFixed(2)}`;
+            balanceStatusSpan.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Out of Balance - Difference: ${CURRENCY_SYMBOL}${difference.toFixed(2)}`;
             balanceStatusSpan.style.color = 'red';
             submitBtn.disabled = true;
         }
@@ -176,7 +180,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const tbody = document.querySelector('#journal-lines-table tbody');
         const newIndex = tbody.children.length;
 
-        // Get the select options from the first row
         const firstSelect = document.querySelector('.account-select');
         const selectOptions = firstSelect.innerHTML;
 

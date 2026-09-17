@@ -80,7 +80,7 @@
                         </div>
                     </div>
 
-                    <!-- Account Information (Payment Account Only) -->
+                    <!-- Account Information -->
                     <div class="col-md-4">
                         <div class="card">
                             <div class="card-header bg-secondary text-white">
@@ -109,7 +109,12 @@
                 <!-- Transaction Details -->
                 <div class="card mt-3">
                     <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-table"></i> Transaction Details</span>
+                        <span>
+                            <i class="fas fa-table"></i> Transaction Details
+                            <span class="badge bg-light text-dark ms-2" id="line-items-currency-badge">
+                                {{ base_currency }}
+                            </span>
+                        </span>
                         <button type="button" class="btn btn-light btn-sm" id="addRowBtn">
                             <i class="fas fa-plus"></i> Add Row
                         </button>
@@ -165,30 +170,54 @@
                                     </tr>
                                 </tbody>
                                 <tfoot>
-                                    <tr class="table-info">
-                                        <td colspan="3" class="text-end"><strong>Totals:</strong></td>
-                                        <td colspan="2">
-                                            <strong id="total-gross">$0.00</strong>
+                                    <!-- Base Currency Label Row -->
+                                    <tr class="table-secondary">
+                                        <td colspan="5" class="text-center">
+                                            <small class="text-muted">
+                                                <i class="fas fa-exchange-alt"></i>
+                                                Totals shown in <strong>Base Currency: {{ base_currency }} ({{ base_currency_symbol }})</strong>
+                                                <span id="conversion-note" class="ms-2"></span>
+                                            </small>
                                         </td>
                                     </tr>
+
+                                    <!-- Gross Total -->
+                                    <tr class="table-info">
+                                        <td colspan="3" class="text-end">
+                                            <strong>Total Gross:</strong>
+                                        </td>
+                                        <td colspan="2">
+                                            <strong id="total-gross">{{ base_currency_symbol }}0.00</strong>
+                                        </td>
+                                    </tr>
+
+                                    <!-- WHT / VAT / Net / Due -->
                                     <tr class="table-warning">
                                         <td colspan="5">
                                             <div class="row">
                                                 <div class="col-md-3">
                                                     <small>Total WHT Amount:</small><br>
-                                                    <strong id="total-wht" class="text-danger">$0.00</strong>
+                                                    <strong id="total-wht" class="text-danger">
+                                                        {{ base_currency_symbol }}0.00
+                                                    </strong>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <small>Total VAT Amount:</small><br>
-                                                    <strong id="total-vat" class="text-success">$0.00</strong>
+                                                    <strong id="total-vat" class="text-success">
+                                                        {{ base_currency_symbol }}0.00
+                                                    </strong>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <small>Total Net Amount:</small><br>
-                                                    <strong id="total-net" class="text-primary">$0.00</strong>
+                                                    <strong id="total-net" class="text-primary">
+                                                        {{ base_currency_symbol }}0.00
+                                                    </strong>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <small>Payment Due:</small><br>
-                                                    <strong id="payment-due" class="text-info">$0.00</strong>
+                                                    <strong id="payment-due" class="text-info">
+                                                        {{ base_currency_symbol }}0.00
+                                                    </strong>
                                                 </div>
                                             </div>
                                         </td>
@@ -215,7 +244,8 @@
 </div>
 
 <style media="print">
-    .sidebar, .card-header .btn, .mt-3 .btn, footer, .alert, .remove-row, #addRowBtn, #resetColumnsBtn, #printBtn {
+    .sidebar, .card-header .btn, .mt-3 .btn, footer, .alert, .remove-row,
+    #addRowBtn, #resetColumnsBtn, #printBtn {
         display: none !important;
     }
     .main-content, .card, .card-body {
@@ -245,6 +275,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     let rowCount = 1;
 
+    // ✅ Base currency info injected from the server
+    const BASE_CURRENCY = "{{ base_currency }}";
+    const BASE_CURRENCY_SYMBOL = "{{ base_currency_symbol }}";
+
+    // ========== COLUMN RESIZING ==========
     function makeColumnsResizable() {
         const headers = document.querySelectorAll('#resizable-header .resizable-column');
         let startX, startWidth, resizingColumn = null;
@@ -286,9 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function saveColumnWidths() {
         const columns = document.querySelectorAll('#resizable-header .resizable-column');
         const widths = {};
-        columns.forEach((col, index) => {
-            widths[index] = col.style.width;
-        });
+        columns.forEach((col, index) => { widths[index] = col.style.width; });
         localStorage.setItem('paymentVoucherColumnWidths', JSON.stringify(widths));
     }
 
@@ -319,19 +352,50 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('Column widths reset to default!');
     }
 
+    // ========== CURRENCY BADGE UPDATER ==========
+    function updateCurrencyBadge() {
+        const currencySelect = document.querySelector('.currency-select');
+        const badge = document.getElementById('line-items-currency-badge');
+        const note = document.getElementById('conversion-note');
+
+        if (!currencySelect || !badge) return;
+
+        const voucherCcy = currencySelect.value;
+
+        if (voucherCcy === BASE_CURRENCY) {
+            badge.textContent = voucherCcy;
+            badge.className = 'badge bg-secondary ms-2';
+            if (note) note.textContent = '(same as voucher currency)';
+        } else {
+            badge.textContent = voucherCcy;
+            badge.className = 'badge bg-warning text-dark ms-2';
+
+            const rateInput = document.querySelector('.exchange-rate');
+            const rate = parseFloat(rateInput?.value) || 1.0;
+            if (note) {
+                note.textContent = `— converted at 1 ${voucherCcy} = ${rate} ${BASE_CURRENCY}`;
+            }
+        }
+    }
+
+    // ========== CALCULATE TOTALS ==========
     function calculateTotals() {
         let totalGross = 0;
         let totalWHT = 0;
         let totalVAT = 0;
         let totalNet = 0;
 
+        // Read exchange rate (default 1)
+        const rateInput = document.querySelector('.exchange-rate');
+        const rate = parseFloat(rateInput?.value) || 1.0;
+
         document.querySelectorAll('.voucher-row').forEach(row => {
             const grossAmount = parseFloat(row.querySelector('.gross-amount').value) || 0;
             const whtRate = parseFloat(row.querySelector('.wht-rate').value) || 0;
             const vatRate = parseFloat(row.querySelector('.vat-rate').value) || 0;
 
-            const whtAmount = (grossAmount * whtRate / 100);
-            const vatAmount = (grossAmount * vatRate / 100);
+            const whtAmount = grossAmount * whtRate / 100;
+            const vatAmount = grossAmount * vatRate / 100;
             const netAmount = grossAmount - whtAmount + vatAmount;
 
             totalGross += grossAmount;
@@ -340,13 +404,28 @@ document.addEventListener('DOMContentLoaded', function() {
             totalNet += netAmount;
         });
 
-        document.getElementById('total-gross').innerHTML = `$${totalGross.toFixed(2)}`;
-        document.getElementById('total-wht').innerHTML = `$${totalWHT.toFixed(2)}`;
-        document.getElementById('total-vat').innerHTML = `$${totalVAT.toFixed(2)}`;
-        document.getElementById('total-net').innerHTML = `$${totalNet.toFixed(2)}`;
-        document.getElementById('payment-due').innerHTML = `$${totalNet.toFixed(2)}`;
+        // ✅ Convert to base currency using exchange rate
+        const baseGross = totalGross * rate;
+        const baseWHT = totalWHT * rate;
+        const baseVAT = totalVAT * rate;
+        const baseNet = totalNet * rate;
+
+        document.getElementById('total-gross').innerHTML =
+            `${BASE_CURRENCY_SYMBOL}${baseGross.toFixed(2)}`;
+        document.getElementById('total-wht').innerHTML =
+            `${BASE_CURRENCY_SYMBOL}${baseWHT.toFixed(2)}`;
+        document.getElementById('total-vat').innerHTML =
+            `${BASE_CURRENCY_SYMBOL}${baseVAT.toFixed(2)}`;
+        document.getElementById('total-net').innerHTML =
+            `${BASE_CURRENCY_SYMBOL}${baseNet.toFixed(2)}`;
+        document.getElementById('payment-due').innerHTML =
+            `${BASE_CURRENCY_SYMBOL}${baseNet.toFixed(2)}`;
+
+        // Update the badge + note
+        updateCurrencyBadge();
     }
 
+    // ========== ADD NEW ROW ==========
     function addNewRow() {
         const tbody = document.getElementById('entries-body');
         const newIndex = rowCount;
@@ -385,14 +464,15 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateTotals();
     }
 
+    // ========== SETUP ROW EVENTS ==========
     function setupRowEvents(row) {
         const whtInput = row.querySelector('.wht-rate');
         const vatInput = row.querySelector('.vat-rate');
         const grossInput = row.querySelector('.gross-amount');
         const removeBtn = row.querySelector('.remove-row');
 
-        if (whtInput) whtInput.addEventListener('input', calculateTotals);
-        if (vatInput) vatInput.addEventListener('input', calculateTotals);
+        if (whtInput)   whtInput.addEventListener('input', calculateTotals);
+        if (vatInput)   vatInput.addEventListener('input', calculateTotals);
         if (grossInput) grossInput.addEventListener('input', calculateTotals);
 
         if (removeBtn) {
@@ -407,27 +487,42 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // ========== PRINT ==========
     function printVoucher() {
         window.print();
     }
 
+    // ========== INITIALIZE ==========
     document.querySelectorAll('.voucher-row').forEach(row => {
         setupRowEvents(row);
     });
 
     document.getElementById('addRowBtn').addEventListener('click', addNewRow);
     document.getElementById('printBtn').addEventListener('click', printVoucher);
-
-    makeColumnsResizable();
-    loadColumnWidths();
-    calculateTotals();
-
     document.getElementById('resetColumnsBtn').addEventListener('click', resetColumnWidths);
 
+    // ✅ Recalculate when exchange rate changes
     const exchangeRateInput = document.querySelector('.exchange-rate');
     if (exchangeRateInput) {
         exchangeRateInput.addEventListener('input', calculateTotals);
     }
+
+    // ✅ Update badge when currency changes
+    const currencySelect = document.querySelector('.currency-select');
+    if (currencySelect) {
+        currencySelect.addEventListener('change', function() {
+            // If switching to base currency, reset rate to 1
+            if (this.value === BASE_CURRENCY) {
+                const rateInput = document.querySelector('.exchange-rate');
+                if (rateInput) rateInput.value = 1;
+            }
+            calculateTotals();
+        });
+    }
+
+    makeColumnsResizable();
+    loadColumnWidths();
+    calculateTotals();   // Initial run
 });
 </script>
 

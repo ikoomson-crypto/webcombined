@@ -3,9 +3,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Invoices</h2>
-    <a href="{{ url_for('add_invoice') }}" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Add Invoice
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-info">
+            <i class="fas fa-coins"></i> {{ base_currency }}
+        </span>
+        <a href="{{ url_for('add_invoice') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Invoice
+        </a>
+    </div>
 </div>
 
 <div class="card">
@@ -33,7 +38,7 @@
                         </th>
                         <th>Invoice #</th>
                         <th>Customer</th>
-                        <th>Amount</th>
+                        <th class="text-end">Amount ({{ base_currency }})</th>
                         <th>Date</th>
                         <th>Status</th>
                         <th>Account</th>
@@ -47,9 +52,15 @@
                         <td>
                             <input type="checkbox" class="form-check-input invoice-checkbox" data-invoice-id="{{ invoice.id }}">
                         </td>
-                        <td>{{ invoice.invoice_number }}</td>
+                        <td>
+                            <a href="{{ url_for('view_invoice', id=invoice.id) }}">
+                                {{ invoice.invoice_number }}
+                            </a>
+                        </td>
                         <td>{{ invoice.customer_name }}</td>
-                        <td>${{ "%.2f"|format(invoice_total) }}</td>
+                        <td class="text-end">
+                            {{ base_currency_symbol }}{{ "{:,.2f}".format(invoice_total) }}
+                        </td>
                         <td>{{ invoice.date.strftime('%Y-%m-%d') }}</td>
                         <td>
                             <span class="badge bg-{{ 'success' if invoice.status == 'Paid' else 'warning' if invoice.status == 'Pending' else 'danger' }}">
@@ -65,16 +76,29 @@
                         </td>
                         <td>
                             <div class="btn-group" role="group">
-                                <a href="{{ url_for('view_invoice', id=invoice.id) }}" class="btn btn-sm btn-info">
+                                <a href="{{ url_for('view_invoice', id=invoice.id) }}"
+                                   class="btn btn-sm btn-info" title="View">
                                     <i class="fas fa-eye"></i>
                                 </a>
-                                <a href="{{ url_for('edit_invoice', id=invoice.id) }}" class="btn btn-sm btn-warning">
+                                <a href="{{ url_for('edit_invoice', id=invoice.id) }}"
+                                   class="btn btn-sm btn-warning" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="{{ url_for('download_invoice', id=invoice.id) }}" class="btn btn-sm btn-secondary">
-                                    <i class="fas fa-download"></i>
+                                <a href="{{ url_for('download_invoice', id=invoice.id) }}"
+                                   class="btn btn-sm btn-danger" title="Download PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <a href="{{ url_for('download_invoice_excel', id=invoice.id) }}"
+                                   class="btn btn-sm btn-success" title="Download Excel">
+                                    <i class="fas fa-file-excel"></i>
                                 </a>
                             </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            No invoices found. <a href="{{ url_for('add_invoice') }}">Add your first invoice</a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -84,7 +108,7 @@
     </div>
 </div>
 
-<!-- Bulk Edit Modal -->
+<!-- ========== BULK EDIT MODAL ========== -->
 <div class="modal fade" id="bulkEditModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -123,7 +147,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description (Optional)</label>
-                        <textarea class="form-control" id="bulkDescription" rows="2" placeholder="Add a note to all selected invoices..."></textarea>
+                        <textarea class="form-control" id="bulkDescription" rows="2"
+                                  placeholder="Add a note to all selected invoices..."></textarea>
                     </div>
                 </form>
             </div>
@@ -137,7 +162,7 @@
     </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
+<!-- ========== DELETE MODAL ========== -->
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -176,25 +201,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
     let selectedInvoiceIds = [];
 
-    // Get URLs from Flask
     const updateInvoicesUrl = "{{ url_for('update_invoices') }}";
     const deleteInvoicesUrl = "{{ url_for('delete_invoices') }}";
 
-    // Update bulk actions visibility and count
     function updateBulkActions() {
         const checked = document.querySelectorAll('.invoice-checkbox:checked');
         const count = checked.length;
         selectedCount.textContent = count;
         selectedInvoiceIds = Array.from(checked).map(cb => parseInt(cb.dataset.invoiceId));
 
-        if (count > 0) {
-            bulkActions.style.display = 'block';
-            document.getElementById('bulkEditCount').textContent = count;
-        } else {
-            bulkActions.style.display = 'none';
-        }
+        bulkActions.style.display = count > 0 ? 'block' : 'none';
+        document.getElementById('bulkEditCount').textContent = count;
 
-        // Update select all state
         const total = invoiceCheckboxes.length;
         if (total > 0) {
             selectAllCheckbox.checked = count === total;
@@ -202,32 +220,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Select/Deselect All
     selectAllCheckbox.addEventListener('change', function() {
-        const isChecked = this.checked;
-        invoiceCheckboxes.forEach(cb => cb.checked = isChecked);
+        invoiceCheckboxes.forEach(cb => cb.checked = this.checked);
         updateBulkActions();
     });
 
-    // Individual checkbox change
-    invoiceCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateBulkActions);
-    });
+    invoiceCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkActions));
 
-    // Deselect All
     deselectAllBtn.addEventListener('click', function() {
         invoiceCheckboxes.forEach(cb => cb.checked = false);
         selectAllCheckbox.checked = false;
         updateBulkActions();
     });
 
-    // Bulk Edit
     bulkEditBtn.addEventListener('click', function() {
         if (selectedInvoiceIds.length === 0) return;
         bulkEditModal.show();
     });
 
-    // Confirm Bulk Edit
     confirmBulkEditBtn.addEventListener('click', function() {
         const status = document.getElementById('bulkStatus').value;
         const date = document.getElementById('bulkDate').value;
@@ -235,7 +245,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (selectedInvoiceIds.length === 0) return;
 
-        // Prepare data for each invoice
         const invoicesData = selectedInvoiceIds.map(id => {
             const data = { id: id };
             if (status) data.status = status;
@@ -246,15 +255,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         fetch(updateInvoicesUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ invoices: invoicesData })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Reload the page to show updates
                 location.reload();
             } else {
                 showAlert('danger', data.message || 'Error updating invoices.');
@@ -264,50 +270,38 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             showAlert('danger', 'An error occurred while updating invoices.');
         })
-        .finally(() => {
-            bulkEditModal.hide();
-        });
+        .finally(() => bulkEditModal.hide());
     });
 
-    // Delete Selected
     deleteSelectedBtn.addEventListener('click', function() {
         if (selectedInvoiceIds.length === 0) return;
-
         document.getElementById('deleteMessage').innerHTML =
             `Are you sure you want to delete <strong>${selectedInvoiceIds.length}</strong> invoice(s)?`;
         deleteModal.show();
     });
 
-    // Confirm Delete
     confirmDeleteBtn.addEventListener('click', function() {
         if (selectedInvoiceIds.length === 0) return;
 
         fetch(deleteInvoicesUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ invoice_ids: selectedInvoiceIds })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Remove deleted rows from table
                 if (data.deleted_ids && data.deleted_ids.length > 0) {
                     data.deleted_ids.forEach(id => {
                         const row = document.querySelector(`tr[data-invoice-id="${id}"]`);
                         if (row) row.remove();
                     });
                 }
-
                 deleteModal.hide();
                 updateBulkActions();
-
                 if (data.deleted_count > 0) {
                     showAlert('success', `Successfully deleted ${data.deleted_count} invoice(s).`);
                 }
-
-                // Refresh if no invoices left
                 if (document.querySelectorAll('.invoice-row').length === 0) {
                     location.reload();
                 }
@@ -319,47 +313,27 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             showAlert('danger', 'An error occurred while deleting invoices.');
         })
-        .finally(() => {
-            deleteModal.hide();
-        });
+        .finally(() => deleteModal.hide());
     });
 
-    // Helper function to show alerts
     function showAlert(type, message) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
         alertDiv.role = 'alert';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
+        alertDiv.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
         const container = document.querySelector('.container.mt-4');
         container.insertBefore(alertDiv, container.firstChild);
-
-        // Auto dismiss after 5 seconds
-        setTimeout(() => {
-            alertDiv.remove();
-        }, 5000);
+        setTimeout(() => alertDiv.remove(), 5000);
     }
 });
 </script>
 
 <style>
-    .invoice-row {
-        transition: background-color 0.3s ease;
-    }
-    .invoice-row:hover {
-        background-color: rgba(0, 123, 255, 0.05);
-    }
-    .invoice-checkbox {
-        cursor: pointer;
-    }
-    #selectAll {
-        cursor: pointer;
-    }
-    #bulk-actions {
-        animation: fadeIn 0.3s ease;
-    }
+    .invoice-row { transition: background-color 0.3s ease; }
+    .invoice-row:hover { background-color: rgba(0, 123, 255, 0.05); }
+    .invoice-checkbox { cursor: pointer; }
+    #selectAll { cursor: pointer; }
+    #bulk-actions { animation: fadeIn 0.3s ease; }
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-10px); }
         to { opacity: 1; transform: translateY(0); }

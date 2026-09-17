@@ -11,3 +11,4 @@ reportlab==4.0.4
 email_validator==2.0.0
 psycopg2-binary==2.9.9
 Flask-Migrate==4.0.5
+openpyxl==3.1.2

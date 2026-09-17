@@ -1,13 +1,77 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2 class="mb-4">Financial Reports</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Financial Reports</h2>
+    <span class="badge bg-info fs-6">
+        <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+    </span>
+</div>
 
+<!-- ========== REPORT CARDS ========== -->
+<div class="row mb-4 g-3">
+    <div class="col-md-3">
+        <a href="{{ url_for('profit_and_loss') }}" class="text-decoration-none">
+            <div class="card dashboard-card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line fa-3x mb-3"></i>
+                    <h5 class="card-title">Profit &amp; Loss</h5>
+                    <p class="card-text small mb-0">
+                        Revenue, expenses and net profit for a period
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('balance_sheet') }}" class="text-decoration-none">
+            <div class="card dashboard-card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-balance-scale fa-3x mb-3"></i>
+                    <h5 class="card-title">Balance Sheet</h5>
+                    <p class="card-text small mb-0">
+                        Assets, liabilities and equity at a point in time
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('trial_balance') }}" class="text-decoration-none">
+            <div class="card dashboard-card bg-secondary text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-book fa-3x mb-3"></i>
+                    <h5 class="card-title">Trial Balance</h5>
+                    <p class="card-text small mb-0">
+                        Verify that debits equal credits
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('general_ledger') }}" class="text-decoration-none">
+            <div class="card dashboard-card bg-dark text-white h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-book-open fa-3x mb-3"></i>
+                    <h5 class="card-title">General Ledger</h5>
+                    <p class="card-text small mb-0">
+                        Detailed transaction history per account
+                    </p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- ========== ANNUAL OVERVIEW CHART ========== -->
 <div class="row">
     <div class="col-md-12">
         <div class="card">
-            <div class="card-header">
-                <h5>Annual Financial Overview</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-bar"></i> Annual Financial Overview ({{ base_currency }})
+                </h5>
             </div>
             <div class="card-body">
                 <canvas id="annualChart" height="100"></canvas>
@@ -16,11 +80,14 @@
     </div>
 </div>
 
+<!-- ========== PIE CHART + SUMMARY ========== -->
 <div class="row mt-4">
     <div class="col-md-6">
-        <div class="card">
+        <div class="card h-100">
             <div class="card-header">
-                <h5>Revenue vs Expenses</h5>
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie"></i> Revenue vs Expenses
+                </h5>
             </div>
             <div class="card-body">
                 <canvas id="pieChart" height="300"></canvas>
@@ -28,9 +95,11 @@
         </div>
     </div>
     <div class="col-md-6">
-        <div class="card">
+        <div class="card h-100">
             <div class="card-header">
-                <h5>Summary Statistics</h5>
+                <h5 class="mb-0">
+                    <i class="fas fa-calculator"></i> Summary Statistics ({{ base_currency }})
+                </h5>
             </div>
             <div class="card-body" id="summaryStats">
                 <p>Loading statistics...</p>
@@ -42,24 +111,26 @@
 
 {% block scripts %}
 <script>
-// ✅ Fetch financial data using correct URL with /acctsys prefix
+const BASE_CURRENCY = "{{ base_currency }}";
+const BASE_CURRENCY_SYMBOL = "{{ base_currency_symbol }}";
+
 fetch('/acctsys/api/financial_data?type=monthly')
     .then(response => response.json())
     .then(data => {
-        // Line Chart
+        // ========== BAR CHART ==========
         const ctx = document.getElementById('annualChart').getContext('2d');
         new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: data.map(d => d.month),
                 datasets: [{
-                    label: 'Revenue',
+                    label: `Revenue (${BASE_CURRENCY})`,
                     data: data.map(d => d.invoices),
                     backgroundColor: 'rgba(54, 162, 235, 0.5)',
                     borderColor: 'rgb(54, 162, 235)',
                     borderWidth: 1
                 }, {
-                    label: 'Expenses',
+                    label: `Expenses (${BASE_CURRENCY})`,
                     data: data.map(d => d.expenses),
                     backgroundColor: 'rgba(255, 99, 132, 0.5)',
                     borderColor: 'rgb(255, 99, 132)',
@@ -69,12 +140,26 @@ fetch('/acctsys/api/financial_data?type=monthly')
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' +
+                                       BASE_CURRENCY_SYMBOL +
+                                       context.parsed.y.toLocaleString(undefined, {
+                                           minimumFractionDigits: 2,
+                                           maximumFractionDigits: 2
+                                       });
+                            }
+                        }
+                    }
+                },
                 scales: {
                     y: {
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
-                                return '$' + value.toLocaleString();
+                                return BASE_CURRENCY_SYMBOL + value.toLocaleString();
                             }
                         }
                     }
@@ -82,7 +167,7 @@ fetch('/acctsys/api/financial_data?type=monthly')
             }
         });
 
-        // Pie Chart
+        // ========== PIE CHART ==========
         const totalRevenue = data.reduce((sum, month) => sum + month.invoices, 0);
         const totalExpenses = data.reduce((sum, month) => sum + month.expenses, 0);
 
@@ -95,25 +180,68 @@ fetch('/acctsys/api/financial_data?type=monthly')
                     data: [totalRevenue, totalExpenses],
                     backgroundColor: ['rgba(54, 162, 235, 0.8)', 'rgba(255, 99, 132, 0.8)']
                 }]
+            },
+            options: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' +
+                                       BASE_CURRENCY_SYMBOL +
+                                       context.parsed.toLocaleString(undefined, {
+                                           minimumFractionDigits: 2,
+                                           maximumFractionDigits: 2
+                                       });
+                            }
+                        }
+                    }
+                }
             }
         });
 
-        // Summary Statistics
+        // ========== SUMMARY STATISTICS ==========
         const netProfit = totalRevenue - totalExpenses;
-        const profitMargin = (netProfit / totalRevenue * 100).toFixed(2);
+        const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue * 100).toFixed(2) : '0.00';
+        const netProfitColor = netProfit >= 0 ? 'text-success' : 'text-danger';
+        const netProfitIcon = netProfit >= 0 ? 'fa-check-circle' : 'fa-exclamation-triangle';
 
         document.getElementById('summaryStats').innerHTML = `
-            <div class="mb-3">
-                <strong>Total Revenue:</strong> $${totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            <div class="row mb-3">
+                <div class="col-8 text-end">
+                    <i class="fas fa-arrow-up text-primary"></i>
+                    <strong>Total Revenue:</strong>
+                </div>
+                <div class="col-4 text-end text-primary">
+                    <strong>${BASE_CURRENCY_SYMBOL}${totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                </div>
             </div>
-            <div class="mb-3">
-                <strong>Total Expenses:</strong> $${totalExpenses.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            <div class="row mb-3">
+                <div class="col-8 text-end">
+                    <i class="fas fa-arrow-down text-danger"></i>
+                    <strong>Total Expenses:</strong>
+                </div>
+                <div class="col-4 text-end text-danger">
+                    <strong>${BASE_CURRENCY_SYMBOL}${totalExpenses.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                </div>
             </div>
-            <div class="mb-3">
-                <strong>Net Profit:</strong> $${netProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            <hr>
+            <div class="row mb-3">
+                <div class="col-8 text-end">
+                    <i class="fas ${netProfitIcon} ${netProfitColor}"></i>
+                    <strong>Net Profit:</strong>
+                </div>
+                <div class="col-4 text-end ${netProfitColor}">
+                    <strong>${BASE_CURRENCY_SYMBOL}${netProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                </div>
             </div>
-            <div class="mb-3">
-                <strong>Profit Margin:</strong> ${profitMargin}%
+            <div class="row">
+                <div class="col-8 text-end">
+                    <i class="fas fa-percent text-info"></i>
+                    <strong>Profit Margin:</strong>
+                </div>
+                <div class="col-4 text-end text-info">
+                    <strong>${profitMargin}%</strong>
+                </div>
             </div>
         `;
     })

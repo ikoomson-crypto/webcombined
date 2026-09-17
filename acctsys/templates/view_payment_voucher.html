@@ -5,8 +5,9 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Payment Voucher Details</h2>
         <div class="btn-group" role="group">
-            <a href="{{ url_for('print_payment_voucher', id=voucher.id) }}" class="btn btn-secondary" target="_blank">
-                <i class="fas fa-print"></i> Print Voucher
+            <a href="{{ url_for('print_payment_voucher', id=voucher.id) }}"
+               class="btn btn-danger" target="_blank">
+                <i class="fas fa-file-pdf"></i> Print PDF
             </a>
             <a href="{{ url_for('payment_vouchers') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back to List
@@ -14,18 +15,36 @@
         </div>
     </div>
 
+    {% set base_ccy = base_currency %}
+    {% set voucher_ccy = voucher.currency or base_ccy %}
+    {% set rate = voucher.exchange_rate or 1.0 %}
+    {% set is_foreign = (voucher_ccy != base_ccy) %}
+
     <div class="row">
         <div class="col-md-12">
             <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Voucher #: {{ voucher.voucher_number }}</h5>
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        Voucher #: {{ voucher.voucher_number }}
+                    </h5>
+                    <div>
+                        <span class="badge bg-light text-dark me-2">
+                            <i class="fas fa-coins"></i>
+                            Voucher: {{ voucher_ccy }}
+                        </span>
+                        <span class="badge bg-light text-dark">
+                            Base: {{ base_ccy }} ({{ base_currency_symbol }})
+                        </span>
+                    </div>
                 </div>
                 <div class="card-body">
+
+                    <!-- ========== HEADER DETAILS ========== -->
                     <div class="row">
                         <div class="col-md-6">
                             <table class="table table-borderless">
                                 <tr>
-                                    <th width="150">Supplier:</th>
+                                    <th width="180">Supplier:</th>
                                     <td>{{ voucher.supplier.name if voucher.supplier else 'N/A' }}</td>
                                 </tr>
                                 <tr>
@@ -33,8 +52,23 @@
                                     <td>{{ voucher.date.strftime('%Y-%m-%d') }}</td>
                                 </tr>
                                 <tr>
-                                    <th>Currency:</th>
-                                    <td>{{ voucher.currency }} (Rate: {{ voucher.exchange_rate }})</td>
+                                    <th>Voucher Currency:</th>
+                                    <td>
+                                        <strong>{{ voucher_ccy }}</strong>
+                                        {% if is_foreign %}
+                                        <span class="badge bg-warning text-dark ms-2">Foreign</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Exchange Rate:</th>
+                                    <td>
+                                        {% if is_foreign %}
+                                            1 {{ voucher_ccy }} = <strong>{{ rate }}</strong> {{ base_ccy }}
+                                        {% else %}
+                                            <span class="text-muted">N/A (same as base)</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>Reference #:</th>
@@ -52,8 +86,10 @@
                                     <th>Support Document:</th>
                                     <td>
                                         {% if voucher.attachment_filename %}
-                                            <a href="{{ url_for('download_voucher_attachment', id=voucher.id) }}" class="btn btn-sm btn-warning">
-                                                <i class="fas fa-download"></i> {{ voucher.attachment_original_name }}
+                                            <a href="{{ url_for('download_voucher_attachment', id=voucher.id) }}"
+                                               class="btn btn-sm btn-warning">
+                                                <i class="fas fa-download"></i>
+                                                {{ voucher.attachment_original_name }}
                                             </a>
                                         {% else %}
                                             <span class="text-muted">No document attached</span>
@@ -65,7 +101,7 @@
                         <div class="col-md-6">
                             <table class="table table-borderless">
                                 <tr>
-                                    <th width="150">Created By:</th>
+                                    <th width="180">Created By:</th>
                                     <td>{{ voucher.user.username if voucher.user else 'N/A' }}</td>
                                 </tr>
                                 <tr>
@@ -76,7 +112,8 @@
                                     <th>Payment Account:</th>
                                     <td>
                                         {% if voucher.payment_account %}
-                                            {{ voucher.payment_account.account_code }} - {{ voucher.payment_account.account_name }}
+                                            {{ voucher.payment_account.account_code }} -
+                                            {{ voucher.payment_account.account_name }}
                                         {% else %}
                                             <span class="text-muted">N/A</span>
                                         {% endif %}
@@ -92,9 +129,16 @@
 
                     <hr>
 
+                    <!-- ========== LINE ITEMS (in voucher currency) ========== -->
                     <div class="row">
                         <div class="col-md-12">
-                            <h6>Payment Line Items:</h6>
+                            <h6>
+                                <i class="fas fa-list"></i>
+                                Payment Line Items
+                                <span class="badge bg-secondary ms-2">
+                                    in {{ voucher_ccy }}
+                                </span>
+                            </h6>
                             <div class="table-responsive">
                                 <table class="table table-bordered table-striped">
                                     <thead class="table-secondary">
@@ -102,38 +146,177 @@
                                             <th>Description</th>
                                             <th class="text-end">WHT Rate</th>
                                             <th class="text-end">VAT Rate</th>
-                                            <th class="text-end">Gross Amount</th>
-                                            <th class="text-end">WHT Amount</th>
-                                            <th class="text-end">VAT Amount</th>
-                                            <th class="text-end">Net Amount</th>
+                                            <th class="text-end">Gross ({{ voucher_ccy }})</th>
+                                            <th class="text-end">WHT ({{ voucher_ccy }})</th>
+                                            <th class="text-end">VAT ({{ voucher_ccy }})</th>
+                                            <th class="text-end">Net ({{ voucher_ccy }})</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for line in voucher.lines %}
                                         <tr>
                                             <td>{{ line.description }}</td>
-                                            <td class="text-end">{{ "%.2f"|format(line.wht_rate) }}%</td>
-                                            <td class="text-end">{{ "%.2f"|format(line.vat_rate) }}%</td>
-                                            <td class="text-end">{{ voucher.currency }} {{ "%.2f"|format(line.gross_amount) }}</td>
-                                            <td class="text-end text-danger">({{ voucher.currency }} {{ "%.2f"|format(line.wht_amount) }})</td>
-                                            <td class="text-end text-success">{{ voucher.currency }} {{ "%.2f"|format(line.vat_amount) }}</td>
-                                            <td class="text-end text-primary">{{ voucher.currency }} {{ "%.2f"|format(line.net_amount) }}</td>
+                                            <td class="text-end">{{ "{:,.2f}".format(line.wht_rate) }}%</td>
+                                            <td class="text-end">{{ "{:,.2f}".format(line.vat_rate) }}%</td>
+                                            <td class="text-end">
+                                                {{ voucher_ccy }} {{ "{:,.2f}".format(line.gross_amount) }}
+                                            </td>
+                                            <td class="text-end text-danger">
+                                                ({{ voucher_ccy }} {{ "{:,.2f}".format(line.wht_amount) }})
+                                            </td>
+                                            <td class="text-end text-success">
+                                                {{ voucher_ccy }} {{ "{:,.2f}".format(line.vat_amount) }}
+                                            </td>
+                                            <td class="text-end text-primary">
+                                                {{ voucher_ccy }} {{ "{:,.2f}".format(line.net_amount) }}
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
                                     <tfoot class="table-info">
                                         <tr>
                                             <th colspan="3" class="text-end">Totals:</th>
-                                            <th class="text-end">{{ voucher.currency }} {{ "%.2f"|format(voucher.gross_amount) }}</th>
-                                            <th class="text-end">({{ voucher.currency }} {{ "%.2f"|format(voucher.wht_amount) }})</th>
-                                            <th class="text-end">{{ voucher.currency }} {{ "%.2f"|format(voucher.vat_amount) }}</th>
-                                            <th class="text-end">{{ voucher.currency }} {{ "%.2f"|format(voucher.net_amount) }}</th>
+                                            <th class="text-end">
+                                                {{ voucher_ccy }} {{ "{:,.2f}".format(voucher.gross_amount) }}
+                                            </th>
+                                            <th class="text-end">
+                                                ({{ voucher_ccy }} {{ "{:,.2f}".format(voucher.wht_amount) }})
+                                            </th>
+                                            <th class="text-end">
+                                                {{ voucher_ccy }} {{ "{:,.2f}".format(voucher.vat_amount) }}
+                                            </th>
+                                            <th class="text-end">
+                                                {{ voucher_ccy }} {{ "{:,.2f}".format(voucher.net_amount) }}
+                                            </th>
                                         </tr>
                                     </tfoot>
                                 </table>
                             </div>
                         </div>
                     </div>
+
+                    <!-- ========== SUMMARY (Voucher Currency) ========== -->
+                    <div class="row mt-4">
+                        <div class="col-md-6 offset-md-6">
+                            <div class="card border-secondary">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">
+                                        Summary
+                                        <span class="badge bg-secondary">in {{ voucher_ccy }}</span>
+                                    </h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td>Total Gross Amount:</td>
+                                                <td class="text-end">
+                                                    {{ voucher_ccy }}
+                                                    {{ "{:,.2f}".format(voucher.gross_amount) }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Less: WHT Amount:</td>
+                                                <td class="text-end text-danger">
+                                                    ({{ voucher_ccy }}
+                                                    {{ "{:,.2f}".format(voucher.wht_amount) }})
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Add: VAT Amount:</td>
+                                                <td class="text-end text-success">
+                                                    {{ voucher_ccy }}
+                                                    {{ "{:,.2f}".format(voucher.vat_amount) }}
+                                                </td>
+                                            </tr>
+                                            <tr class="table-primary">
+                                                <th>Net Payment Amount:</th>
+                                                <th class="text-end">
+                                                    {{ voucher_ccy }}
+                                                    {{ "{:,.2f}".format(voucher.net_amount) }}
+                                                </th>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ========== BASE CURRENCY EQUIVALENT ========== -->
+                    {% if is_foreign %}
+                    <div class="row mt-3">
+                        <div class="col-md-6 offset-md-6">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-exchange-alt"></i>
+                                        Base Currency Equivalent
+                                        <span class="badge bg-dark ms-2">
+                                            in {{ base_ccy }}
+                                        </span>
+                                    </h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <table class="table table-sm mb-0">
+                                        <tbody>
+                                            <tr class="table-light">
+                                                <td colspan="2">
+                                                    <small class="text-muted">
+                                                        Exchange Rate:
+                                                        <strong>1 {{ voucher_ccy }} = {{ rate }} {{ base_ccy }}</strong>
+                                                    </small>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Total Gross (Base):</td>
+                                                <td class="text-end">
+                                                    {{ base_currency_symbol }}
+                                                    {{ "{:,.2f}".format(voucher.gross_amount * rate) }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Less: WHT (Base):</td>
+                                                <td class="text-end text-danger">
+                                                    ({{ base_currency_symbol }}
+                                                    {{ "{:,.2f}".format(voucher.wht_amount * rate) }})
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>Add: VAT (Base):</td>
+                                                <td class="text-end text-success">
+                                                    {{ base_currency_symbol }}
+                                                    {{ "{:,.2f}".format(voucher.vat_amount * rate) }}
+                                                </td>
+                                            </tr>
+                                            <tr class="table-warning">
+                                                <th>Net Payment (Base):</th>
+                                                <th class="text-end">
+                                                    {{ base_currency_symbol }}
+                                                    {{ "{:,.2f}".format(voucher.net_amount * rate) }}
+                                                    <small class="text-muted">{{ base_ccy }}</small>
+                                                </th>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="row mt-3">
+                        <div class="col-md-6 offset-md-6">
+                            <div class="alert alert-light border mb-0">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i>
+                                    Voucher currency (<strong>{{ voucher_ccy }}</strong>) matches
+                                    base currency. No conversion applied.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                 </div>
             </div>
         </div>

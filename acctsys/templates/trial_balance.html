@@ -2,11 +2,100 @@
 
 {% block content %}
 <div class="container mt-4">
-    <h2 class="mb-4">Trial Balance</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Trial Balance</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info fs-6">
+                <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+            </span>
+            <a href="{{ url_for('trial_balance_pdf',
+                                 start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '',
+                                 mode=mode) }}"
+               class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('trial_balance_excel',
+                                 start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '',
+                                 mode=mode) }}"
+               class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+        </div>
+    </div>
 
+    <!-- ========== FILTER FORM ========== -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Report Mode</label>
+                    <select class="form-select" name="mode">
+                        <option value="as_of" {% if mode == 'as_of' %}selected{% endif %}>
+                            As of date (cumulative)
+                        </option>
+                        <option value="period" {% if mode == 'period' %}selected{% endif %}>
+                            For a period (movement)
+                        </option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Start Date</label>
+                    <input type="date" class="form-control" name="start_date"
+                           value="{{ start_date.strftime('%Y-%m-%d') if start_date else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">End Date</label>
+                    <input type="date" class="form-control" name="end_date"
+                           value="{{ end_date.strftime('%Y-%m-%d') if end_date else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Apply
+                    </button>
+                </div>
+            </form>
+            <div class="mt-2 small text-muted">
+                <i class="fas fa-info-circle"></i>
+                <strong>As of date:</strong> includes all activity up to the end date.
+                <strong>For a period:</strong> includes only activity within the range.
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== QUICK PERIOD BUTTONS ========== -->
+    <div class="mb-3">
+        <span class="text-muted small me-2">Quick filters:</span>
+        <a href="{{ url_for('trial_balance', mode='as_of') }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-infinity"></i> All Time
+        </a>
+        <a href="{{ url_for('trial_balance', mode='as_of', end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-calendar-day"></i> As of Today
+        </a>
+        <a href="{{ url_for('trial_balance', mode='period',
+                             start_date=(datetime.now().replace(day=1)).strftime('%Y-%m-%d'),
+                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-calendar-alt"></i> This Month
+        </a>
+        <a href="{{ url_for('trial_balance', mode='period',
+                             start_date=(datetime.now().replace(month=1, day=1)).strftime('%Y-%m-%d'),
+                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-calendar-check"></i> Year to Date
+        </a>
+    </div>
+
+    <!-- ========== REPORT TABLE ========== -->
     <div class="card">
-        <div class="card-header">
-            <h5 class="mb-0">As of {{ datetime.now().strftime('%Y-%m-%d') }}</h5>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-balance-scale"></i> {{ period_label }}
+            </h5>
+            <small class="text-muted">All amounts in {{ base_currency }}</small>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -16,42 +105,54 @@
                             <th>Account Code</th>
                             <th>Account Name</th>
                             <th>Account Type</th>
-                            <th class="text-end">Debit ($)</th>
-                            <th class="text-end">Credit ($)</th>
+                            <th class="text-end">Debit ({{ base_currency }})</th>
+                            <th class="text-end">Credit ({{ base_currency }})</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for account in trial_balance %}
                         <tr>
-                            <td>{{ account.account_code }}</td>
+                            <td><strong>{{ account.account_code }}</strong></td>
                             <td>{{ account.account_name }}</td>
-                            <td>{{ account.account_type }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ account.account_type }}</span>
+                            </td>
                             <td class="text-end">
                                 {% if account.debit > 0 %}
-                                    ${{ "%.2f"|format(account.debit) }}
+                                    <span class="text-success">
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(account.debit) }}
+                                    </span>
                                 {% else %}
-                                    -
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td class="text-end">
                                 {% if account.credit > 0 %}
-                                    ${{ "%.2f"|format(account.credit) }}
+                                    <span class="text-danger">
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(account.credit) }}
+                                    </span>
                                 {% else %}
-                                    -
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="text-center">No accounts found</td>
+                            <td colspan="5" class="text-center text-muted">
+                                No account activity found for this period
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
                         <tr class="table-primary">
                             <th colspan="3" class="text-end">Total:</th>
-                            <th class="text-end">${{ "%.2f"|format(total_debits) }}</th>
-                            <th class="text-end">${{ "%.2f"|format(total_credits) }}</th>
+                            <th class="text-end">
+                                {{ base_currency_symbol }}{{ "{:,.2f}".format(total_debits) }}
+                            </th>
+                            <th class="text-end">
+                                {{ base_currency_symbol }}{{ "{:,.2f}".format(total_credits) }}
+                            </th>
                         </tr>
                         {% if total_debits == total_credits %}
                         <tr class="table-success">
@@ -64,7 +165,12 @@
                         <tr class="table-danger">
                             <td colspan="5" class="text-center">
                                 <i class="fas fa-exclamation-triangle"></i>
-                                <strong>Trial balance is out of balance! Difference: ${{ "%.2f"|format(total_debits - total_credits) }}</strong>
+                                <strong>
+                                    Trial balance is out of balance!
+                                    Difference:
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(total_debits - total_credits) }}
+                                    {{ base_currency }}
+                                </strong>
                             </td>
                         </tr>
                         {% endif %}
@@ -76,7 +182,14 @@
 
     <div class="alert alert-info mt-3">
         <i class="fas fa-info-circle"></i>
-        <strong>Note:</strong> The trial balance shows the balances of all accounts. For the accounting system to be in balance, total debits must equal total credits.
+        <strong>Note:</strong> The trial balance shows account balances in
+        <strong>{{ base_currency }}</strong>.
+        {% if mode == 'as_of' %}
+            Cumulative balances up to the selected cut-off date.
+        {% else %}
+            Movement during the selected period.
+        {% endif %}
+        For the accounting system to be in balance, total debits must equal total credits.
     </div>
 </div>
 {% endblock %}

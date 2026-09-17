@@ -9,13 +9,19 @@
 </div>
 
 <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Expense List</h5>
+        <span class="badge bg-info">
+            <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+        </span>
+    </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-striped">
                 <thead>
                     <tr>
                         <th>Description</th>
-                        <th>Amount</th>
+                        <th class="text-end">Amount ({{ base_currency }})</th>
                         <th>Date</th>
                         <th>Payment Method</th>
                         <th>Category</th>
@@ -25,14 +31,18 @@
                     {% for expense in expenses %}
                     <tr>
                         <td>{{ expense.description }}</td>
-                        <td>${{ "%.2f"|format(expense.amount) }}</td>
+                        <td class="text-end">
+                            {{ base_currency_symbol }}{{ "{:,.2f}".format(expense.amount) }}
+                        </td>
                         <td>{{ expense.date.strftime('%Y-%m-%d') }}</td>
                         <td>{{ expense.payment_method }}</td>
                         <td>{{ expense.category.name if expense.category else 'Uncategorized' }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5" class="text-center">No expenses found. <a href="{{ url_for('add_expense') }}">Add your first expense</a></td>
+                        <td colspan="5" class="text-center">
+                            No expenses found. <a href="{{ url_for('add_expense') }}">Add your first expense</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

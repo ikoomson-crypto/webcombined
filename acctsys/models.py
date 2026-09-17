@@ -240,11 +240,13 @@ class GeneralLedger(db.Model):
 
     account = db.relationship('ChartOfAccount', backref='general_ledger', lazy=True)
 
-# acctsys/models.py – Add SystemSetting model
+# acctsys/models.py – Updated SystemSetting model
 
 class SystemSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(50), unique=True, nullable=False)
-    value = db.Column(db.Integer, nullable=False)  # Stores the ChartOfAccount id
+    value = db.Column(db.Integer, nullable=True)              # ChartOfAccount id
+    value_string = db.Column(db.String(255), nullable=True)   # ✅ widened from 100 → 255
+    value_text = db.Column(db.Text, nullable=True)            # ✅ NEW: long text (address, notes)
     description = db.Column(db.String(200))
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

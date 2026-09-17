@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>General Ledger</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info fs-6">
+                <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+            </span>
+            <a href="{{ url_for('general_ledger_pdf',
+                                 account_id=account_id or '',
+                                 start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '') }}"
+               class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('general_ledger_excel',
+                                 account_id=account_id or '',
+                                 start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '') }}"
+               class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+            <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- ========== FILTER FORM ========== -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Account</label>
+                    <select class="form-select" name="account_id">
+                        <option value="">All Accounts</option>
+                        {% for acc in all_accounts %}
+                        <option value="{{ acc.id }}"
+                                {% if account_id == acc.id %}selected{% endif %}>
+                            {{ acc.account_code }} - {{ acc.account_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Start Date</label>
+                    <input type="date" class="form-control" name="start_date"
+                           value="{{ start_date.strftime('%Y-%m-%d') if start_date else '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">End Date</label>
+                    <input type="date" class="form-control" name="end_date"
+                           value="{{ end_date.strftime('%Y-%m-%d') if end_date else '' }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Apply
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========== QUICK FILTERS ========== -->
+    <div class="mb-3">
+        <span class="text-muted small me-2">Quick filters:</span>
+        <a href="{{ url_for('general_ledger') }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-infinity"></i> All Time
+        </a>
+        <a href="{{ url_for('general_ledger',
+                             start_date=(datetime.now().replace(day=1)).strftime('%Y-%m-%d'),
+                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-calendar-alt"></i> This Month
+        </a>
+        <a href="{{ url_for('general_ledger',
+                             start_date=(datetime.now().replace(month=1, day=1)).strftime('%Y-%m-%d'),
+                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-calendar-check"></i> Year to Date
+        </a>
+    </div>
+
+    <!-- ========== REPORT ========== -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-book"></i> {{ period_label }}
+            </h5>
+            <small class="text-muted">All amounts in {{ base_currency }}</small>
+        </div>
+        <div class="card-body">
+            {% if grouped %}
+                {% for account_id_, data in grouped.items() %}
+                {% set account = data.account %}
+                {% set at = data.account_type %}
+                <div class="mb-4">
+                    <!-- Account header -->
+                    <div class="card">
+                        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">
+                                <i class="fas fa-folder-open"></i>
+                                <strong>{{ account.account_code }}</strong> - {{ account.account_name }}
+                                {% if at %}
+                                <span class="badge bg-light text-dark ms-2">{{ at.name }}</span>
+                                {% endif %}
+                            </h6>
+                            <div class="small">
+                                <span class="me-3">
+                                    Debits:
+                                    <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(data.total_debit) }}</strong>
+                                </span>
+                                <span class="me-3">
+                                    Credits:
+                                    <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(data.total_credit) }}</strong>
+                                </span>
+                                <span>
+                                    Closing:
+                                    <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(data.closing) }}</strong>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0">
+                                    <thead class="table-secondary">
+                                        <tr>
+                                            <th style="width: 10%;">Date</th>
+                                            <th style="width: 20%;">Entry #</th>
+                                            <th style="width: 35%;">Description</th>
+                                            <th class="text-end" style="width: 10%;">Debit</th>
+                                            <th class="text-end" style="width: 10%;">Credit</th>
+                                            <th class="text-end" style="width: 15%;">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if data.opening != 0 or start_date %}
+                                        <tr class="table-light">
+                                            <td colspan="5" class="text-end fst-italic">
+                                                Opening Balance
+                                            </td>
+                                            <td class="text-end fst-italic">
+                                                {{ base_currency_symbol }}{{ "{:,.2f}".format(data.opening) }}
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+
+                                        {% for entry in data.entries %}
+                                        <tr>
+                                            <td>{{ entry.date.strftime('%Y-%m-%d') }}</td>
+                                            <td>
+                                                <a href="{{ url_for('view_journal_entry', entry_number=entry.entry_number) }}"
+                                                   class="text-decoration-none">
+                                                    <small>{{ entry.entry_number }}</small>
+                                                </a>
+                                            </td>
+                                            <td>{{ entry.description or '' }}</td>
+                                            <td class="text-end text-success">
+                                                {% if entry.debit > 0 %}
+                                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(entry.debit) }}
+                                                {% else %}-{% endif %}
+                                            </td>
+                                            <td class="text-end text-danger">
+                                                {% if entry.credit > 0 %}
+                                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(entry.credit) }}
+                                                {% else %}-{% endif %}
+                                            </td>
+                                            <td class="text-end fw-bold">
+                                                {{ base_currency_symbol }}{{ "{:,.2f}".format(entry._running_balance) }}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-info">
+                                        <tr>
+                                            <td colspan="3" class="text-end fw-bold">
+                                                Total for {{ account.account_code }}:
+                                            </td>
+                                            <td class="text-end fw-bold">
+                                                {{ base_currency_symbol }}{{ "{:,.2f}".format(data.total_debit) }}
+                                            </td>
+                                            <td class="text-end fw-bold">
+                                                {{ base_currency_symbol }}{{ "{:,.2f}".format(data.total_credit) }}
+                                            </td>
+                                            <td class="text-end fw-bold">
+                                                {{ base_currency_symbol }}{{ "{:,.2f}".format(data.closing) }}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Grand totals -->
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-calculator"></i> Grand Totals
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 text-end">
+                                <strong>Total Debits:</strong>
+                            </div>
+                            <div class="col-md-6">
+                                <strong class="text-success">
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(grand_total_debit) }}
+                                </strong>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6 text-end">
+                                <strong>Total Credits:</strong>
+                            </div>
+                            <div class="col-md-6">
+                                <strong class="text-danger">
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(grand_total_credit) }}
+                                </strong>
+                            </div>
+                        </div>
+                        <hr>
+                        {% if grand_total_debit == grand_total_credit %}
+                        <div class="alert alert-success mb-0">
+                            <i class="fas fa-check-circle"></i>
+                            <strong>Ledger is balanced</strong> — Debits equal Credits.
+                        </div>
+                        {% else %}
+                        <div class="alert alert-danger mb-0">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Out of balance by
+                                {{ base_currency_symbol }}{{ "{:,.2f}".format(grand_total_debit - grand_total_credit) }}
+                            </strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+            {% else %}
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle"></i>
+                    No transactions found for the selected filters.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-3">
+        <i class="fas fa-info-circle"></i>
+        <strong>About this report:</strong> The General Ledger shows every transaction
+        that touched each account, with a running balance. Filter by account and/or
+        date range to focus on a specific period. All amounts shown in
+        <strong>{{ base_currency }}</strong>.
+    </div>
+</div>
+{% endblock %}

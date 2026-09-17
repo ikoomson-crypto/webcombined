@@ -6,7 +6,7 @@ from wtforms.validators import DataRequired, EqualTo, Length, ValidationError
 from datetime import datetime
 from wtforms import FieldList, FormField
 from flask_wtf.file import FileField, FileAllowed, FileRequired
-from acctsys.models import User, ChartOfAccount, Supplier, Customer, Invoice, InvoiceLine
+from acctsys.models import User, ChartOfAccount, Supplier, Customer, Invoice, InvoiceLine, AccountType
 from extensions import db
 
 

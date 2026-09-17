@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Profit &amp; Loss Statement</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info fs-6">
+                <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+            </span>
+            <a href="{{ url_for('profit_and_loss_pdf',
+                                 start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '') }}"
+               class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('profit_and_loss_excel',
+                                 start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '') }}"
+               class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+            <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <!-- ========== DATE RANGE FILTER ========== -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Start Date</label>
+                    <input type="date" class="form-control" name="start_date"
+                           value="{{ start_date.strftime('%Y-%m-%d') if start_date else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">End Date</label>
+                    <input type="date" class="form-control" name="end_date"
+                           value="{{ end_date.strftime('%Y-%m-%d') if end_date else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Apply Filter
+                    </button>
+                </div>
+            </form>
+            <div class="mt-2 small text-muted">
+                <i class="fas fa-info-circle"></i>
+                Leave both dates blank to include <strong>all activity</strong>.
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== QUICK PERIOD BUTTONS ========== -->
+    <div class="mb-3">
+        <span class="text-muted small me-2">Quick filters:</span>
+        <a href="{{ url_for('profit_and_loss') }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-infinity"></i> All Time
+        </a>
+        <a href="{{ url_for('profit_and_loss',
+                             start_date=(datetime.now().replace(day=1)).strftime('%Y-%m-%d'),
+                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-calendar-alt"></i> This Month
+        </a>
+        <a href="{{ url_for('profit_and_loss',
+                             start_date=(datetime.now().replace(month=1, day=1)).strftime('%Y-%m-%d'),
+                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-calendar-check"></i> Year to Date
+        </a>
+    </div>
+
+    <!-- ========== REPORT TABLE ========== -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line"></i> Statement of Profit or Loss
+            </h5>
+            <small>All amounts in {{ base_currency }}</small>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 15%;">Code</th>
+                        <th style="width: 65%;">Account</th>
+                        <th class="text-end" style="width: 20%;">
+                            Amount ({{ base_currency }})
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- ========== REVENUE ========== -->
+                    <tr class="table-primary">
+                        <td colspan="3">
+                            <strong><i class="fas fa-arrow-up"></i> REVENUE</strong>
+                        </td>
+                    </tr>
+                    {% for line in revenue_lines %}
+                    <tr>
+                        <td>{{ line.account_code }}</td>
+                        <td>{{ line.account_name }}</td>
+                        <td class="text-end text-success">
+                            {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            No revenue recorded for this period
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-success">
+                        <td colspan="2" class="text-end"><strong>Total Revenue</strong></td>
+                        <td class="text-end">
+                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(total_revenue) }}</strong>
+                        </td>
+                    </tr>
+
+                    <!-- ========== EXPENSES ========== -->
+                    <tr class="table-warning">
+                        <td colspan="3">
+                            <strong><i class="fas fa-arrow-down"></i> EXPENSES</strong>
+                        </td>
+                    </tr>
+                    {% for line in expense_lines %}
+                    <tr>
+                        <td>{{ line.account_code }}</td>
+                        <td>{{ line.account_name }}</td>
+                        <td class="text-end text-danger">
+                            {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted">
+                            No expenses recorded for this period
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-danger">
+                        <td colspan="2" class="text-end"><strong>Total Expenses</strong></td>
+                        <td class="text-end">
+                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(total_expenses) }}</strong>
+                        </td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr class="{{ 'table-success' if is_profit else 'table-danger' }}">
+                        <td colspan="2" class="text-end">
+                            <strong>
+                                {% if is_profit %}
+                                    <i class="fas fa-check-circle"></i> NET PROFIT
+                                {% else %}
+                                    <i class="fas fa-exclamation-triangle"></i> NET LOSS
+                                {% endif %}
+                            </strong>
+                        </td>
+                        <td class="text-end">
+                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(net_profit|abs) }}</strong>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <strong>Formula:</strong> Net Profit / (Loss) = Total Revenue − Total Expenses.
+        All amounts shown in <strong>{{ base_currency }}</strong>.
+    </div>
+</div>
+{% endblock %}

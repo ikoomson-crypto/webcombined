@@ -4,7 +4,10 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Supplier Details</h2>
-        <div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info">
+                <i class="fas fa-coins"></i> {{ base_currency }}
+            </span>
             <a href="{{ url_for('edit_supplier', id=supplier.id) }}" class="btn btn-warning">
                 <i class="fas fa-edit"></i> Edit Supplier
             </a>
@@ -28,6 +31,10 @@
                     <p><strong>Phone:</strong> {{ supplier.phone or 'N/A' }}</p>
                     <p><strong>Tax ID:</strong> {{ supplier.tax_id or 'N/A' }}</p>
                     <p><strong>Payment Terms:</strong> {{ supplier.payment_terms }}</p>
+                    <p><strong>Current Balance:</strong>
+                        {{ base_currency_symbol }}{{ "{:,.2f}".format(supplier.current_balance) }}
+                        <small class="text-muted">{{ base_currency }}</small>
+                    </p>
                     <p><strong>Address:</strong> {{ supplier.address or 'N/A' }}</p>
                     <p><strong>Status:</strong>
                         <span class="badge bg-{{ 'success' if supplier.is_active else 'danger' }}">
@@ -40,8 +47,11 @@
 
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Purchase History</h5>
+                    <span class="badge bg-info">
+                        <i class="fas fa-coins"></i> {{ base_currency }}
+                    </span>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -50,7 +60,7 @@
                                 <tr>
                                     <th>Purchase #</th>
                                     <th>Date</th>
-                                    <th>Amount</th>
+                                    <th class="text-end">Amount ({{ base_currency }})</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -59,7 +69,9 @@
                                 <tr>
                                     <td>{{ purchase.purchase_number }}</td>
                                     <td>{{ purchase.date.strftime('%Y-%m-%d') }}</td>
-                                    <td>${{ "%.2f"|format(purchase.amount) }}</td>
+                                    <td class="text-end">
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(purchase.amount) }}
+                                    </td>
                                     <td>
                                         <span class="badge bg-{{ 'success' if purchase.status == 'Paid' else 'warning' }}">
                                             {{ purchase.status }}

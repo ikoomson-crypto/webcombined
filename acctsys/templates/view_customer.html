@@ -23,8 +23,14 @@
                     <p><strong>Phone:</strong> {{ customer.phone or 'N/A' }}</p>
                     <p><strong>Tax ID:</strong> {{ customer.tax_id or 'N/A' }}</p>
                     <p><strong>Payment Terms:</strong> {{ customer.payment_terms }}</p>
-                    <p><strong>Credit Limit:</strong> ${{ "%.2f"|format(customer.credit_limit) }}</p>
-                    <p><strong>Current Balance:</strong> ${{ "%.2f"|format(customer.current_balance) }}</p>
+                    <p><strong>Credit Limit:</strong>
+                        {{ base_currency_symbol }}{{ "{:,.2f}".format(customer.credit_limit) }}
+                        <small class="text-muted">{{ base_currency }}</small>
+                    </p>
+                    <p><strong>Current Balance:</strong>
+                        {{ base_currency_symbol }}{{ "{:,.2f}".format(customer.current_balance) }}
+                        <small class="text-muted">{{ base_currency }}</small>
+                    </p>
                     <p><strong>Address:</strong> {{ customer.address or 'N/A' }}</p>
                 </div>
             </div>
@@ -32,8 +38,11 @@
 
         <div class="col-md-8">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Invoice History</h5>
+                    <span class="badge bg-info">
+                        <i class="fas fa-coins"></i> {{ base_currency }}
+                    </span>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -42,7 +51,7 @@
                                 <tr>
                                     <th>Invoice #</th>
                                     <th>Date</th>
-                                    <th>Amount</th>
+                                    <th class="text-end">Amount ({{ base_currency }})</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -51,7 +60,9 @@
                                 <tr>
                                     <td>{{ invoice.invoice_number }}</td>
                                     <td>{{ invoice.date.strftime('%Y-%m-%d') }}</td>
-                                    <td>${{ "%.2f"|format(invoice.amount) }}</td>
+                                    <td class="text-end">
+                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(invoice.lines|sum(attribute='total')) }}
+                                    </td>
                                     <td>
                                         <span class="badge bg-{{ 'success' if invoice.status == 'Paid' else 'warning' }}">
                                             {{ invoice.status }}

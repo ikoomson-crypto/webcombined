@@ -4,9 +4,14 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Payment Vouchers</h2>
-        <a href="{{ url_for('add_payment_voucher') }}" class="btn btn-primary">
-            <i class="fas fa-plus"></i> New Payment Voucher
-        </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info">
+                <i class="fas fa-coins"></i> Base: {{ base_currency }}
+            </span>
+            <a href="{{ url_for('add_payment_voucher') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Payment Voucher
+            </a>
+        </div>
     </div>
 
     <div class="card">
@@ -14,7 +19,8 @@
             <h5 class="mb-0">Payment Voucher List</h5>
             <div id="bulk-actions" style="display: none;">
                 <button type="button" class="btn btn-danger btn-sm" id="deleteSelectedBtn">
-                    <i class="fas fa-trash"></i> Delete Selected (<span id="selectedCount">0</span>)
+                    <i class="fas fa-trash"></i> Delete Selected
+                    (<span id="selectedCount">0</span>)
                 </button>
                 <button type="button" class="btn btn-secondary btn-sm" id="deselectAllBtn">
                     <i class="fas fa-times"></i> Deselect All
@@ -34,25 +40,53 @@
                             <th>Supplier</th>
                             <th>Items</th>
                             <th>Currency</th>
-                            <th>Gross Amount</th>
-                            <th>Net Amount</th>
+                            <th class="text-end">Gross Amount</th>
+                            <th class="text-end">Net Amount</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for voucher in vouchers %}
+                        {% set vccy = voucher.currency or base_currency %}
+                        {% set vrate = voucher.exchange_rate or 1.0 %}
+                        {% set is_foreign = (vccy != base_currency) %}
                         <tr class="voucher-row" data-voucher-id="{{ voucher.id }}">
                             <td>
-                                <input type="checkbox" class="form-check-input voucher-checkbox" data-voucher-id="{{ voucher.id }}">
+                                <input type="checkbox" class="form-check-input voucher-checkbox"
+                                       data-voucher-id="{{ voucher.id }}">
                             </td>
-                            <td>{{ voucher.voucher_number }}</td>
+                            <td>
+                                <a href="{{ url_for('view_payment_voucher', id=voucher.id) }}">
+                                    {{ voucher.voucher_number }}
+                                </a>
+                            </td>
                             <td>{{ voucher.date.strftime('%Y-%m-%d') }}</td>
                             <td>{{ voucher.supplier.name if voucher.supplier else 'N/A' }}</td>
                             <td>{{ voucher.lines|length }} item(s)</td>
-                            <td>{{ voucher.currency }}</td>
-                            <td class="text-end">{{ voucher.currency }} {{ "%.2f"|format(voucher.gross_amount) }}</td>
-                            <td class="text-end text-success">{{ voucher.currency }} {{ "%.2f"|format(voucher.net_amount) }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'warning text-dark' if is_foreign else 'secondary' }}">
+                                    {{ vccy }}
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <div>{{ vccy }} {{ "{:,.2f}".format(voucher.gross_amount) }}</div>
+                                {% if is_foreign %}
+                                <small class="text-muted d-block">
+                                    ≈ {{ base_currency_symbol }}{{ "{:,.2f}".format(voucher.gross_amount * vrate) }}
+                                    {{ base_currency }}
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-success">
+                                <div>{{ vccy }} {{ "{:,.2f}".format(voucher.net_amount) }}</div>
+                                {% if is_foreign %}
+                                <small class="text-muted d-block">
+                                    ≈ {{ base_currency_symbol }}{{ "{:,.2f}".format(voucher.net_amount * vrate) }}
+                                    {{ base_currency }}
+                                </small>
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="badge bg-{{ 'success' if voucher.status == 'Paid' else 'warning' if voucher.status == 'Pending' else 'danger' }}">
                                     {{ voucher.status }}
@@ -60,10 +94,12 @@
                             </td>
                             <td>
                                 <div class="btn-group" role="group">
-                                    <a href="{{ url_for('view_payment_voucher', id=voucher.id) }}" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-eye"></i> View
+                                    <a href="{{ url_for('view_payment_voucher', id=voucher.id) }}"
+                                       class="btn btn-sm btn-primary" title="View">
+                                        <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="{{ url_for('edit_payment_voucher', id=voucher.id) }}" class="btn btn-sm btn-warning">
+                                    <a href="{{ url_for('edit_payment_voucher', id=voucher.id) }}"
+                                       class="btn btn-sm btn-warning" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     <button type="button" class="btn btn-sm btn-danger delete-single"
@@ -77,7 +113,10 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="10" class="text-center">No payment vouchers found. <a href="{{ url_for('add_payment_voucher') }}">Create your first payment voucher</a></td>
+                            <td colspan="10" class="text-center">
+                                No payment vouchers found.
+                                <a href="{{ url_for('add_payment_voucher') }}">Create your first payment voucher</a>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -111,8 +150,8 @@
     </div>
 </div>
 
-<!-- Hidden input for delete URL -->
-<input type="hidden" id="deletePaymentVouchersUrl" value="{{ url_for('delete_payment_vouchers') }}">
+<input type="hidden" id="deletePaymentVouchersUrl"
+       value="{{ url_for('delete_payment_vouchers') }}">
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -131,12 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const checked = document.querySelectorAll('.voucher-checkbox:checked');
         const count = checked.length;
         selectedCount.textContent = count;
-
-        if (count > 0) {
-            bulkActions.style.display = 'block';
-        } else {
-            bulkActions.style.display = 'none';
-        }
+        bulkActions.style.display = count > 0 ? 'block' : 'none';
 
         const total = voucherCheckboxes.length;
         if (total > 0) {
@@ -150,9 +184,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateBulkActions();
     });
 
-    voucherCheckboxes.forEach(cb => {
-        cb.addEventListener('change', updateBulkActions);
-    });
+    voucherCheckboxes.forEach(cb => cb.addEventListener('change', updateBulkActions));
 
     deselectAllBtn.addEventListener('click', function() {
         voucherCheckboxes.forEach(cb => cb.checked = false);
@@ -160,52 +192,41 @@ document.addEventListener('DOMContentLoaded', function() {
         updateBulkActions();
     });
 
-    // Delete Selected
     deleteSelectedBtn.addEventListener('click', function() {
         const checked = document.querySelectorAll('.voucher-checkbox:checked');
         if (checked.length === 0) return;
-
         deleteTargets = Array.from(checked).map(cb => parseInt(cb.dataset.voucherId));
         document.getElementById('deleteMessage').innerHTML =
             `Are you sure you want to delete <strong>${deleteTargets.length}</strong> payment voucher(s)?`;
         deleteModal.show();
     });
 
-    // Single Delete
     document.querySelectorAll('.delete-single').forEach(btn => {
         btn.addEventListener('click', function() {
-            const voucherId = parseInt(this.dataset.voucherId);
-            const voucherNumber = this.dataset.voucherNumber;
-            deleteTargets = [voucherId];
+            deleteTargets = [parseInt(this.dataset.voucherId)];
             document.getElementById('deleteMessage').innerHTML =
-                `Are you sure you want to delete payment voucher <strong>${voucherNumber}</strong>?`;
+                `Are you sure you want to delete payment voucher <strong>${this.dataset.voucherNumber}</strong>?`;
             deleteModal.show();
         });
     });
 
-    // Confirm Delete
     confirmDeleteBtn.addEventListener('click', function() {
-        const voucherIds = deleteTargets;
-        if (voucherIds.length === 0) return;
+        if (deleteTargets.length === 0) return;
 
         fetch(deleteUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ voucher_ids: voucherIds })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ voucher_ids: deleteTargets })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Remove deleted rows
                 if (data.deleted_ids && data.deleted_ids.length > 0) {
                     data.deleted_ids.forEach(id => {
                         const row = document.querySelector(`tr[data-voucher-id="${id}"]`);
                         if (row) row.remove();
                     });
                 }
-
                 deleteModal.hide();
                 updateBulkActions();
                 showAlert('success', data.message || 'Payment vouchers deleted successfully.');
@@ -217,42 +238,27 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error:', error);
             showAlert('danger', 'An error occurred while deleting payment vouchers.');
         })
-        .finally(() => {
-            deleteModal.hide();
-        });
+        .finally(() => deleteModal.hide());
     });
 
     function showAlert(type, message) {
         const alertDiv = document.createElement('div');
         alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
         alertDiv.role = 'alert';
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
+        alertDiv.innerHTML = `${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
         const container = document.querySelector('.container.mt-4');
         container.insertBefore(alertDiv, container.firstChild);
-        setTimeout(() => { alertDiv.remove(); }, 5000);
+        setTimeout(() => alertDiv.remove(), 5000);
     }
 });
 </script>
 
 <style>
-    .voucher-row {
-        transition: background-color 0.3s ease;
-    }
-    .voucher-row:hover {
-        background-color: rgba(0, 123, 255, 0.05);
-    }
-    .voucher-checkbox {
-        cursor: pointer;
-    }
-    #selectAll {
-        cursor: pointer;
-    }
-    #bulk-actions {
-        animation: fadeIn 0.3s ease;
-    }
+    .voucher-row { transition: background-color 0.3s ease; }
+    .voucher-row:hover { background-color: rgba(0, 123, 255, 0.05); }
+    .voucher-checkbox { cursor: pointer; }
+    #selectAll { cursor: pointer; }
+    #bulk-actions { animation: fadeIn 0.3s ease; }
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-10px); }
         to { opacity: 1; transform: translateY(0); }

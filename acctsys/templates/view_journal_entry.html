@@ -4,9 +4,14 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Journal Entry Details</h2>
-        <a href="{{ url_for('journal_entries') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Journal
-        </a>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-info">
+                <i class="fas fa-coins"></i> {{ base_currency }}
+            </span>
+            <a href="{{ url_for('journal_entries') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Journal
+            </a>
+        </div>
     </div>
 
     <div class="card">
@@ -21,8 +26,8 @@
                             <th>Date</th>
                             <th>Account Name</th>
                             <th>Description</th>
-                            <th class="text-end">Debit ($)</th>
-                            <th class="text-end">Credit ($)</th>
+                            <th class="text-end">Debit ({{ base_currency }})</th>
+                            <th class="text-end">Credit ({{ base_currency }})</th>
                             <th>Attachment</th>
                         </tr>
                     </thead>
@@ -34,14 +39,14 @@
                             <td>{{ entry.description }}</td>
                             <td class="text-end text-success">
                                 {% if entry.debit > 0 %}
-                                    ${{ "%.2f"|format(entry.debit) }}
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(entry.debit) }}
                                 {% else %}
                                     -
                                 {% endif %}
                             </td>
                             <td class="text-end text-danger">
                                 {% if entry.credit > 0 %}
-                                    ${{ "%.2f"|format(entry.credit) }}
+                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(entry.credit) }}
                                 {% else %}
                                     -
                                 {% endif %}
@@ -61,8 +66,8 @@
                     <tfoot class="table-warning">
                         <tr>
                             <th colspan="3" class="text-end">Totals:</th>
-                            <th class="text-end">${{ "%.2f"|format(total_debits) }}</th>
-                            <th class="text-end">${{ "%.2f"|format(total_credits) }}</th>
+                            <th class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(total_debits) }}</th>
+                            <th class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(total_credits) }}</th>
                             <th></th>
                         </tr>
                         {% if total_debits == total_credits %}

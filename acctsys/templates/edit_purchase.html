@@ -116,7 +116,7 @@
                                                 </td>
                                                 <td class="text-end line-total">
                                                     {% if line.data %}
-                                                        ${{ "%.2f"|format(line.data.quantity * line.data.unit_price) }}
+                                                        ${{ "{:,.2f}".format(line.data.quantity * line.data.unit_price) }}
                                                     {% else %}
                                                         $0.00
                                                     {% endif %}

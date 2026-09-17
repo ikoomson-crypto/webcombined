@@ -1,49 +1,189 @@
+<!-- acctsys/templates/settings.html -->
 {% extends "base.html" %}
 
 {% block content %}
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-md-10">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0"><i class="fas fa-cog"></i> System Settings</h4>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('save_settings') }}">
+                    <form method="POST" action="{{ url_for('save_settings') }}"
+                          enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
+                        <!-- ========== COMPANY PROFILE ========== -->
                         <div class="mb-4">
-                            <h5 class="text-primary"><i class="fas fa-file-invoice"></i> Accounts Receivable (AR)</h5>
+                            <h5 class="text-primary">
+                                <i class="fas fa-building"></i> Company Profile
+                            </h5>
+                            <p class="text-muted small">
+                                These details appear on invoices, payment vouchers, and reports.
+                            </p>
+
+                            <div class="row">
+                                <!-- Left: text fields -->
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Company Name *</label>
+                                        <input type="text" class="form-control" name="company_name"
+                                               value="{{ company.name }}"
+                                               placeholder="e.g., Kulana Limited" required>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Address</label>
+                                        <textarea class="form-control" name="company_address"
+                                                  rows="3"
+                                                  placeholder="Street, City, Country">{{ company.address }}</textarea>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">Phone</label>
+                                            <input type="text" class="form-control" name="company_phone"
+                                                   value="{{ company.phone }}"
+                                                   placeholder="+233 20 000 0000">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">Email</label>
+                                            <input type="email" class="form-control" name="company_email"
+                                                   value="{{ company.email }}"
+                                                   placeholder="info@company.com">
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">Tax ID / VAT Number</label>
+                                            <input type="text" class="form-control" name="company_tax_id"
+                                                   value="{{ company.tax_id }}"
+                                                   placeholder="e.g., TIN-123456789">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label fw-bold">Website</label>
+                                            <input type="text" class="form-control" name="company_website"
+                                                   value="{{ company.website }}"
+                                                   placeholder="www.company.com">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right: logo -->
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Company Logo</label>
+                                        <div class="border rounded p-3 text-center bg-light"
+                                             style="min-height: 160px;">
+                                            {% if company.logo %}
+                                                <img src="{{ url_for('company_logo') }}"
+                                                     alt="Company Logo"
+                                                     style="max-width: 100%; max-height: 140px; object-fit: contain;">
+                                            {% else %}
+                                                <i class="fas fa-image fa-3x text-muted mb-2"></i>
+                                                <p class="text-muted small mb-0">No logo uploaded</p>
+                                            {% endif %}
+                                        </div>
+                                        <input type="file" class="form-control mt-2"
+                                               name="company_logo_file"
+                                               accept="image/*">
+                                        <small class="text-muted">
+                                            PNG, JPG, SVG, WEBP. Recommended 200×200px.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- ========== BASE CURRENCY ========== -->
+                        <div class="mb-4">
+                            <h5 class="text-primary">
+                                <i class="fas fa-coins"></i> Base Currency
+                            </h5>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">System Base Currency</label>
+                                <select class="form-select" name="base_currency" required>
+                                    {% for code, label in supported_currencies %}
+                                    <option value="{{ code }}"
+                                        {% if settings.base_currency == code %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">
+                                    All reports, trial balances, and summaries will display in this currency.
+                                    Foreign-currency transactions convert using their exchange rate.
+                                </small>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- ========== AR ========== -->
+                        <div class="mb-4">
+                            <h5 class="text-primary">
+                                <i class="fas fa-file-invoice"></i> Accounts Receivable (AR)
+                            </h5>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">AR Account</label>
                                 <select class="form-select" name="ar_account_id" required>
                                     <option value="">Select AR Account</option>
                                     {% for account in asset_accounts %}
-                                    <option value="{{ account.id }}" {% if settings.ar_account_id == account.id %}selected{% endif %}>
+                                    <option value="{{ account.id }}"
+                                        {% if settings.ar_account_id == account.id %}selected{% endif %}>
                                         {{ account.account_code }} - {{ account.account_name }}
+                                        ({{ account.account_type.name }})
                                     </option>
+                                    {% else %}
+                                    <option value="" disabled>⚠ No debit-balance accounts found</option>
                                     {% endfor %}
                                 </select>
-                                <small class="text-muted">Used for the Debit side of invoices</small>
+                                <small class="text-muted">Debited when invoices are posted.</small>
+                                {% if not asset_accounts %}
+                                <div class="alert alert-warning mt-2 mb-0 py-2">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    You haven't created any debit-balance accounts yet.
+                                    <a href="{{ url_for('add_account') }}" class="alert-link">Add one now</a>.
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
 
+                        <!-- ========== AP ========== -->
                         <div class="mb-4">
-                            <h5 class="text-primary"><i class="fas fa-shopping-cart"></i> Accounts Payable (AP)</h5>
+                            <h5 class="text-primary">
+                                <i class="fas fa-shopping-cart"></i> Accounts Payable (AP)
+                            </h5>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">AP Account</label>
                                 <select class="form-select" name="ap_account_id" required>
                                     <option value="">Select AP Account</option>
                                     {% for account in liability_accounts %}
-                                    <option value="{{ account.id }}" {% if settings.ap_account_id == account.id %}selected{% endif %}>
+                                    <option value="{{ account.id }}"
+                                        {% if settings.ap_account_id == account.id %}selected{% endif %}>
                                         {{ account.account_code }} - {{ account.account_name }}
+                                        ({{ account.account_type.name }})
                                     </option>
+                                    {% else %}
+                                    <option value="" disabled>⚠ No credit-balance accounts found</option>
                                     {% endfor %}
                                 </select>
-                                <small class="text-muted">Used for the Credit side of purchases and payment vouchers</small>
+                                <small class="text-muted">Credited for purchases and payment vouchers.</small>
+                                {% if not liability_accounts %}
+                                <div class="alert alert-warning mt-2 mb-0 py-2">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    You haven't created any credit-balance accounts yet.
+                                    <a href="{{ url_for('add_account') }}" class="alert-link">Add one now</a>.
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
 
+                        <!-- ========== BUTTONS ========== -->
                         <div class="d-flex justify-content-between mt-4">
                             <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left"></i> Cancel
