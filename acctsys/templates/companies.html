@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <!-- ===== HEADER ===== -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">
+                {% if create_mode %}
+                    <i class="fas fa-building"></i> New Company
+                {% elif edit_company %}
+                    <i class="fas fa-edit"></i> Edit Company
+                {% elif chooser_mode %}
+                    <i class="fas fa-exchange-alt"></i> Choose a Company
+                {% else %}
+                    <i class="fas fa-building"></i> Companies
+                {% endif %}
+            </h2>
+            <small class="text-muted">
+                Switch between companies or create a new one. Data is isolated per company.
+            </small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            {% if not create_mode and not edit_company %}
+                <a href="{{ url_for('company.create') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> New Company
+                </a>
+            {% endif %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    {% if create_mode or edit_company %}
+    <!-- ===== CREATE / EDIT FORM ===== -->
+    {% set c = edit_company %}
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <strong>{{ 'Edit company' if edit_company else 'Create a new company' }}</strong>
+        </div>
+        <div class="card-body">
+            <form method="POST"
+                  action="{{ url_for('company.edit', company_id=c.id) if c else url_for('company.create') }}">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Company Name *</label>
+                        <input type="text" class="form-control" name="name" required
+                               value="{{ c.name if c else '' }}"
+                               placeholder="e.g., Kulana Limited">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">Code *</label>
+                        <input type="text" class="form-control text-uppercase" name="code" required
+                               value="{{ c.code if c else '' }}"
+                               placeholder="e.g., KLN" maxlength="20">
+                        <small class="text-muted">Short unique identifier.</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">Base Currency</label>
+                        <select class="form-select" name="base_currency">
+                            {% for code, label in supported_currencies %}
+                            <option value="{{ code }}"
+                                {% if (c and c.base_currency == code) or (not c and code == base_currency) %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Tax ID / VAT</label>
+                        <input type="text" class="form-control" name="tax_id"
+                               value="{{ c.tax_id if c else '' }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Phone</label>
+                        <input type="text" class="form-control" name="phone"
+                               value="{{ c.phone if c else '' }}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Email</label>
+                        <input type="email" class="form-control" name="email"
+                               value="{{ c.email if c else '' }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Address</label>
+                        <textarea class="form-control" name="address" rows="1">{{ c.address if c else '' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-2">
+                    <a href="{{ url_for('company.list_companies') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        {{ 'Save Changes' if edit_company else 'Create Company' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- ===== LIST / CHOOSER ===== -->
+    <div class="card">
+        <div class="card-header bg-dark text-white d-flex justify-content-between">
+            <span><strong>Available Companies</strong></span>
+            <span class="small">
+                {% if active_company %}
+                    Currently active: <strong>{{ active_company.name }}</strong>
+                {% else %}
+                    No company selected.
+                {% endif %}
+            </span>
+        </div>
+        <div class="card-body p-0">
+            {% if companies %}
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Base Currency</th>
+                        <th>Tax ID</th>
+                        <th>Status</th>
+                        <th style="width: 260px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in companies %}
+                    <tr class="{% if current_id == c.id %}table-success{% endif %}">
+                        <td><strong>{{ c.code }}</strong></td>
+                        <td>
+                            {{ c.name }}
+                            {% if c.is_default %}
+                                <span class="badge bg-secondary ms-1">Default</span>
+                            {% endif %}
+                            {% if current_id == c.id %}
+                                <span class="badge bg-success ms-1">
+                                    <i class="fas fa-check"></i> Active
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ c.base_currency }}</td>
+                        <td>{{ c.tax_id or '—' }}</td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if c.is_active else 'danger' }}">
+                                {{ 'Active' if c.is_active else 'Inactive' }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+
+                                {# ---------- Switch ---------- #}
+                                {% if current_id != c.id and c.is_active %}
+                                <a href="{{ url_for('company.switch', company_id=c.id) }}"
+                                   class="btn btn-sm btn-primary"
+                                   title="Switch to this company">
+                                    <i class="fas fa-sign-in-alt"></i> Switch
+                                </a>
+                                {% endif %}
+
+                                {# ---------- Edit ---------- #}
+                                <a href="{{ url_for('company.edit', company_id=c.id) }}"
+                                   class="btn btn-sm btn-warning"
+                                   title="Edit company details">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+
+                                {# ---------- Delete (hard) ---------- #}
+                                {% if companies|length > 1 %}
+                                <form method="POST"
+                                      action="{{ url_for('company.delete', company_id=c.id) }}"
+                                      onsubmit="return confirm(
+                                          '⚠️ DELETE COMPANY: {{ c.name|e }}\n\n' +
+                                          'This will PERMANENTLY delete the company and ALL of its data:\n' +
+                                          '  • Invoices and invoice lines\n' +
+                                          '  • Purchases and purchase lines\n' +
+                                          '  • Payment vouchers and lines\n' +
+                                          '  • Journal entries and general ledger\n' +
+                                          '  • Customers and suppliers\n' +
+                                          '  • Chart of accounts and account types\n' +
+                                          '  • Categories and expenses\n\n' +
+                                          'This action CANNOT be undone.\n\n' +
+                                          'Are you absolutely sure?'
+                                      );"
+                                      style="display:inline;">
+                                    <button type="submit"
+                                            class="btn btn-sm btn-danger"
+                                            title="Permanently delete this company and all its data">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <button type="button"
+                                        class="btn btn-sm btn-danger"
+                                        disabled
+                                        title="Cannot delete the last remaining company — create another one first">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                {% endif %}
+
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="alert alert-info m-3 mb-3">
+                <i class="fas fa-info-circle"></i>
+                No companies yet.
+                <a href="{{ url_for('company.create') }}">Create your first company</a>.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if companies and companies|length <= 1 %}
+    <div class="alert alert-warning mt-3">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Only one company exists.</strong>
+        The delete button is disabled because you need at least one company to log in to.
+        <a href="{{ url_for('company.create') }}" class="alert-link">Create another company</a>
+        to enable deletion.
+    </div>
+    {% endif %}
+
+    {% if companies and companies|length > 1 %}
+    <div class="alert alert-danger mt-3">
+        <i class="fas fa-skull-crossbones"></i>
+        <strong>Warning:</strong> Deleting a company is a <strong>permanent, irreversible</strong>
+        action. Every invoice, purchase, payment voucher, journal entry, customer, supplier,
+        and chart-of-accounts record belonging to that company will be removed from the
+        database. There is no undo. Consider exporting your data first via the
+        <a href="{{ url_for('reports') }}" class="alert-link">Reports</a> section.
+    </div>
+    {% endif %}
+
+    {% endif %}
+
+</div>
+{% endblock %}

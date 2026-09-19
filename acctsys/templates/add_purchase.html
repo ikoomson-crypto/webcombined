@@ -5,8 +5,11 @@
     <div class="row justify-content-center">
         <div class="col-md-12">
             <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h4 class="mb-0"><i class="fas fa-shopping-cart"></i> Add Purchase</h4>
+                    <span class="badge bg-light text-dark">
+                        <i class="fas fa-coins"></i> {{ base_currency }}
+                    </span>
                 </div>
                 <div class="card-body">
                     <form method="POST" id="purchaseForm">
@@ -69,7 +72,12 @@
                         <!-- ========== LINE ITEMS TABLE ========== -->
                         <div class="card mt-4">
                             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                                <span><i class="fas fa-list"></i> Line Items</span>
+                                <span>
+                                    <i class="fas fa-list"></i> Line Items
+                                    <span class="badge bg-light text-dark ms-2">
+                                        <i class="fas fa-coins"></i> {{ base_currency }}
+                                    </span>
+                                </span>
                                 <button type="button" class="btn btn-light btn-sm" id="addLineBtn">
                                     <i class="fas fa-plus"></i> Add Line
                                 </button>
@@ -81,9 +89,9 @@
                                             <tr>
                                                 <th style="width: 30%;">Description</th>
                                                 <th style="width: 12%;">Qty</th>
-                                                <th style="width: 15%;">Unit Price</th>
+                                                <th style="width: 15%;">Unit Price ({{ base_currency }})</th>
                                                 <th style="width: 23%;">Account</th>
-                                                <th style="width: 15%;">Total</th>
+                                                <th style="width: 15%;">Total ({{ base_currency }})</th>
                                                 <th style="width: 5%;">Actions</th>
                                             </tr>
                                         </thead>
@@ -117,7 +125,9 @@
                                                         {% endfor %}
                                                     </select>
                                                 </td>
-                                                <td class="text-end line-total">$0.00</td>
+                                                <td class="text-end line-total">
+                                                    {{ base_currency_symbol }}0.00
+                                                </td>
                                                 <td class="text-center">
                                                     <button type="button" class="btn btn-sm btn-danger remove-line-btn" {% if loop.index == 1 %}disabled{% endif %}>
                                                         <i class="fas fa-times"></i>
@@ -128,8 +138,12 @@
                                         </tbody>
                                         <tfoot>
                                             <tr class="table-info">
-                                                <td colspan="4" class="text-end fw-bold">Grand Total:</td>
-                                                <td class="text-end fw-bold" id="grandTotal">$0.00</td>
+                                                <td colspan="4" class="text-end fw-bold">
+                                                    Grand Total ({{ base_currency }}):
+                                                </td>
+                                                <td class="text-end fw-bold" id="grandTotal">
+                                                    {{ base_currency_symbol }}0.00
+                                                </td>
                                                 <td></td>
                                             </tr>
                                         </tfoot>
@@ -158,12 +172,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const addLineBtn = document.getElementById('addLineBtn');
     const grandTotalEl = document.getElementById('grandTotal');
 
+    // ✅ Currency symbol injected from the server
+    const CURRENCY_SYMBOL = "{{ base_currency_symbol }}";
+
     // ========== CALCULATE LINE TOTAL ==========
     function calculateLineTotal(row) {
         const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
         const price = parseFloat(row.querySelector('.price-input').value) || 0;
         const total = qty * price;
-        row.querySelector('.line-total').textContent = `$${total.toFixed(2)}`;
+        row.querySelector('.line-total').textContent =
+            `${CURRENCY_SYMBOL}${total.toFixed(2)}`;
         return total;
     }
 
@@ -173,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.line-row').forEach(row => {
             grandTotal += calculateLineTotal(row);
         });
-        grandTotalEl.textContent = `$${grandTotal.toFixed(2)}`;
+        grandTotalEl.textContent = `${CURRENCY_SYMBOL}${grandTotal.toFixed(2)}`;
     }
 
     // ========== ADD NEW LINE ROW ==========
@@ -202,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     ${accountOptions}
                 </select>
             </td>
-            <td class="text-end line-total">$0.00</td>
+            <td class="text-end line-total">${CURRENCY_SYMBOL}0.00</td>
             <td class="text-center">
                 <button type="button" class="btn btn-sm btn-danger remove-line-btn">
                     <i class="fas fa-times"></i>

@@ -2,36 +2,52 @@
 
 {% block content %}
 <div class="container mt-4">
+
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Balance Sheet</h2>
+        <div>
+            <h2 class="mb-0">Statement of Financial Position</h2>
+            <small class="text-muted">Balance Sheet &mdash; prepared under IFRS principles</small>
+        </div>
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-info fs-6">
-                <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+                <i class="fas fa-coins"></i> {{ base_currency }}
             </span>
-            <a href="{{ url_for('balance_sheet_pdf', as_of_date=as_of_date.strftime('%Y-%m-%d')) }}"
-               class="btn btn-danger">
-                <i class="fas fa-file-pdf"></i> PDF
-            </a>
-            <a href="{{ url_for('balance_sheet_excel', as_of_date=as_of_date.strftime('%Y-%m-%d')) }}"
-               class="btn btn-success">
-                <i class="fas fa-file-excel"></i> Excel
-            </a>
+            <a href="{{ url_for('balance_sheet_pdf',
+                                 as_of_date=as_of_date.strftime('%Y-%m-%d'),
+                                 compare='on' if compare else 'off') }}"
+               class="btn btn-danger"><i class="fas fa-file-pdf"></i> PDF</a>
+            <a href="{{ url_for('balance_sheet_excel',
+                                 as_of_date=as_of_date.strftime('%Y-%m-%d'),
+                                 compare='on' if compare else 'off') }}"
+               class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <a href="{{ url_for('reports') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>
     </div>
 
-    <!-- ========== AS-OF DATE FILTER ========== -->
+    <!-- ===== FILTER ===== -->
     <div class="card mb-4">
         <div class="card-body">
             <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-6">
+                <input type="hidden" name="compare" value="off">
+                <div class="col-md-4">
                     <label class="form-label fw-bold">As of Date</label>
                     <input type="date" class="form-control" name="as_of_date"
                            value="{{ as_of_date.strftime('%Y-%m-%d') }}">
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold d-block">Comparative</label>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox"
+                               id="compareSwitch" name="compare" value="on"
+                               {% if compare %}checked{% endif %}>
+                        <label class="form-check-label" for="compareSwitch">
+                            Show prior-year column
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-4">
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="fas fa-filter"></i> Apply
                     </button>
@@ -40,212 +56,288 @@
         </div>
     </div>
 
-    <!-- ========== ASSETS + LIABILITIES/EQUITY ========== -->
-    <div class="row">
-        <!-- ---------- ASSETS ---------- -->
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-wallet"></i> ASSETS
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <table class="table table-bordered mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 20%;">Code</th>
-                                <th style="width: 55%;">Account</th>
-                                <th class="text-end" style="width: 25%;">
-                                    Amount ({{ base_currency }})
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for line in asset_lines %}
-                            <tr>
-                                <td>{{ line.code }}</td>
-                                <td>{{ line.name }}</td>
-                                <td class="text-end">
-                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center text-muted">
-                                    No assets recorded
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot>
-                            <tr class="table-primary">
-                                <td colspan="2" class="text-end">
-                                    <strong>Total Assets</strong>
-                                </td>
-                                <td class="text-end">
-                                    <strong>
-                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(total_assets) }}
-                                    </strong>
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
+    <!-- ===== STATEMENT ===== -->
+    <div class="card">
+        <div class="card-header bg-dark text-white d-flex justify-content-between">
+            <span>
+                <strong>{{ company.name }}</strong>
+                {% if company.address %}
+                    <br><small class="text-white-50">{{ company.address }}</small>
+                {% endif %}
+            </span>
+            <div class="text-end">
+                <div><strong>Statement of Financial Position</strong></div>
+                <small class="text-white-50">
+                    As of {{ as_of_date.strftime('%d %b %Y') }}
+                    {% if compare %}
+                        &nbsp;·&nbsp; Comparative: {{ prior_date.strftime('%d %b %Y') }}
+                    {% endif %}
+                </small>
             </div>
         </div>
 
-        <!-- ---------- LIABILITIES + EQUITY ---------- -->
-        <div class="col-md-6">
-            <!-- Liabilities -->
-            <div class="card mb-4">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">
-                        <i class="fas fa-hand-holding-usd"></i> LIABILITIES
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <table class="table table-bordered mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 20%;">Code</th>
-                                <th style="width: 55%;">Account</th>
-                                <th class="text-end" style="width: 25%;">
-                                    Amount ({{ base_currency }})
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for line in liability_lines %}
-                            <tr>
-                                <td>{{ line.code }}</td>
-                                <td>{{ line.name }}</td>
-                                <td class="text-end">
-                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center text-muted">
-                                    No liabilities recorded
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                        <tfoot>
-                            <tr class="table-danger">
-                                <td colspan="2" class="text-end">
-                                    <strong>Total Liabilities</strong>
-                                </td>
-                                <td class="text-end">
-                                    <strong>
-                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities) }}
-                                    </strong>
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
+        <div class="card-body p-0">
+            <table class="table table-bordered mb-0 ifrs-table">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: {{ '55%' if compare else '70%' }};">Description</th>
+                        <th class="text-end" style="width: {{ '22.5%' if compare else '30%' }};">
+                            {{ as_of_date.strftime('%d %b %Y') }}<br>
+                            <small class="text-muted">{{ base_currency }}</small>
+                        </th>
+                        {% if compare %}
+                        <th class="text-end" style="width: 22.5%;">
+                            {{ prior_date.strftime('%d %b %Y') }}<br>
+                            <small class="text-muted">{{ base_currency }}</small>
+                        </th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- ============ ASSETS ============ -->
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>ASSETS</strong></td>
+                    </tr>
 
-            <!-- Equity -->
-            <div class="card mb-4">
-                <div class="card-header text-white" style="background-color:#8e44ad;">
-                    <h5 class="mb-0">
-                        <i class="fas fa-landmark"></i> EQUITY
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <table class="table table-bordered mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th style="width: 20%;">Code</th>
-                                <th style="width: 55%;">Account</th>
-                                <th class="text-end" style="width: 25%;">
-                                    Amount ({{ base_currency }})
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for line in equity_lines %}
-                            <tr>
-                                <td>{{ line.code }}</td>
-                                <td>{{ line.name }}</td>
-                                <td class="text-end">
-                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            <tr>
-                                <td>—</td>
-                                <td>
-                                    Retained Earnings
-                                    <small class="text-muted d-block">
-                                        Cumulative net profit (Revenue − Expenses)
-                                    </small>
-                                </td>
-                                <td class="text-end">
-                                    {{ base_currency_symbol }}{{ "{:,.2f}".format(retained_earnings) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                        <tfoot>
-                            <tr style="background-color:#f4ecf7;">
-                                <td colspan="2" class="text-end">
-                                    <strong>Total Equity</strong>
-                                </td>
-                                <td class="text-end">
-                                    <strong>
-                                        {{ base_currency_symbol }}{{ "{:,.2f}".format(total_equity) }}
-                                    </strong>
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
+                    <tr class="ifrs-subhead">
+                        <td colspan="{{ 3 if compare else 2 }}"><em>Non-current assets</em></td>
+                    </tr>
+                    {% for line in current.non_current_assets %}
+                    <tr>
+                        <td class="ifrs-indent-2">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.non_current_assets|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}{{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}{% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="ifrs-subtotal">
+                        <td class="ifrs-indent-1"><strong>Total non-current assets</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_non_current_assets) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_non_current_assets) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <tr class="ifrs-subhead">
+                        <td colspan="{{ 3 if compare else 2 }}"><em>Current assets</em></td>
+                    </tr>
+                    {% for line in current.current_assets %}
+                    <tr>
+                        <td class="ifrs-indent-2">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.current_assets|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}{{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}{% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="ifrs-subtotal">
+                        <td class="ifrs-indent-1"><strong>Total current assets</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_current_assets) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_current_assets) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <tr class="ifrs-total">
+                        <td><strong>TOTAL ASSETS</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_assets) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_assets) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <tr><td colspan="{{ 3 if compare else 2 }}" style="height: 12px; background: #fafafa;"></td></tr>
+
+                    <!-- ============ EQUITY ============ -->
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>EQUITY</strong></td>
+                    </tr>
+                    {% for line in current.equity_lines %}
+                    <tr>
+                        <td class="ifrs-indent-1">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.equity_lines|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}{{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}{% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <td class="ifrs-indent-1">Retained earnings</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(current.retained_earnings) }}</td>
+                        {% if compare %}
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.retained_earnings) }}</td>
+                        {% endif %}
+                    </tr>
+                    <tr class="ifrs-subtotal">
+                        <td><strong>Total equity</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_equity) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_equity) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <!-- ============ LIABILITIES ============ -->
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>LIABILITIES</strong></td>
+                    </tr>
+
+                    <tr class="ifrs-subhead">
+                        <td colspan="{{ 3 if compare else 2 }}"><em>Non-current liabilities</em></td>
+                    </tr>
+                    {% for line in current.non_current_liabilities %}
+                    <tr>
+                        <td class="ifrs-indent-2">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.non_current_liabilities|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}{{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}{% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="ifrs-subtotal">
+                        <td class="ifrs-indent-1"><strong>Total non-current liabilities</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_non_current_liabilities) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_non_current_liabilities) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <tr class="ifrs-subhead">
+                        <td colspan="{{ 3 if compare else 2 }}"><em>Current liabilities</em></td>
+                    </tr>
+                    {% for line in current.current_liabilities %}
+                    <tr>
+                        <td class="ifrs-indent-2">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.current_liabilities|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}{{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}{% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="ifrs-subtotal">
+                        <td class="ifrs-indent-1"><strong>Total current liabilities</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_current_liabilities) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_current_liabilities) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <tr class="ifrs-subtotal">
+                        <td><strong>Total liabilities</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_liabilities) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_liabilities) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <tr class="ifrs-total">
+                        <td><strong>TOTAL EQUITY AND LIABILITIES</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_liab_eq) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_liab_eq) }}</strong></td>
+                        {% endif %}
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <!-- ========== SUMMARY / BALANCE CHECK ========== -->
-    <div class="row mt-2">
-        <div class="col-md-6 offset-md-6">
-            <table class="table table-bordered">
-                <tfoot>
-                    <tr class="table-info">
-                        <th class="text-end">Total Liabilities + Equity</th>
-                        <th class="text-end">
-                            {{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities_and_equity) }}
-                        </th>
-                    </tr>
-                </tfoot>
-            </table>
-
+    <!-- ===== KPIs + BALANCE CHECK ===== -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">Key Figures</div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tr>
+                            <td>Working capital (CA − CL)</td>
+                            <td class="text-end fw-bold">{{ base_currency_symbol }}{{ "{:,.2f}".format(working_capital) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Current ratio</td>
+                            <td class="text-end fw-bold">
+                                {{ "%.2f"|format(current.total_current_assets / current.total_current_liabilities) if current.total_current_liabilities else "n/a" }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Equity ratio (Equity / Total Assets)</td>
+                            <td class="text-end fw-bold">
+                                {{ "%.2f%%"|format(100 * current.total_equity / current.total_assets) if current.total_assets else "n/a" }}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
             {% if is_balanced %}
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle"></i>
-                <strong>Balance Sheet is balanced.</strong>
-                Assets ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_assets) }}) =
-                Liabilities + Equity ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities_and_equity) }})
+            <div class="alert alert-success h-100 mb-0 d-flex align-items-center">
+                <div>
+                    <i class="fas fa-check-circle fa-2x me-2"></i>
+                    <strong>Balanced.</strong>
+                    Assets ({{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_assets) }})
+                    = Equity + Liabilities
+                    ({{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_liab_eq) }}).
+                </div>
             </div>
             {% else %}
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-triangle"></i>
-                <strong>Out of balance by
-                    {{ base_currency_symbol }}{{ "{:,.2f}".format(difference|abs) }}</strong>.
-                Assets ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_assets) }}) ≠
-                Liabilities + Equity ({{ base_currency_symbol }}{{ "{:,.2f}".format(total_liabilities_and_equity) }}).
-                Check your journal entries.
+            <div class="alert alert-danger h-100 mb-0 d-flex align-items-center">
+                <div>
+                    <i class="fas fa-exclamation-triangle fa-2x me-2"></i>
+                    <strong>Out of balance by
+                        {{ base_currency_symbol }}{{ "{:,.2f}".format(difference|abs) }}</strong>.
+                    Check journal entries.
+                </div>
             </div>
             {% endif %}
         </div>
     </div>
 
-    <div class="alert alert-info">
+    <div class="alert alert-info mt-3">
         <i class="fas fa-info-circle"></i>
-        <strong>Accounting Equation:</strong> Assets = Liabilities + Equity.
-        Retained Earnings reflect cumulative net profit (Revenue − Expenses) up to the selected date.
-        All amounts shown in <strong>{{ base_currency }}</strong>.
+        <strong>IFRS presentation notes:</strong>
+        Assets and liabilities are classified as current vs non-current.
+        Accounts whose type contains <em>"current"</em> are shown as current;
+        others appear under non-current. Retained earnings are presented separately
+        from contributed equity.
+        {% if compare %}
+            Comparative figures are the same date one year earlier.
+        {% else %}
+            Comparatives are hidden.
+        {% endif %}
+        All amounts in <strong>{{ base_currency }}</strong>.
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .ifrs-table td, .ifrs-table th { vertical-align: middle; }
+    .ifrs-section { background: #2c3e50; color: #fff; }
+    .ifrs-section td { padding: 8px 12px !important; letter-spacing: 0.5px; }
+    .ifrs-subhead td { background: #ecf0f1; font-style: italic; padding-left: 20px !important; }
+    .ifrs-subtotal td { background: #f4f6f8; }
+    .ifrs-total td {
+        background: #d6eaf8;
+        border-top: 2px solid #2c3e50 !important;
+        border-bottom: 3px double #2c3e50 !important;
+    }
+    .ifrs-indent-1 { padding-left: 24px !important; }
+    .ifrs-indent-2 { padding-left: 42px !important; }
+</style>
 {% endblock %}

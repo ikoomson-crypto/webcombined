@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="card">
+        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">
+                <i class="fas fa-edit"></i> Edit Journal Entry — {{ entry_number }}
+                <span class="badge bg-dark ms-2">
+                    <i class="fas fa-coins"></i> {{ base_currency }}
+                </span>
+            </h4>
+            <div>
+                <button type="button" class="btn btn-light btn-sm" id="add-row">
+                    <i class="fas fa-plus"></i> Add Row
+                </button>
+                <a href="{{ url_for('view_journal_entry', entry_number=entry_number) }}"
+                   class="btn btn-secondary btn-sm">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Editing entry {{ entry_number }}.</strong>
+                Saving will reverse the old General Ledger postings and re-post the new ones.
+            </div>
+
+            <form method="POST" enctype="multipart/form-data" id="journalForm">
+                <input type="hidden" name="entry_count" id="entry_count"
+                       value="{{ entries|length if entries else 1 }}">
+
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="min-width: 120px;">Date</th>
+                                <th style="min-width: 200px;">Description</th>
+                                <th style="min-width: 200px;">Account (Dr)</th>
+                                <th style="min-width: 200px;">Account (Cr)</th>
+                                <th style="min-width: 120px;">Amount ({{ base_currency }})</th>
+                                <th style="min-width: 180px;">Attach File</th>
+                                <th style="width: 70px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entries-body">
+                            {% for i in range(entries|length if entries else 1) %}
+                            {% set e = entries[i] if i < entries|length else None %}
+                            <tr class="journal-row">
+                                <td>
+                                    <input type="date" name="entries-{{ i }}-date"
+                                           class="form-control form-control-sm"
+                                           value="{{ e.date.strftime('%Y-%m-%d') if e else datetime.now().strftime('%Y-%m-%d') }}"
+                                           required>
+                                </td>
+                                <td>
+                                    <textarea name="entries-{{ i }}-description"
+                                              class="form-control form-control-sm"
+                                              rows="2"
+                                              placeholder="Enter description...">{{ e.description if e else '' }}</textarea>
+                                </td>
+                                <td>
+                                    <select name="entries-{{ i }}-debit_account"
+                                            class="form-select form-select-sm" required>
+                                        <option value="">Select Debit Account</option>
+                                        {% for account in accounts %}
+                                        <option value="{{ account.id }}"
+                                            {% if e and e.debit_account_id == account.id %}selected{% endif %}>
+                                            {{ account.account_code }} - {{ account.account_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="entries-{{ i }}-credit_account"
+                                            class="form-select form-select-sm" required>
+                                        <option value="">Select Credit Account</option>
+                                        {% for account in accounts %}
+                                        <option value="{{ account.id }}"
+                                            {% if e and e.credit_account_id == account.id %}selected{% endif %}>
+                                            {{ account.account_code }} - {{ account.account_name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" name="entries-{{ i }}-amount"
+                                           class="form-control form-control-sm amount-input"
+                                           step="0.01" min="0"
+                                           value="{{ '%.2f'|format(e.amount) if e else '0.00' }}"
+                                           required>
+                                </td>
+                                <td>
+                                    <input type="file" name="entries-{{ i }}-attachment"
+                                           class="form-control form-control-sm"
+                                           accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                                    {% if e and e.attachment_original_name %}
+                                    <small class="text-muted d-block">
+                                        Current: <em>{{ e.attachment_original_name }}</em>
+                                    </small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if i > 0 %}
+                                    <button type="button" class="btn btn-sm btn-danger remove-row">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-info">
+                                <td colspan="4" class="text-end"><strong>Total Amount ({{ base_currency }}):</strong></td>
+                                <td colspan="3">
+                                    <strong id="total-amount">{{ base_currency_symbol }}0.00</strong>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <a href="{{ url_for('journal_entries') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Journal
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let rowCount = {{ entries|length if entries else 1 }};
+
+    // ✅ Currency symbol injected from the server
+    const CURRENCY_SYMBOL = "{{ base_currency_symbol }}";
+
+    function calculateTotal() {
+        let total = 0;
+        document.querySelectorAll('.amount-input').forEach(i => {
+            total += parseFloat(i.value) || 0;
+        });
+        document.getElementById('total-amount').innerHTML =
+            `${CURRENCY_SYMBOL}${total.toFixed(2)}`;
+    }
+
+    document.querySelectorAll('.amount-input').forEach(i => {
+        i.addEventListener('input', calculateTotal);
+    });
+    calculateTotal();
+
+    document.getElementById('add-row').addEventListener('click', function() {
+        const tbody = document.getElementById('entries-body');
+        const idx = rowCount;
+
+        let accountOptions = '<option value="">Select Account</option>';
+        {% for account in accounts %}
+        accountOptions += '<option value="{{ account.id }}">{{ account.account_code }} - {{ account.account_name }}</option>';
+        {% endfor %}
+
+        const row = document.createElement('tr');
+        row.className = 'journal-row';
+        row.innerHTML = `
+            <td><input type="date" name="entries-${idx}-date" class="form-control form-control-sm"
+                       value="${new Date().toISOString().split('T')[0]}" required></td>
+            <td><textarea name="entries-${idx}-description" class="form-control form-control-sm"
+                          rows="2" placeholder="Enter description..."></textarea></td>
+            <td><select name="entries-${idx}-debit_account" class="form-select form-select-sm" required>
+                ${accountOptions}</select></td>
+            <td><select name="entries-${idx}-credit_account" class="form-select form-select-sm" required>
+                ${accountOptions}</select></td>
+            <td><input type="number" name="entries-${idx}-amount" class="form-control form-control-sm amount-input"
+                       step="0.01" min="0" value="0.00" required></td>
+            <td><input type="file" name="entries-${idx}-attachment" class="form-control form-control-sm"
+                       accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"></td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-danger remove-row">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+        rowCount++;
+        document.getElementById('entry_count').value = rowCount;
+        row.querySelector('.amount-input').addEventListener('input', calculateTotal);
+        row.querySelector('.remove-row').addEventListener('click', function() {
+            row.remove();
+            calculateTotal();
+        });
+        calculateTotal();
+    });
+
+    document.querySelectorAll('.remove-row').forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.closest('tr').remove();
+            calculateTotal();
+        });
+    });
+});
+</script>
+{% endblock %}

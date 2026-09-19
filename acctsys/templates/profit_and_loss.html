@@ -2,178 +2,358 @@
 
 {% block content %}
 <div class="container mt-4">
+
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Profit &amp; Loss Statement</h2>
+        <div>
+            <h2 class="mb-0">Statement of Profit or Loss</h2>
+            <small class="text-muted">Prepared under IFRS principles</small>
+        </div>
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-info fs-6">
-                <i class="fas fa-coins"></i> Base Currency: {{ base_currency }}
+                <i class="fas fa-coins"></i> {{ base_currency }}
             </span>
             <a href="{{ url_for('profit_and_loss_pdf',
                                  start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
-                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '') }}"
-               class="btn btn-danger">
-                <i class="fas fa-file-pdf"></i> PDF
-            </a>
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '',
+                                 compare='on' if compare else 'off') }}"
+               class="btn btn-danger"><i class="fas fa-file-pdf"></i> PDF</a>
             <a href="{{ url_for('profit_and_loss_excel',
                                  start_date=start_date.strftime('%Y-%m-%d') if start_date else '',
-                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '') }}"
-               class="btn btn-success">
-                <i class="fas fa-file-excel"></i> Excel
-            </a>
+                                 end_date=end_date.strftime('%Y-%m-%d') if end_date else '',
+                                 compare='on' if compare else 'off') }}"
+               class="btn btn-success"><i class="fas fa-file-excel"></i> Excel</a>
             <a href="{{ url_for('reports') }}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back
             </a>
         </div>
     </div>
 
-    <!-- ========== DATE RANGE FILTER ========== -->
+    <!-- ===== FILTER ===== -->
     <div class="card mb-4">
         <div class="card-body">
             <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-4">
+                <input type="hidden" name="compare" value="off">
+                <div class="col-md-3">
                     <label class="form-label fw-bold">Start Date</label>
                     <input type="date" class="form-control" name="start_date"
                            value="{{ start_date.strftime('%Y-%m-%d') if start_date else '' }}">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label fw-bold">End Date</label>
                     <input type="date" class="form-control" name="end_date"
                            value="{{ end_date.strftime('%Y-%m-%d') if end_date else '' }}">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold d-block">Comparative</label>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox"
+                               id="compareSwitch" name="compare" value="on"
+                               {% if compare %}checked{% endif %}>
+                        <label class="form-check-label" for="compareSwitch">
+                            Show prior-period column
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-3">
                     <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter"></i> Apply Filter
+                        <i class="fas fa-filter"></i> Apply
                     </button>
                 </div>
             </form>
             <div class="mt-2 small text-muted">
                 <i class="fas fa-info-circle"></i>
-                Leave both dates blank to include <strong>all activity</strong>.
+                Leave both dates blank to default to <strong>year-to-date</strong>.
+                Prior-period comparative = same window one year earlier.
             </div>
         </div>
     </div>
 
-    <!-- ========== QUICK PERIOD BUTTONS ========== -->
+    <!-- ===== QUICK FILTERS ===== -->
     <div class="mb-3">
         <span class="text-muted small me-2">Quick filters:</span>
-        <a href="{{ url_for('profit_and_loss') }}"
-           class="btn btn-sm btn-outline-secondary">
-            <i class="fas fa-infinity"></i> All Time
-        </a>
         <a href="{{ url_for('profit_and_loss',
                              start_date=(datetime.now().replace(day=1)).strftime('%Y-%m-%d'),
-                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+                             end_date=datetime.now().strftime('%Y-%m-%d'),
+                             compare='on' if compare else 'off') }}"
            class="btn btn-sm btn-outline-secondary">
             <i class="fas fa-calendar-alt"></i> This Month
         </a>
         <a href="{{ url_for('profit_and_loss',
                              start_date=(datetime.now().replace(month=1, day=1)).strftime('%Y-%m-%d'),
-                             end_date=datetime.now().strftime('%Y-%m-%d')) }}"
+                             end_date=datetime.now().strftime('%Y-%m-%d'),
+                             compare='on' if compare else 'off') }}"
            class="btn btn-sm btn-outline-secondary">
             <i class="fas fa-calendar-check"></i> Year to Date
         </a>
+        <a href="{{ url_for('profit_and_loss',
+                             start_date=(datetime.now().replace(month=1, day=1)).replace(year=datetime.now().year - 1).strftime('%Y-%m-%d'),
+                             end_date=datetime.now().strftime('%Y-%m-%d').replace(str(datetime.now().year), str(datetime.now().year - 1)),
+                             compare='on' if compare else 'off') }}"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-history"></i> Prior Year
+        </a>
     </div>
 
-    <!-- ========== REPORT TABLE ========== -->
-    <div class="card mb-4">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
-                <i class="fas fa-chart-line"></i> Statement of Profit or Loss
-            </h5>
-            <small>All amounts in {{ base_currency }}</small>
+    <!-- ===== STATEMENT ===== -->
+    <div class="card">
+        <div class="card-header bg-dark text-white d-flex justify-content-between">
+            <span><strong>{{ company.name }}</strong></span>
+            <div class="text-end">
+                <div><strong>Statement of Profit or Loss</strong></div>
+                <small class="text-white-50">
+                    For the period {{ start_date.strftime('%d %b %Y') }} &ndash;
+                    {{ end_date.strftime('%d %b %Y') }}
+                    {% if compare %}
+                        &nbsp;·&nbsp; Comparative: {{ prior_start.strftime('%d %b %Y') }} &ndash;
+                        {{ prior_end.strftime('%d %b %Y') }}
+                    {% endif %}
+                </small>
+            </div>
         </div>
+
         <div class="card-body p-0">
-            <table class="table table-bordered mb-0">
+            <table class="table table-bordered mb-0 ifrs-table">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 15%;">Code</th>
-                        <th style="width: 65%;">Account</th>
-                        <th class="text-end" style="width: 20%;">
-                            Amount ({{ base_currency }})
+                        <th style="width: {{ '55%' if compare else '70%' }};">Description</th>
+                        <th class="text-end" style="width: {{ '22.5%' if compare else '30%' }};">
+                            Current period<br>
+                            <small class="text-muted">{{ base_currency }}</small>
                         </th>
+                        {% if compare %}
+                        <th class="text-end" style="width: 22.5%;">
+                            Prior period<br>
+                            <small class="text-muted">{{ base_currency }}</small>
+                        </th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- ========== REVENUE ========== -->
-                    <tr class="table-primary">
-                        <td colspan="3">
-                            <strong><i class="fas fa-arrow-up"></i> REVENUE</strong>
-                        </td>
+                    <!-- ============ REVENUE ============ -->
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>REVENUE</strong></td>
                     </tr>
-                    {% for line in revenue_lines %}
+                    {% for line in current.revenue %}
                     <tr>
-                        <td>{{ line.account_code }}</td>
-                        <td>{{ line.account_name }}</td>
-                        <td class="text-end text-success">
-                            {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
+                        <td class="ifrs-indent-1">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">{{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.revenue|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}{{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}{% else %}—{% endif %}
                         </td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="3" class="text-center text-muted">
-                            No revenue recorded for this period
+                        <td colspan="{{ 3 if compare else 2 }}" class="text-center text-muted">
+                            No revenue recorded
                         </td>
                     </tr>
                     {% endfor %}
-                    <tr class="table-success">
-                        <td colspan="2" class="text-end"><strong>Total Revenue</strong></td>
-                        <td class="text-end">
-                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(total_revenue) }}</strong>
-                        </td>
+                    <tr class="ifrs-subtotal">
+                        <td><strong>Total revenue</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_revenue) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_revenue) }}</strong></td>
+                        {% endif %}
                     </tr>
 
-                    <!-- ========== EXPENSES ========== -->
-                    <tr class="table-warning">
-                        <td colspan="3">
-                            <strong><i class="fas fa-arrow-down"></i> EXPENSES</strong>
-                        </td>
+                    <!-- ============ COST OF SALES ============ -->
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>COST OF SALES</strong></td>
                     </tr>
-                    {% for line in expense_lines %}
+                    {% for line in current.cost_of_sales %}
                     <tr>
-                        <td>{{ line.account_code }}</td>
-                        <td>{{ line.account_name }}</td>
-                        <td class="text-end text-danger">
-                            {{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }}
+                        <td class="ifrs-indent-1">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">({{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }})</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.cost_of_sales|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}({{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}){% else %}—{% endif %}
                         </td>
+                        {% endif %}
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="3" class="text-center text-muted">
-                            No expenses recorded for this period
+                        <td colspan="{{ 3 if compare else 2 }}" class="text-center text-muted">
+                            No cost of sales recorded
                         </td>
                     </tr>
                     {% endfor %}
-                    <tr class="table-danger">
-                        <td colspan="2" class="text-end"><strong>Total Expenses</strong></td>
+                    <tr class="ifrs-subtotal">
+                        <td><strong>Total cost of sales</strong></td>
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_cos) }})</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_cos) }})</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <!-- ============ GROSS PROFIT ============ -->
+                    <tr class="ifrs-subtotal">
+                        <td><strong>GROSS PROFIT</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.gross_profit) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.gross_profit) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <!-- ============ OPERATING EXPENSES ============ -->
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>OPERATING EXPENSES</strong></td>
+                    </tr>
+                    {% for line in current.operating_expenses %}
+                    <tr>
+                        <td class="ifrs-indent-1">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">({{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }})</td>
+                        {% if compare %}
                         <td class="text-end">
-                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(total_expenses) }}</strong>
+                            {% set p = prior.operating_expenses|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}({{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}){% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="{{ 3 if compare else 2 }}" class="text-center text-muted">
+                            No operating expenses recorded
                         </td>
                     </tr>
+                    {% endfor %}
+                    <tr class="ifrs-subtotal">
+                        <td><strong>Total operating expenses</strong></td>
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_opex) }})</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_opex) }})</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <!-- ============ OPERATING PROFIT ============ -->
+                    <tr class="ifrs-subtotal">
+                        <td><strong>OPERATING PROFIT</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.operating_profit) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.operating_profit) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <!-- ============ FINANCE COSTS ============ -->
+                    {% if current.finance_costs or current.total_finance %}
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>FINANCE COSTS</strong></td>
+                    </tr>
+                    {% for line in current.finance_costs %}
+                    <tr>
+                        <td class="ifrs-indent-1">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">({{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }})</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.finance_costs|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}({{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}){% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="ifrs-subtotal">
+                        <td><strong>Total finance costs</strong></td>
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_finance) }})</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_finance) }})</strong></td>
+                        {% endif %}
+                    </tr>
+                    {% endif %}
+
+                    <!-- ============ PROFIT BEFORE TAX ============ -->
+                    <tr class="ifrs-subtotal">
+                        <td><strong>PROFIT BEFORE TAX</strong></td>
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.profit_before_tax) }}</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.profit_before_tax) }}</strong></td>
+                        {% endif %}
+                    </tr>
+
+                    <!-- ============ TAX ============ -->
+                    {% if current.tax or current.total_tax %}
+                    <tr class="ifrs-section">
+                        <td colspan="{{ 3 if compare else 2 }}"><strong>INCOME TAX EXPENSE</strong></td>
+                    </tr>
+                    {% for line in current.tax %}
+                    <tr>
+                        <td class="ifrs-indent-1">{{ line.code }} &mdash; {{ line.name }}</td>
+                        <td class="text-end">({{ base_currency_symbol }}{{ "{:,.2f}".format(line.amount) }})</td>
+                        {% if compare %}
+                        <td class="text-end">
+                            {% set p = prior.tax|selectattr('code','equalto',line.code)|first %}
+                            {% if p %}({{ base_currency_symbol }}{{ "{:,.2f}".format(p.amount) }}){% else %}—{% endif %}
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="ifrs-subtotal">
+                        <td><strong>Total tax</strong></td>
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(current.total_tax) }})</strong></td>
+                        {% if compare %}
+                        <td class="text-end"><strong>({{ base_currency_symbol }}{{ "{:,.2f}".format(prior.total_tax) }})</strong></td>
+                        {% endif %}
+                    </tr>
+                    {% endif %}
                 </tbody>
+
+                <!-- ============ NET PROFIT ============ -->
                 <tfoot>
-                    <tr class="{{ 'table-success' if is_profit else 'table-danger' }}">
-                        <td colspan="2" class="text-end">
+                    <tr class="ifrs-total">
+                        <td>
                             <strong>
-                                {% if is_profit %}
-                                    <i class="fas fa-check-circle"></i> NET PROFIT
+                                {% if current.is_profit %}
+                                    NET PROFIT FOR THE PERIOD
                                 {% else %}
-                                    <i class="fas fa-exclamation-triangle"></i> NET LOSS
+                                    NET LOSS FOR THE PERIOD
                                 {% endif %}
                             </strong>
                         </td>
                         <td class="text-end">
-                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(net_profit|abs) }}</strong>
+                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(current.net_profit|abs) }}</strong>
                         </td>
+                        {% if compare %}
+                        <td class="text-end">
+                            <strong>{{ base_currency_symbol }}{{ "{:,.2f}".format(prior.net_profit|abs) }}</strong>
+                        </td>
+                        {% endif %}
                     </tr>
                 </tfoot>
             </table>
         </div>
     </div>
 
-    <div class="alert alert-info">
+    <div class="alert alert-info mt-3">
         <i class="fas fa-info-circle"></i>
-        <strong>Formula:</strong> Net Profit / (Loss) = Total Revenue − Total Expenses.
-        All amounts shown in <strong>{{ base_currency }}</strong>.
+        <strong>IFRS presentation notes:</strong>
+        The statement follows the <em>function-of-expense</em> method:
+        Revenue &minus; Cost of Sales = Gross Profit;
+        &minus; Operating Expenses = Operating Profit;
+        &minus; Finance Costs = Profit before Tax;
+        &minus; Tax = Net Profit.
+        {% if compare %}
+            Comparative figures cover the same period one year earlier.
+        {% else %}
+            Comparatives are hidden.
+        {% endif %}
+        All amounts in <strong>{{ base_currency }}</strong>.
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .ifrs-table td, .ifrs-table th { vertical-align: middle; }
+    .ifrs-section { background: #2c3e50; color: #fff; }
+    .ifrs-section td { padding: 8px 12px !important; letter-spacing: 0.5px; }
+    .ifrs-subtotal td { background: #f4f6f8; }
+    .ifrs-total td {
+        background: #d6eaf8;
+        border-top: 2px solid #2c3e50 !important;
+        border-bottom: 3px double #2c3e50 !important;
+    }
+    .ifrs-indent-1 { padding-left: 24px !important; }
+</style>
 {% endblock %}

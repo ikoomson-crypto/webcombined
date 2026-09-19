@@ -188,6 +188,59 @@
             margin-bottom: 10px;
         }
 
+        /* Company badge in sidebar */
+        .company-badge {
+            display: inline-block;
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .company-badge.active-company {
+            background: rgba(255,255,255,0.95);
+            color: #2c3e50;
+            border: 1px solid rgba(255,255,255,0.4);
+        }
+
+        .company-badge.no-company {
+            background: #f39c12;
+            color: #fff;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .company-badge.no-company:hover,
+        .company-badge.active-company:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .switch-company-btn {
+            display: inline-block;
+            width: 100%;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            border-radius: 6px;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.5);
+            color: #fff;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .switch-company-btn:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: #fff;
+            color: #fff;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .sidebar {
@@ -232,11 +285,41 @@
     <!-- Sidebar - Scrollable -->
     <div class="sidebar">
         <div class="sidebar-content">
-            <!-- Logo Section -->
+            <!-- Logo + Company Section -->
             <div class="logo-section">
                 <i class="fas fa-calculator fa-3x text-white mb-2"></i>
                 <h4 class="text-white">Accounting Pro</h4>
-                <p class="text-white-50 small mb-0">{{ current_user.username }}</p>
+
+                {# ---------- Company indicator ---------- #}
+                {% if active_company %}
+                    <div class="mt-2 mb-2">
+                        <span class="company-badge active-company"
+                              title="Active company: {{ active_company.name }}">
+                            <i class="fas fa-building"></i>
+                            {{ active_company.name }}
+                        </span>
+                    </div>
+                {% else %}
+                    <div class="mt-2 mb-2">
+                        <a href="{{ url_for('company.choose') }}"
+                           class="company-badge no-company"
+                           title="No company selected — click to choose one">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            No company selected
+                        </a>
+                    </div>
+                {% endif %}
+
+                {# ---------- Switch company button ---------- #}
+                {% if has_multiple_companies or not active_company %}
+                    <a href="{{ url_for('company.choose') }}"
+                       class="switch-company-btn mb-2"
+                       title="Switch to a different company">
+                        <i class="fas fa-exchange-alt"></i> Switch Company
+                    </a>
+                {% endif %}
+
+                <p class="text-white-50 small mb-0 mt-2">{{ current_user.username }}</p>
                 <p class="text-white-50 small">{{ current_user.email }}</p>
             </div>
 
@@ -244,6 +327,11 @@
             <nav class="nav flex-column">
                 <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+
+                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('company.') %}active{% endif %}"
+                   href="{{ url_for('company.list_companies') }}">
+                    <i class="fas fa-building"></i> Companies
                 </a>
 
                 <a class="nav-link {% if request.endpoint == 'chart_of_accounts' %}active{% endif %}" href="{{ url_for('chart_of_accounts') }}">

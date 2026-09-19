@@ -6,6 +6,9 @@
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h4 class="mb-0">
                 <i class="fas fa-book"></i> Journal Entry
+                <span class="badge bg-light text-dark ms-2">
+                    <i class="fas fa-coins"></i> {{ base_currency }}
+                </span>
             </h4>
             <div>
                 <button type="button" class="btn btn-light btn-sm" id="expandAllBtn">
@@ -50,7 +53,7 @@
                                     <div class="resize-handle"></div>
                                 </th>
                                 <th style="min-width: 120px; width: 120px; position: relative;" class="resizable-column">
-                                    Amount ($)
+                                    Amount ({{ base_currency }})
                                     <div class="resize-handle"></div>
                                 </th>
                                 <th style="min-width: 180px; width: 180px; position: relative;" class="resizable-column">
@@ -100,7 +103,7 @@
                                 </td>
                                 <td class="amount-cell">
                                     <div class="amount-preview" data-row="{{ i }}">
-                                        <span class="preview-amount">$0.00</span>
+                                        <span class="preview-amount">{{ base_currency_symbol }}0.00</span>
                                     </div>
                                     <input type="number" name="entries-{{ i }}-amount" id="entries-{{ i }}-amount"
                                            class="form-control form-control-sm amount-input expanded-content"
@@ -127,8 +130,8 @@
                         </tbody>
                         <tfoot>
                             <tr class="table-info">
-                                <td colspan="4" class="text-end"><strong>Total Amount:</strong></td>
-                                <td colspan="2"><strong id="total-amount">$0.00</strong></td>
+                                <td colspan="4" class="text-end"><strong>Total Amount ({{ base_currency }}):</strong></td>
+                                <td colspan="2"><strong id="total-amount">{{ base_currency_symbol }}0.00</strong></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -157,7 +160,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let rowCount = {{ entry_count }};
     const accountsData = {{ accounts_json|tojson|safe }};
 
-    // Column resizing functionality
+    // ✅ Currency symbol injected from the server
+    const CURRENCY_SYMBOL = "{{ base_currency_symbol }}";
+
+    // ========== COLUMN RESIZING ==========
     function makeColumnsResizable() {
         const headers = document.querySelectorAll('#resizable-header .resizable-column');
         let startX, startWidth, resizingColumn = null;
@@ -199,9 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function saveColumnWidths() {
         const columns = document.querySelectorAll('#resizable-header .resizable-column');
         const widths = {};
-        columns.forEach((col, index) => {
-            widths[index] = col.style.width;
-        });
+        columns.forEach((col, index) => { widths[index] = col.style.width; });
         localStorage.setItem('journalColumnWidths', JSON.stringify(widths));
     }
 
@@ -232,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('Column widths reset to default!');
     }
 
-    // Toggle row expansion
+    // ========== ROW TOGGLE ==========
     function toggleRow(row) {
         const isExpanded = row.getAttribute('data-expanded') === 'true';
         const descriptionTextarea = row.querySelector('.description-input');
@@ -259,7 +263,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Update preview text
     function updateDescriptionPreview(row, textarea) {
         const previewSpan = row.querySelector('.preview-text');
         const value = textarea.value.trim();
@@ -275,12 +278,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Update amount preview
     function updateAmountPreview(row, amountInput) {
         const previewSpan = row.querySelector('.preview-amount');
         const value = parseFloat(amountInput.value) || 0;
 
-        previewSpan.textContent = `$${value.toFixed(2)}`;
+        previewSpan.textContent = `${CURRENCY_SYMBOL}${value.toFixed(2)}`;
         if (value > 0) {
             previewSpan.style.color = '#28a745';
         } else {
@@ -288,16 +290,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Calculate total amount
     function calculateTotal() {
         let total = 0;
         document.querySelectorAll('.amount-input').forEach(input => {
             total += parseFloat(input.value) || 0;
         });
-        document.getElementById('total-amount').innerHTML = `$${total.toFixed(2)}`;
+        document.getElementById('total-amount').innerHTML =
+            `${CURRENCY_SYMBOL}${total.toFixed(2)}`;
     }
 
-    // Setup row functionality
     function setupRow(row) {
         const toggleBtn = row.querySelector('.toggle-row');
         const descriptionTextarea = row.querySelector('.description-input');
@@ -309,10 +310,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileInput = row.querySelector('.attachment-input');
         const filenameSpan = row.querySelector('.filename-display');
 
-        // Toggle button
         toggleBtn.addEventListener('click', () => toggleRow(row));
 
-        // Click on preview to expand
         descriptionPreview.addEventListener('click', () => {
             if (row.getAttribute('data-expanded') !== 'true') toggleRow(row);
         });
@@ -320,19 +319,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (row.getAttribute('data-expanded') !== 'true') toggleRow(row);
         });
 
-        // Description input
         descriptionTextarea.addEventListener('input', () => {
             updateDescriptionPreview(row, descriptionTextarea);
         });
 
-        // Amount input
         amountInput.addEventListener('input', () => {
             if (amountInput.value < 0) amountInput.value = 0;
             updateAmountPreview(row, amountInput);
             calculateTotal();
         });
 
-        // Account validation
         debitSelect.addEventListener('change', function() {
             if (creditSelect.value === this.value && this.value !== "") {
                 alert('Debit and Credit accounts cannot be the same!');
@@ -347,7 +343,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // File attachment
         if (fileInput && filenameSpan) {
             fileInput.addEventListener('change', function() {
                 if (this.files[0]) {
@@ -359,12 +354,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
-        // Initialize previews
         updateDescriptionPreview(row, descriptionTextarea);
         updateAmountPreview(row, amountInput);
     }
 
-    // Add new row
     function addNewRow() {
         const tbody = document.getElementById('entries-body');
         const newIndex = rowCount;
@@ -406,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </td>
             <td class="amount-cell">
                 <div class="amount-preview" data-row="${newIndex}">
-                    <span class="preview-amount">$0.00</span>
+                    <span class="preview-amount">${CURRENCY_SYMBOL}0.00</span>
                 </div>
                 <input type="number" name="entries-${newIndex}-amount" id="entries-${newIndex}-amount"
                        class="form-control form-control-sm amount-input expanded-content"
@@ -431,7 +424,6 @@ document.addEventListener('DOMContentLoaded', function() {
         tbody.appendChild(newRow);
         setupRow(newRow);
 
-        // Remove row functionality
         newRow.querySelector('.remove-row').addEventListener('click', function() {
             newRow.remove();
             calculateTotal();
@@ -442,7 +434,6 @@ document.addEventListener('DOMContentLoaded', function() {
         calculateTotal();
     }
 
-    // Expand all rows
     function expandAllRows() {
         document.querySelectorAll('.journal-row').forEach(row => {
             if (row.getAttribute('data-expanded') !== 'true') {
@@ -451,7 +442,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Collapse all rows
     function collapseAllRows() {
         document.querySelectorAll('.journal-row').forEach(row => {
             if (row.getAttribute('data-expanded') === 'true') {
@@ -460,22 +450,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Initialize
+    // ========== INIT ==========
     makeColumnsResizable();
     loadColumnWidths();
 
-    // Setup existing rows
     document.querySelectorAll('.journal-row').forEach(row => {
         setupRow(row);
     });
 
-    // Calculate initial total
     calculateTotal();
 
-    // Add row button
     document.getElementById('add-row').addEventListener('click', addNewRow);
 
-    // Remove row buttons for existing rows
     document.querySelectorAll('.remove-row').forEach(btn => {
         btn.addEventListener('click', function() {
             this.closest('tr').remove();
@@ -483,7 +469,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Expand/Collapse all buttons
     document.getElementById('expandAllBtn').addEventListener('click', expandAllRows);
     document.getElementById('collapseAllBtn').addEventListener('click', collapseAllRows);
     document.getElementById('resetColumnsBtn').addEventListener('click', resetColumnWidths);
@@ -491,13 +476,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-    .journal-row {
-        transition: all 0.3s ease;
-    }
-
-    .journal-row:hover {
-        background-color: rgba(0, 123, 255, 0.05);
-    }
+    .journal-row { transition: all 0.3s ease; }
+    .journal-row:hover { background-color: rgba(0, 123, 255, 0.05); }
 
     .description-preview, .amount-preview {
         cursor: pointer;
@@ -514,39 +494,14 @@ document.addEventListener('DOMContentLoaded', function() {
         background-color: #f8f9fa;
     }
 
-    .preview-text {
-        color: #999;
-        font-style: italic;
-    }
+    .preview-text { color: #999; font-style: italic; }
+    .preview-amount { font-weight: bold; font-size: 13px; }
+    .expanded-content { margin-top: 5px; }
+    .description-input { width: 100%; resize: vertical; }
+    .amount-input { text-align: right; }
+    .toggle-row { margin-right: 5px; }
 
-    .preview-amount {
-        font-weight: bold;
-        font-size: 13px;
-    }
-
-    .expanded-content {
-        margin-top: 5px;
-    }
-
-    .description-input {
-        width: 100%;
-        resize: vertical;
-    }
-
-    .amount-input {
-        text-align: right;
-    }
-
-    .toggle-row {
-        margin-right: 5px;
-    }
-
-    /* Resizable columns */
-    .resizable-column {
-        position: relative;
-        user-select: none;
-    }
-
+    .resizable-column { position: relative; user-select: none; }
     .resize-handle {
         position: absolute;
         top: 0;
@@ -557,42 +512,24 @@ document.addEventListener('DOMContentLoaded', function() {
         background-color: transparent;
         z-index: 10;
     }
+    .resize-handle:hover { background-color: #3498db; }
+    .resize-handle:active { background-color: #2980b9; }
 
-    .resize-handle:hover {
-        background-color: #3498db;
-    }
-
-    .resize-handle:active {
-        background-color: #2980b9;
-    }
-
-    .table th, .table td {
-        vertical-align: middle;
-        padding: 8px;
-    }
-
+    .table th, .table td { vertical-align: middle; padding: 8px; }
     .table-responsive {
         border-radius: 10px;
         overflow-x: auto;
         overflow-y: visible;
     }
 
-    .form-control-sm, .form-select-sm {
-        font-size: 13px;
-    }
-
+    .form-control-sm, .form-select-sm { font-size: 13px; }
     .form-control:focus, .form-select:focus {
         border-color: #80bdff;
         box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
     }
 
-    .debit-account-select {
-        border-left: 3px solid #28a745;
-    }
-
-    .credit-account-select {
-        border-left: 3px solid #dc3545;
-    }
+    .debit-account-select { border-left: 3px solid #28a745; }
+    .credit-account-select { border-left: 3px solid #dc3545; }
 
     .filename-display {
         display: block;
@@ -602,29 +539,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
-
-    .expanded-content {
-        animation: slideDown 0.3s ease;
-    }
+    .expanded-content { animation: slideDown 0.3s ease; }
 
     @media (max-width: 768px) {
-        .btn-sm {
-            padding: 4px 8px;
-            font-size: 11px;
-        }
-
-        .table th, .table td {
-            padding: 5px;
-        }
+        .btn-sm { padding: 4px 8px; font-size: 11px; }
+        .table th, .table td { padding: 5px; }
     }
 </style>
 {% endblock %}

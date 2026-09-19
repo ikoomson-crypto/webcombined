@@ -21,8 +21,8 @@ from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
-
-
+from datetime import datetime, timedelta, date as date_cls
+from acctsys.company import company_bp, init_company_support, Company
 
 
 from config import config
@@ -287,6 +287,8 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+app.register_blueprint(company_bp)
+init_company_support(app, db)
 
 # ============================================================
 # ✅ CORE HELPERS
@@ -302,23 +304,33 @@ def get_system_setting(key):
     return setting.value if setting else None
 
 
+DEFAULT_BASE_CURRENCY = 'USD'   # already defined
+
 def get_base_currency():
-    """Get the configured base currency. Falls back to USD."""
+    """
+    Return the base currency for the current context.
+    Priority: active company's base_currency → SystemSetting → default.
+    """
+    from flask import g
+    active = getattr(g, 'company', None)
+    if active and active.base_currency:
+        return active.base_currency
+
     setting = SystemSetting.query.filter_by(key='base_currency').first()
     if setting and setting.value_string:
         return setting.value_string
+
     return DEFAULT_BASE_CURRENCY
 
 
 def get_base_currency_symbol():
-    """Get the symbol for the base currency."""
+    """Return the symbol for the current base currency."""
     symbols = {
         'USD': '$', 'EUR': '€', 'GBP': '£', 'GHS': '₵',
         'NGN': '₦', 'ZAR': 'R', 'KES': 'KSh', 'XOF': 'CFA',
     }
     code = get_base_currency()
     return symbols.get(code, code + ' ')
-
 
 def get_company_setting(key, default=''):
     """Fetch a company profile setting by key."""
@@ -501,7 +513,6 @@ def get_ap_account():
 # ============================================================
 # ✅ CONTEXT PROCESSOR — inject globals into all templates
 # ============================================================
-
 @app.context_processor
 def inject_globals():
     return dict(
@@ -510,8 +521,10 @@ def inject_globals():
         supported_currencies=SUPPORTED_CURRENCIES,
         company=get_company_profile(),
         datetime=datetime,
+        timedelta=timedelta,
+        date=date_cls,        # ← aliased name
+        str=str,
     )
-
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -3550,6 +3563,168 @@ def view_journal_entry(entry_number):
         total_debits=total_debits, total_credits=total_credits
     )
 
+# acctsys/app.py – Edit a manual journal entry
+
+@app.route('/edit_journal_entry/<entry_number>', methods=['GET', 'POST'])
+@login_required
+def edit_journal_entry(entry_number):
+    """
+    Edit a manual journal entry group.
+    Reverses the old GL postings, deletes the old rows, and re-creates them
+    from the submitted form. Only works for reference_type='Manual Entry'.
+    """
+    # Fetch all rows belonging to this entry_number
+    rows = JournalEntry.query.filter_by(
+        entry_number=entry_number,
+        user_id=current_user.id,
+    ).order_by(JournalEntry.id).all()
+
+    if not rows:
+        flash('Journal entry not found.', 'danger')
+        return redirect(url_for('journal_entries'))
+
+    if rows[0].reference_type != 'Manual Entry':
+        flash('Only manual journal entries can be edited.', 'warning')
+        return redirect(url_for('journal_entries'))
+
+    # Build the list of accounts for the dropdowns
+    accounts = ChartOfAccount.query.filter_by(is_active=True).order_by(
+        ChartOfAccount.account_code
+    ).all()
+    accounts_serializable = [
+        {'id': a.id, 'account_code': a.account_code, 'account_name': a.account_name}
+        for a in accounts
+    ]
+
+    # Pair up debit / credit rows by (date, description) -> one line per pair
+    # (This mirrors the layout produced by add_journal_entry.)
+    debit_rows = [r for r in rows if (r.debit or 0) > 0]
+    credit_rows = [r for r in rows if (r.credit or 0) > 0]
+
+    pairs = []
+    # Match by order — add_journal_entry creates them in the same sequence
+    for d, c in zip(debit_rows, credit_rows):
+        pairs.append({
+            'date': d.date,
+            'description': d.description,
+            'debit_account_id': d.account_id,
+            'credit_account_id': c.account_id,
+            'amount': d.debit,
+            'attachment_filename': d.attachment_filename,
+            'attachment_original_name': d.attachment_original_name,
+        })
+
+    # ---------------- POST ----------------
+    if request.method == 'POST':
+        try:
+            entry_count = int(request.form.get('entry_count', 1))
+            entries_data = []
+            total_amount = 0.0
+
+            for i in range(entry_count):
+                date_str = request.form.get(f'entries-{i}-date')
+                description = request.form.get(f'entries-{i}-description', '').strip()
+                debit_account_id = request.form.get(f'entries-{i}-debit_account')
+                credit_account_id = request.form.get(f'entries-{i}-credit_account')
+                amount = float(request.form.get(f'entries-{i}-amount', 0) or 0)
+
+                if debit_account_id and credit_account_id and amount > 0:
+                    entries_data.append({
+                        'date': date_str,
+                        'description': description,
+                        'debit_account_id': int(debit_account_id),
+                        'credit_account_id': int(credit_account_id),
+                        'amount': amount,
+                        'index': i,
+                    })
+                    total_amount += amount
+
+            if total_amount == 0:
+                flash('At least one entry must have an amount greater than 0.', 'danger')
+                return redirect(url_for('edit_journal_entry', entry_number=entry_number))
+
+            # 1. Reverse the old GL postings
+            for old in rows:
+                if (old.debit or 0) > 0:
+                    post_to_general_ledger(old.account_id, old.debit, is_debit=False)
+                if (old.credit or 0) > 0:
+                    post_to_general_ledger(old.account_id, old.credit, is_debit=True)
+
+            # 2. Delete the old rows
+            for old in rows:
+                db.session.delete(old)
+
+            # 3. Re-create rows from the submitted data, keeping the same entry_number
+            for entry_data in entries_data:
+                # Optional replacement attachment
+                attachment_filename = None
+                attachment_original_name = None
+                file_field = f'entries-{entry_data["index"]}-attachment'
+                if file_field in request.files:
+                    file = request.files[file_field]
+                    if file and file.filename and allowed_file(file.filename):
+                        original_filename = secure_filename(file.filename)
+                        attachment_filename = f"{uuid.uuid4().hex}_{original_filename}"
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], attachment_filename)
+                        file.save(file_path)
+                        attachment_original_name = original_filename
+
+                # If no new attachment, keep whatever the old pair had
+                if not attachment_filename and entry_data['index'] < len(pairs):
+                    attachment_filename = pairs[entry_data['index']]['attachment_filename']
+                    attachment_original_name = pairs[entry_data['index']]['attachment_original_name']
+
+                entry_date = datetime.strptime(entry_data['date'], '%Y-%m-%d').date()
+
+                # Debit line
+                db.session.add(JournalEntry(
+                    entry_number=entry_number,
+                    date=entry_date,
+                    description=entry_data['description'],
+                    account_id=entry_data['debit_account_id'],
+                    debit=entry_data['amount'],
+                    credit=0,
+                    attachment_filename=attachment_filename,
+                    attachment_original_name=attachment_original_name,
+                    reference_type='Manual Entry',
+                    user_id=current_user.id,
+                ))
+                # Credit line
+                db.session.add(JournalEntry(
+                    entry_number=entry_number,
+                    date=entry_date,
+                    description=entry_data['description'],
+                    account_id=entry_data['credit_account_id'],
+                    debit=0,
+                    credit=entry_data['amount'],
+                    attachment_filename=attachment_filename,
+                    attachment_original_name=attachment_original_name,
+                    reference_type='Manual Entry',
+                    user_id=current_user.id,
+                ))
+
+                post_to_general_ledger(entry_data['debit_account_id'], entry_data['amount'], is_debit=True)
+                post_to_general_ledger(entry_data['credit_account_id'], entry_data['amount'], is_debit=False)
+
+            db.session.commit()
+            flash(f'Journal entry {entry_number} updated successfully!', 'success')
+            return redirect(url_for('view_journal_entry', entry_number=entry_number))
+
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error editing journal entry: {e}")
+            flash(f'Error updating journal entry: {str(e)}', 'danger')
+            return redirect(url_for('edit_journal_entry', entry_number=entry_number))
+
+    # ---------------- GET ----------------
+    return render_template(
+        'edit_journal_entry.html',
+        entry_number=entry_number,
+        entries=pairs,
+        accounts=accounts,
+        accounts_json=accounts_serializable,
+        datetime=datetime,
+    )
 
 @app.route('/download_attachment/<int:entry_id>')
 @login_required
@@ -4382,7 +4557,6 @@ def delete_payment_vouchers():
 # ============================================================
 # ✅ ROUTES — SETTINGS
 # ============================================================
-
 @app.route('/settings')
 @login_required
 def settings():
@@ -4400,12 +4574,10 @@ def settings():
 
     ar_setting = SystemSetting.query.filter_by(key='ar_account_id').first()
     ap_setting = SystemSetting.query.filter_by(key='ap_account_id').first()
-    currency_setting = SystemSetting.query.filter_by(key='base_currency').first()
 
     settings = {
         'ar_account_id': ar_setting.value if ar_setting else None,
         'ap_account_id': ap_setting.value if ap_setting else None,
-        'base_currency': currency_setting.value_string if currency_setting else DEFAULT_BASE_CURRENCY,
     }
 
     return render_template(
@@ -4413,81 +4585,41 @@ def settings():
         asset_accounts=asset_accounts,
         liability_accounts=liability_accounts,
         settings=settings,
-        company=get_company_profile(),
-        supported_currencies=SUPPORTED_CURRENCIES,
         csrf_token=generate_csrf()
     )
-
 
 @app.route('/settings/save', methods=['POST'])
 @login_required
 def save_settings():
-    # Base currency
-    base_currency = request.form.get('base_currency', DEFAULT_BASE_CURRENCY).strip().upper()
-    valid_codes = [code for code, _ in SUPPORTED_CURRENCIES]
-    if base_currency not in valid_codes:
-        flash(f'Invalid currency code: {base_currency}', 'danger')
-        return redirect(url_for('settings'))
-
-    currency_setting = SystemSetting.query.filter_by(key='base_currency').first()
-    if currency_setting:
-        currency_setting.value_string = base_currency
-    else:
-        db.session.add(SystemSetting(
-            key='base_currency', value=base_currency,
-            value_string=base_currency,
-            description='System base currency for reporting'
-        ))
-
-    # AR / AP
+    # ---- AR ----
     ar_account_id = request.form.get('ar_account_id')
-    ap_account_id = request.form.get('ap_account_id')
-
     if ar_account_id:
         s = SystemSetting.query.filter_by(key='ar_account_id').first()
         if s:
             s.value = int(ar_account_id)
         else:
             db.session.add(SystemSetting(
-                key='ar_account_id', value=int(ar_account_id),
+                key='ar_account_id',
+                value=int(ar_account_id),
                 description='Accounts Receivable account for invoices'
             ))
 
+    # ---- AP ----
+    ap_account_id = request.form.get('ap_account_id')
     if ap_account_id:
         s = SystemSetting.query.filter_by(key='ap_account_id').first()
         if s:
             s.value = int(ap_account_id)
         else:
             db.session.add(SystemSetting(
-                key='ap_account_id', value=int(ap_account_id),
+                key='ap_account_id',
+                value=int(ap_account_id),
                 description='Accounts Payable account for purchases and payment vouchers'
             ))
-
-    # Company profile
-    set_company_setting('company_name',    request.form.get('company_name', '').strip())
-    set_company_setting('company_address', request.form.get('company_address', '').strip())
-    set_company_setting('company_phone',   request.form.get('company_phone', '').strip())
-    set_company_setting('company_email',   request.form.get('company_email', '').strip())
-    set_company_setting('company_tax_id',  request.form.get('company_tax_id', '').strip())
-    set_company_setting('company_website', request.form.get('company_website', '').strip())
-
-    # Logo
-    if 'company_logo_file' in request.files:
-        file = request.files['company_logo_file']
-        if file and file.filename:
-            ext = file.filename.rsplit('.', 1)[-1].lower()
-            if ext in {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}:
-                filename = f"company_logo_{uuid.uuid4().hex[:8]}.{ext}"
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
-                set_company_setting('company_logo', filename)
-            else:
-                flash('Logo must be PNG, JPG, JPEG, GIF, SVG or WEBP.', 'warning')
 
     db.session.commit()
     flash('Settings saved successfully!', 'success')
     return redirect(url_for('settings'))
-
 
 @app.route('/company_logo')
 def company_logo():
@@ -4508,19 +4640,13 @@ def company_logo():
 
     return send_file(filepath)
 
-# acctsys/app.py – Profit & Loss (Income Statement)
+# acctsys/app.py – Profit & Loss (IFRS style, optional comparatives)
 
 @app.route('/profit_and_loss')
 @login_required
 def profit_and_loss():
-    """
-    Profit & Loss report.
-    Revenue - Expenses = Net Profit/Loss.
-    Driven by GeneralLedger balances grouped by AccountType.
-    """
     from datetime import date
 
-    # Optional date range
     start_str = request.args.get('start_date')
     end_str = request.args.get('end_date')
 
@@ -4535,99 +4661,118 @@ def profit_and_loss():
     start_date = parse_date(start_str)
     end_date = parse_date(end_str)
 
-    # Query all journal entries (optionally date-filtered)
-    query = JournalEntry.query.filter(JournalEntry.user_id == current_user.id)
-    if start_date:
-        query = query.filter(JournalEntry.date >= start_date)
-    if end_date:
-        query = query.filter(JournalEntry.date <= end_date)
-    entries = query.all()
+    today = date.today()
+    if not start_date and not end_date:
+        start_date = today.replace(month=1, day=1)
+        end_date = today
 
-    # Aggregate by account
-    account_totals = {}   # account_id -> {'debit': x, 'credit': y}
-    for e in entries:
-        if e.account_id not in account_totals:
-            account_totals[e.account_id] = {'debit': 0.0, 'credit': 0.0}
-        account_totals[e.account_id]['debit'] += e.debit or 0.0
-        account_totals[e.account_id]['credit'] += e.credit or 0.0
+    # ✅ Comparative toggle (default ON)
+    compare = request.args.get('compare', 'on').lower() not in ('off', '0', 'false', 'no')
 
-    # Fetch all account + type info in one go
-    account_ids = list(account_totals.keys())
-    accounts = ChartOfAccount.query.filter(
-        ChartOfAccount.id.in_(account_ids)
-    ).all() if account_ids else []
+    # Comparative window: same dates one year earlier
+    try:
+        prior_start = start_date.replace(year=start_date.year - 1)
+    except ValueError:
+        prior_start = start_date.replace(year=start_date.year - 1, day=28)
+    try:
+        prior_end = end_date.replace(year=end_date.year - 1)
+    except ValueError:
+        prior_end = end_date.replace(year=end_date.year - 1, day=28)
 
-    accounts_by_id = {a.id: a for a in accounts}
+    def build_period(p_start, p_end):
+        entries = JournalEntry.query.filter(
+            JournalEntry.user_id == current_user.id,
+            JournalEntry.date >= p_start,
+            JournalEntry.date <= p_end,
+        ).all()
 
-    revenue_lines = []
-    expense_lines = []
-    total_revenue = 0.0
-    total_expenses = 0.0
+        totals = {}
+        for e in entries:
+            totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
+            totals[e.account_id]['debit'] += e.debit or 0.0
+            totals[e.account_id]['credit'] += e.credit or 0.0
 
-    for account_id, totals in account_totals.items():
-        account = accounts_by_id.get(account_id)
-        if not account or not account.account_type:
-            continue
+        accounts = ChartOfAccount.query.filter(
+            ChartOfAccount.id.in_(list(totals.keys()))
+        ).all() if totals else []
+        acct_map = {a.id: a for a in accounts}
 
-        at = account.account_type
-        debit = totals['debit']
-        credit = totals['credit']
+        revenue, cos, opex, finance, tax = [], [], [], [], []
+        tr = tcos = top = tfin = ttax = 0.0
 
-        # For credit-normal accounts (Revenue), balance = credit - debit
-        # For debit-normal accounts (Expense), balance = debit - credit
-        if at.normal_balance == 'Credit':
-            balance = credit - debit
-        else:
-            balance = debit - credit
+        for acc_id, t in totals.items():
+            acc = acct_map.get(acc_id)
+            if not acc or not acc.account_type:
+                continue
+            at = acc.account_type
+            balance = (t['credit'] - t['debit']) if at.normal_balance == 'Credit' \
+                      else (t['debit'] - t['credit'])
+            if balance == 0:
+                continue
 
-        if balance == 0:
-            continue
+            row = {'code': acc.account_code,
+                   'name': acc.account_name,
+                   'amount': balance}
+            nl = at.name.lower()
+            name_clean = acc.account_name.lower()
 
-        if at.name.lower() in ('revenue', 'income', 'sales'):
-            revenue_lines.append({
-                'account_code': account.account_code,
-                'account_name': account.account_name,
-                'account_type': at.name,
-                'amount': balance,
-            })
-            total_revenue += balance
-        elif at.name.lower() in ('expense', 'expenses', 'cost of sales', 'cogs'):
-            expense_lines.append({
-                'account_code': account.account_code,
-                'account_name': account.account_name,
-                'account_type': at.name,
-                'amount': balance,
-            })
-            total_expenses += balance
-        # Other types (Asset, Liability, Equity) are ignored in P&L
+            if nl in ('revenue', 'income', 'sales'):
+                revenue.append(row); tr += balance
+            elif nl in ('cost of sales', 'cogs') or 'cost of sales' in name_clean or 'cogs' in name_clean:
+                cos.append(row); tcos += balance
+            elif nl in ('finance cost', 'finance costs', 'interest expense',
+                        'interest expenses') or 'interest' in name_clean:
+                finance.append(row); tfin += balance
+            elif nl in ('tax', 'taxes', 'income tax', 'income tax expense'):
+                tax.append(row); ttax += balance
+            elif nl in ('expense', 'expenses', 'operating expense', 'operating expenses'):
+                opex.append(row); top += balance
 
-    # Sort by account code
-    revenue_lines.sort(key=lambda x: x['account_code'])
-    expense_lines.sort(key=lambda x: x['account_code'])
+        for lst in (revenue, cos, opex, finance, tax):
+            lst.sort(key=lambda x: x['code'])
 
-    net_profit = total_revenue - total_expenses
-    is_profit = net_profit >= 0
+        gross_profit = tr - tcos
+        operating_profit = gross_profit - top
+        pbt = operating_profit - tfin
+        net_profit = pbt - ttax
+
+        return {
+            'revenue': revenue, 'cost_of_sales': cos,
+            'operating_expenses': opex, 'finance_costs': finance, 'tax': tax,
+            'total_revenue': tr, 'total_cos': tcos, 'total_opex': top,
+            'total_finance': tfin, 'total_tax': ttax,
+            'gross_profit': gross_profit,
+            'operating_profit': operating_profit,
+            'profit_before_tax': pbt,
+            'net_profit': net_profit,
+            'is_profit': net_profit >= 0,
+        }
+
+    current = build_period(start_date, end_date)
+    # ✅ Only build the prior snapshot when the user asked for it
+    prior = build_period(prior_start, prior_end) if compare else None
 
     return render_template(
         'profit_and_loss.html',
-        revenue_lines=revenue_lines,
-        expense_lines=expense_lines,
-        total_revenue=total_revenue,
-        total_expenses=total_expenses,
-        net_profit=net_profit,
-        is_profit=is_profit,
+        current=current,
+        prior=prior,
+        compare=compare,
         start_date=start_date,
         end_date=end_date,
+        prior_start=prior_start,
+        prior_end=prior_end,
     )
 
 # acctsys/app.py – Profit & Loss Excel export
 
+# acctsys/app.py – Profit & Loss Excel (IFRS + optional comparative)
+
+# acctsys/app.py – Profit & Loss Excel (IFRS + optional comparative)
+
 @app.route('/profit_and_loss/excel')
 @login_required
 def profit_and_loss_excel():
-    # Parse date range (same logic as HTML/PDF)
-    start_str = request.args.get('start_date')
-    end_str = request.args.get('end_date')
+    from datetime import date
 
     def parse_date(s):
         if not s:
@@ -4637,53 +4782,29 @@ def profit_and_loss_excel():
         except ValueError:
             return None
 
-    start_date = parse_date(start_str)
-    end_date = parse_date(end_str)
+    start_date = parse_date(request.args.get('start_date'))
+    end_date = parse_date(request.args.get('end_date'))
 
-    query = JournalEntry.query.filter(JournalEntry.user_id == current_user.id)
-    if start_date:
-        query = query.filter(JournalEntry.date >= start_date)
-    if end_date:
-        query = query.filter(JournalEntry.date <= end_date)
-    entries = query.all()
+    today = date.today()
+    if not start_date and not end_date:
+        start_date = today.replace(month=1, day=1)
+        end_date = today
 
-    account_totals = {}
-    for e in entries:
-        account_totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
-        account_totals[e.account_id]['debit'] += e.debit or 0.0
-        account_totals[e.account_id]['credit'] += e.credit or 0.0
+    compare = (request.args.getlist('compare') or ['on'])[-1].lower() \
+              not in ('off', '0', 'false', 'no')
 
-    accounts = ChartOfAccount.query.filter(
-        ChartOfAccount.id.in_(list(account_totals.keys()))
-    ).all() if account_totals else []
-    accounts_by_id = {a.id: a for a in accounts}
+    try:
+        prior_start = start_date.replace(year=start_date.year - 1)
+    except ValueError:
+        prior_start = start_date.replace(year=start_date.year - 1, day=28)
+    try:
+        prior_end = end_date.replace(year=end_date.year - 1)
+    except ValueError:
+        prior_end = end_date.replace(year=end_date.year - 1, day=28)
 
-    revenue_lines, expense_lines = [], []
-    total_revenue = total_expenses = 0.0
+    current = _pl_snapshot(current_user.id, start_date, end_date)
+    prior = _pl_snapshot(current_user.id, prior_start, prior_end) if compare else None
 
-    for account_id, totals in account_totals.items():
-        account = accounts_by_id.get(account_id)
-        if not account or not account.account_type:
-            continue
-        at = account.account_type
-        balance = (totals['credit'] - totals['debit']) if at.normal_balance == 'Credit' \
-                  else (totals['debit'] - totals['credit'])
-        if balance == 0:
-            continue
-        row = {'code': account.account_code, 'name': account.account_name, 'amount': balance}
-        nl = at.name.lower()
-        if nl in ('revenue', 'income', 'sales'):
-            revenue_lines.append(row)
-            total_revenue += balance
-        elif nl in ('expense', 'expenses', 'cost of sales', 'cogs'):
-            expense_lines.append(row)
-            total_expenses += balance
-
-    revenue_lines.sort(key=lambda x: x['code'])
-    expense_lines.sort(key=lambda x: x['code'])
-    net_profit = total_revenue - total_expenses
-
-    # ========== BUILD WORKBOOK ==========
     company = get_company_profile()
     base_currency = get_base_currency()
     symbol = get_base_currency_symbol()
@@ -4692,150 +4813,207 @@ def profit_and_loss_excel():
     ws = wb.active
     ws.title = "Profit and Loss"
 
-    row = _write_company_header(ws, company, base_currency, symbol)
+    ncols = 3 if compare else 2
+    last_col_letter = get_column_letter(ncols)
 
-    period_text = f"All amounts in {base_currency} ({symbol})"
-    if start_date or end_date:
-        period_text = (
-            f"Period: {start_date.strftime('%d %b %Y') if start_date else '...'} "
-            f"to {end_date.strftime('%d %b %Y') if end_date else '...'}  •  {period_text}"
-        )
-    row = _write_sheet_title(ws, row, "PROFIT & LOSS STATEMENT", period_text)
+    # ---------- Title block ----------
+    ws['A1'] = company['name']
+    ws['A1'].font = EXCEL_TITLE_FONT
+    ws.merge_cells(f'A1:{last_col_letter}1')
+
+    row = 2
+    if company.get('address'):
+        ws.cell(row=row, column=1,
+                value=company['address'].replace('\n', ', ')).font = EXCEL_SUBTITLE_FONT
+        ws.merge_cells(f'A{row}:{last_col_letter}{row}')
+        row += 1
+
+    ws.cell(row=row, column=1,
+            value="STATEMENT OF PROFIT OR LOSS").font = Font(
+        name='Calibri', size=14, bold=True, color='2C3E50')
+    ws.merge_cells(f'A{row}:{last_col_letter}{row}')
+    ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
+    row += 1
+
+    period_text = (f"For the period {start_date.strftime('%d %b %Y')} – "
+                   f"{end_date.strftime('%d %b %Y')}")
+    if compare:
+        period_text += (f"  •  Comparative: {prior_start.strftime('%d %b %Y')} – "
+                        f"{prior_end.strftime('%d %b %Y')}")
+    period_text += f"  •  All amounts in {base_currency} ({symbol})"
+
+    ws.cell(row=row, column=1, value=period_text).font = EXCEL_SUBTITLE_FONT
+    ws.merge_cells(f'A{row}:{last_col_letter}{row}')
+    ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
+    row += 2
+
+    # ---------- Column headers ----------
+    if compare:
+        headers = ['Description', 'Current period', 'Prior period']
+    else:
+        headers = ['Description', 'Current period']
+    for c, h in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=c, value=h)
+        cell.font = EXCEL_HEADER_FONT
+        cell.fill = EXCEL_HEADER_FILL
+        cell.alignment = EXCEL_ALIGN_CENTER
+    row += 1
+
+    # ---------- Helpers ----------
+    def write_section(label):
+        nonlocal row
+        ws.cell(row=row, column=1, value=label).font = EXCEL_SECTION_FONT
+        for c in range(1, ncols + 1):
+            ws.cell(row=row, column=c).fill = EXCEL_HEADER_FILL
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+        row += 1
+
+    def write_line(code, name, amount, prior_amt, indent=1):
+        nonlocal row
+        prefix = '    ' * indent
+        desc = f"{prefix}{code} — {name}" if code else f"{prefix}{name}"
+        ws.cell(row=row, column=1, value=desc).font = EXCEL_NORMAL_FONT
+
+        c2 = ws.cell(row=row, column=2, value=amount)
+        c2.number_format = f'"{symbol}"#,##0.00'
+        c2.font = EXCEL_NORMAL_FONT
+        c2.alignment = EXCEL_ALIGN_RIGHT
+
+        if compare:
+            c3 = ws.cell(row=row, column=3,
+                         value=prior_amt if prior_amt is not None else '—')
+            if prior_amt is not None:
+                c3.number_format = f'"{symbol}"#,##0.00'
+                c3.alignment = EXCEL_ALIGN_RIGHT
+            else:
+                c3.alignment = EXCEL_ALIGN_CENTER
+            c3.font = EXCEL_NORMAL_FONT
+
+        row += 1
+
+    def write_total(label, amount, prior_amt, kind='subtotal', indent=0):
+        nonlocal row
+        prefix = '    ' * indent
+        ws.cell(row=row, column=1, value=f"{prefix}{label}").font = EXCEL_TOTAL_FONT
+
+        fill = EXCEL_TOTAL_FILL if kind == 'subtotal' \
+               else PatternFill('solid', fgColor='D6EAF8')
+        for c in range(1, ncols + 1):
+            ws.cell(row=row, column=c).fill = fill
+
+        c2 = ws.cell(row=row, column=2, value=amount)
+        c2.number_format = f'"{symbol}"#,##0.00'
+        c2.font = EXCEL_TOTAL_FONT
+        c2.alignment = EXCEL_ALIGN_RIGHT
+
+        if compare:
+            c3 = ws.cell(row=row, column=3, value=prior_amt)
+            c3.number_format = f'"{symbol}"#,##0.00'
+            c3.font = EXCEL_TOTAL_FONT
+            c3.alignment = EXCEL_ALIGN_RIGHT
+
+        if kind == 'total':
+            for c in range(1, ncols + 1):
+                cell = ws.cell(row=row, column=c)
+                cell.border = Border(
+                    top=Side(style='medium', color='2C3E50'),
+                    bottom=Side(style='double', color='2C3E50'),
+                )
+        row += 1
+
+    def prior_of(lst, code):
+        """Return the prior-period amount for a given account code, or None."""
+        if not lst:
+            return None
+        for x in lst:
+            if x['code'] == code:
+                return x['amount']
+        return None
 
     # ---------- REVENUE ----------
-    ws.cell(row=row, column=1, value="REVENUE").font = EXCEL_SECTION_FONT
-    for c in range(1, 4):
-        ws.cell(row=row, column=c).fill = EXCEL_SECTION_FILL
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
-    row += 1
+    write_section('REVENUE')
+    for line in current['revenue']:
+        prior_amt = prior_of(prior['revenue'], line['code']) if prior else None
+        write_line(line['code'], line['name'], line['amount'], prior_amt)
+    write_total('Total revenue', current['total_revenue'],
+                prior['total_revenue'] if prior else None)
 
-    # Header
-    for c, h in enumerate(['Code', 'Account', f'Amount ({base_currency})'], start=1):
-        cell = ws.cell(row=row, column=c, value=h)
-        cell.font = EXCEL_HEADER_FONT
-        cell.fill = EXCEL_HEADER_FILL
-        cell.alignment = EXCEL_ALIGN_CENTER
-    rev_header_row = row
-    row += 1
+    # ---------- COST OF SALES ----------
+    write_section('COST OF SALES')
+    for line in current['cost_of_sales']:
+        prior_amt = prior_of(prior['cost_of_sales'], line['code']) if prior else None
+        write_line(line['code'], line['name'], -line['amount'],
+                   (-prior_amt) if prior_amt is not None else None)
+    write_total('Total cost of sales', -current['total_cos'],
+                -prior['total_cos'] if prior else None)
 
-    rev_first_data = row
-    for line in revenue_lines:
-        ws.cell(row=row, column=1, value=line['code']).font = EXCEL_NORMAL_FONT
-        ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
-        ws.cell(row=row, column=2, value=line['name']).font = EXCEL_NORMAL_FONT
-        c3 = ws.cell(row=row, column=3, value=line['amount'])
-        c3.number_format = f'"{symbol}"#,##0.00'
-        c3.font = EXCEL_NORMAL_FONT
-        c3.alignment = EXCEL_ALIGN_RIGHT
-        row += 1
-    if not revenue_lines:
-        ws.cell(row=row, column=1, value="—").font = EXCEL_NORMAL_FONT
-        ws.cell(row=row, column=2, value="No revenue recorded").font = EXCEL_NORMAL_FONT
-        c3 = ws.cell(row=row, column=3, value=0)
-        c3.number_format = f'"{symbol}"#,##0.00'
-        c3.font = EXCEL_NORMAL_FONT
-        c3.alignment = EXCEL_ALIGN_RIGHT
-        row += 1
-    rev_last_data = row - 1
+    # ---------- GROSS PROFIT ----------
+    write_total('GROSS PROFIT', current['gross_profit'],
+                prior['gross_profit'] if prior else None)
 
-    # Total Revenue
-    ws.cell(row=row, column=2, value="Total Revenue").font = EXCEL_TOTAL_FONT
-    ws.cell(row=row, column=2).alignment = EXCEL_ALIGN_RIGHT
-    ws.cell(row=row, column=2).fill = EXCEL_TOTAL_FILL
-    ws.cell(row=row, column=1).fill = EXCEL_TOTAL_FILL
-    c3 = ws.cell(row=row, column=3, value=f"=SUM(C{rev_first_data}:C{rev_last_data})")
-    c3.number_format = f'"{symbol}"#,##0.00'
-    c3.font = EXCEL_TOTAL_FONT
-    c3.alignment = EXCEL_ALIGN_RIGHT
-    c3.fill = EXCEL_TOTAL_FILL
-    rev_total_row = row
-    row += 2
+    # ---------- OPERATING EXPENSES ----------
+    write_section('OPERATING EXPENSES')
+    for line in current['operating_expenses']:
+        prior_amt = prior_of(prior['operating_expenses'], line['code']) if prior else None
+        write_line(line['code'], line['name'], -line['amount'],
+                   (-prior_amt) if prior_amt is not None else None)
+    write_total('Total operating expenses', -current['total_opex'],
+                -prior['total_opex'] if prior else None)
 
-    # ---------- EXPENSES ----------
-    ws.cell(row=row, column=1, value="EXPENSES").font = EXCEL_SECTION_FONT
-    for c in range(1, 4):
-        ws.cell(row=row, column=c).fill = EXCEL_SECTION_FILL_2
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
-    row += 1
+    # ---------- OPERATING PROFIT ----------
+    write_total('OPERATING PROFIT', current['operating_profit'],
+                prior['operating_profit'] if prior else None)
 
-    for c, h in enumerate(['Code', 'Account', f'Amount ({base_currency})'], start=1):
-        cell = ws.cell(row=row, column=c, value=h)
-        cell.font = EXCEL_HEADER_FONT
-        cell.fill = EXCEL_HEADER_FILL
-        cell.alignment = EXCEL_ALIGN_CENTER
-    exp_header_row = row
-    row += 1
+    # ---------- FINANCE COSTS ----------
+    if current['finance_costs'] or current['total_finance']:
+        write_section('FINANCE COSTS')
+        for line in current['finance_costs']:
+            prior_amt = prior_of(prior['finance_costs'], line['code']) if prior else None
+            write_line(line['code'], line['name'], -line['amount'],
+                       (-prior_amt) if prior_amt is not None else None)
+        write_total('Total finance costs', -current['total_finance'],
+                    -prior['total_finance'] if prior else None)
 
-    exp_first_data = row
-    for line in expense_lines:
-        ws.cell(row=row, column=1, value=line['code']).font = EXCEL_NORMAL_FONT
-        ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
-        ws.cell(row=row, column=2, value=line['name']).font = EXCEL_NORMAL_FONT
-        c3 = ws.cell(row=row, column=3, value=line['amount'])
-        c3.number_format = f'"{symbol}"#,##0.00'
-        c3.font = EXCEL_NORMAL_FONT
-        c3.alignment = EXCEL_ALIGN_RIGHT
-        row += 1
-    if not expense_lines:
-        ws.cell(row=row, column=1, value="—").font = EXCEL_NORMAL_FONT
-        ws.cell(row=row, column=2, value="No expenses recorded").font = EXCEL_NORMAL_FONT
-        c3 = ws.cell(row=row, column=3, value=0)
-        c3.number_format = f'"{symbol}"#,##0.00'
-        c3.font = EXCEL_NORMAL_FONT
-        c3.alignment = EXCEL_ALIGN_RIGHT
-        row += 1
-    exp_last_data = row - 1
+    # ---------- PROFIT BEFORE TAX ----------
+    write_total('PROFIT BEFORE TAX', current['profit_before_tax'],
+                prior['profit_before_tax'] if prior else None)
 
-    # Total Expenses
-    ws.cell(row=row, column=2, value="Total Expenses").font = EXCEL_TOTAL_FONT
-    ws.cell(row=row, column=2).alignment = EXCEL_ALIGN_RIGHT
-    ws.cell(row=row, column=2).fill = EXCEL_TOTAL_FILL_RED
-    ws.cell(row=row, column=1).fill = EXCEL_TOTAL_FILL_RED
-    c3 = ws.cell(row=row, column=3, value=f"=SUM(C{exp_first_data}:C{exp_last_data})")
-    c3.number_format = f'"{symbol}"#,##0.00'
-    c3.font = EXCEL_TOTAL_FONT
-    c3.alignment = EXCEL_ALIGN_RIGHT
-    c3.fill = EXCEL_TOTAL_FILL_RED
-    exp_total_row = row
-    row += 2
+    # ---------- TAX ----------
+    if current['tax'] or current['total_tax']:
+        write_section('INCOME TAX EXPENSE')
+        for line in current['tax']:
+            prior_amt = prior_of(prior['tax'], line['code']) if prior else None
+            write_line(line['code'], line['name'], -line['amount'],
+                       (-prior_amt) if prior_amt is not None else None)
+        write_total('Total tax', -current['total_tax'],
+                    -prior['total_tax'] if prior else None)
 
     # ---------- NET PROFIT / LOSS ----------
-    net_label = "NET PROFIT" if net_profit >= 0 else "NET LOSS"
-    fill = EXCEL_TOTAL_FILL_GRN if net_profit >= 0 else EXCEL_TOTAL_FILL_RED
+    net_label = ('NET PROFIT FOR THE PERIOD' if current['is_profit']
+                 else 'NET LOSS FOR THE PERIOD')
+    write_total(net_label, current['net_profit'],
+                prior['net_profit'] if prior else None, kind='total')
 
-    c1 = ws.cell(row=row, column=1, value=net_label)
-    c1.font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
-    c1.alignment = EXCEL_ALIGN_LEFT
-    c1.fill = PatternFill('solid', fgColor='27AE60' if net_profit >= 0 else 'C0392B')
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
-
-    c3 = ws.cell(row=row, column=3, value=f"=C{rev_total_row}-C{exp_total_row}")
-    c3.number_format = f'"{symbol}"#,##0.00'
-    c3.font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
-    c3.alignment = EXCEL_ALIGN_RIGHT
-    c3.fill = PatternFill('solid', fgColor='27AE60' if net_profit >= 0 else 'C0392B')
-    net_row = row
+    # ---------- Footer ----------
     row += 2
-
-    # Footer
     ws.cell(row=row, column=1,
-            value=f"This is a computer-generated Profit & Loss statement. All amounts in {base_currency}."
-            ).font = Font(name='Calibri', size=8, italic=True, color='888888')
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+            value=f"Computer-generated Statement of Profit or Loss. "
+                  f"All amounts in {base_currency}.").font = Font(
+        name='Calibri', size=8, italic=True, color='888888')
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
 
-    # Borders for tables
-    _apply_border(ws, rev_header_row, rev_total_row, 1, 3)
-    _apply_border(ws, exp_header_row, exp_total_row, 1, 3)
-
-    _autosize_columns(ws)
+    ws.column_dimensions['A'].width = 55
+    ws.column_dimensions['B'].width = 22
+    if compare:
+        ws.column_dimensions['C'].width = 22
 
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
 
-    suffix = ""
-    if start_date: suffix += f"_{start_date.strftime('%Y%m%d')}"
-    if end_date:   suffix += f"_{end_date.strftime('%Y%m%d')}"
+    suffix = f"_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}"
+    if compare:
+        suffix += "_comparative"
 
     return send_file(
         buf,
@@ -4846,10 +5024,13 @@ def profit_and_loss_excel():
 
 # acctsys/app.py
 
+# acctsys/app.py – Profit & Loss PDF (IFRS + optional comparative)
+
+# acctsys/app.py – Profit & Loss PDF (IFRS + optional comparative)
+
 @app.route('/profit_and_loss/pdf')
 @login_required
 def profit_and_loss_pdf():
-    """Generate Profit & Loss statement as PDF."""
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib import colors
@@ -4858,14 +5039,9 @@ def profit_and_loss_pdf():
     from io import BytesIO
     from datetime import date
 
-    # ========== ENSURE UNICODE FONTS ARE REGISTERED ==========
     register_unicode_fonts()
     FONT = get_pdf_font(bold=False)
     FONT_BOLD = get_pdf_font(bold=True)
-
-    # ========== PARSE DATE RANGE ==========
-    start_str = request.args.get('start_date')
-    end_str = request.args.get('end_date')
 
     def parse_date(s):
         if not s:
@@ -4875,265 +5051,287 @@ def profit_and_loss_pdf():
         except ValueError:
             return None
 
-    start_date = parse_date(start_str)
-    end_date = parse_date(end_str)
+    start_date = parse_date(request.args.get('start_date'))
+    end_date = parse_date(request.args.get('end_date'))
 
-    # ========== QUERY JOURNAL ENTRIES ==========
-    query = JournalEntry.query.filter(JournalEntry.user_id == current_user.id)
-    if start_date:
-        query = query.filter(JournalEntry.date >= start_date)
-    if end_date:
-        query = query.filter(JournalEntry.date <= end_date)
-    entries = query.all()
+    today = date.today()
+    if not start_date and not end_date:
+        start_date = today.replace(month=1, day=1)
+        end_date = today
 
-    account_totals = {}
-    for e in entries:
-        account_totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
-        account_totals[e.account_id]['debit'] += e.debit or 0.0
-        account_totals[e.account_id]['credit'] += e.credit or 0.0
+    compare = (request.args.getlist('compare') or ['on'])[-1].lower() \
+              not in ('off', '0', 'false', 'no')
 
-    accounts = ChartOfAccount.query.filter(
-        ChartOfAccount.id.in_(list(account_totals.keys()))
-    ).all() if account_totals else []
-    accounts_by_id = {a.id: a for a in accounts}
+    try:
+        prior_start = start_date.replace(year=start_date.year - 1)
+    except ValueError:
+        prior_start = start_date.replace(year=start_date.year - 1, day=28)
+    try:
+        prior_end = end_date.replace(year=end_date.year - 1)
+    except ValueError:
+        prior_end = end_date.replace(year=end_date.year - 1, day=28)
 
-    revenue_lines, expense_lines = [], []
-    total_revenue = total_expenses = 0.0
+    current = _pl_snapshot(current_user.id, start_date, end_date)
+    prior = _pl_snapshot(current_user.id, prior_start, prior_end) if compare else None
 
-    for account_id, totals in account_totals.items():
-        account = accounts_by_id.get(account_id)
-        if not account or not account.account_type:
-            continue
-        at = account.account_type
-        balance = (totals['credit'] - totals['debit']) if at.normal_balance == 'Credit' \
-                  else (totals['debit'] - totals['credit'])
-        if balance == 0:
-            continue
-        row = {
-            'code': account.account_code,
-            'name': account.account_name,
-            'amount': balance,
-        }
-        name_lower = at.name.lower()
-        if name_lower in ('revenue', 'income', 'sales'):
-            revenue_lines.append(row)
-            total_revenue += balance
-        elif name_lower in ('expense', 'expenses', 'cost of sales', 'cogs'):
-            expense_lines.append(row)
-            total_expenses += balance
-
-    revenue_lines.sort(key=lambda x: x['code'])
-    expense_lines.sort(key=lambda x: x['code'])
-    net_profit = total_revenue - total_expenses
-
-    # ========== COMPANY + CURRENCY ==========
     company = get_company_profile()
     base_currency = get_base_currency()
     symbol = get_base_currency_symbol()
 
-    # ========== PDF SETUP ==========
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
         topMargin=15 * mm, bottomMargin=15 * mm,
         leftMargin=15 * mm, rightMargin=15 * mm,
-        title="Profit & Loss Statement",
-        author=company['name'],
+        title="Statement of Profit or Loss", author=company['name'],
     )
     elements = []
     styles = getSampleStyleSheet()
 
-    # ========== STYLES ==========
     company_name_style = ParagraphStyle(
-        'CompanyName', parent=styles['Heading1'], fontSize=18,
-        textColor=colors.HexColor('#2c3e50'), alignment=1, spaceAfter=4,
+        'CN', parent=styles['Heading1'], fontSize=16,
+        textColor=colors.HexColor('#2c3e50'), alignment=1, spaceAfter=3,
         fontName=FONT_BOLD,
     )
-    company_sub_style = ParagraphStyle(
-        'CompanySub', parent=styles['Normal'], fontSize=9,
+    sub_style = ParagraphStyle(
+        'CS', parent=styles['Normal'], fontSize=9,
         textColor=colors.HexColor('#555555'), alignment=1,
-        spaceAfter=2, leading=12,
-        fontName=FONT,
+        spaceAfter=2, leading=11, fontName=FONT,
     )
     title_style = ParagraphStyle(
-        'Title', parent=styles['Heading1'], fontSize=20,
-        textColor=colors.HexColor('#27ae60'), alignment=1,
-        spaceBefore=6, spaceAfter=6,
-        fontName=FONT_BOLD,
+        'T', parent=styles['Heading1'], fontSize=18,
+        textColor=colors.HexColor('#2c3e50'), alignment=1,
+        spaceBefore=6, spaceAfter=4, fontName=FONT_BOLD,
     )
     period_style = ParagraphStyle(
-        'Period', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor('#7f8c8d'), alignment=1, spaceAfter=14,
-        fontName=FONT,
+        'P', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#7f8c8d'), alignment=1,
+        spaceAfter=10, fontName=FONT,
     )
     footer_style = ParagraphStyle(
-        'Footer', parent=styles['Normal'], fontSize=8,
-        textColor=colors.grey, alignment=1,
-        fontName=FONT,
+        'F', parent=styles['Normal'], fontSize=8,
+        textColor=colors.grey, alignment=1, fontName=FONT,
     )
 
-    # ========== HEADER ==========
     elements.append(Paragraph(f"<b>{company['name']}</b>", company_name_style))
-
     if company['address']:
-        elements.append(Paragraph(company['address'].replace('\n', ', '), company_sub_style))
-
+        elements.append(Paragraph(company['address'].replace('\n', ', '), sub_style))
     contact_parts = []
     if company['phone']:
         contact_parts.append(f"Tel: {company['phone']}")
     if company['email']:
         contact_parts.append(f"Email: {company['email']}")
     if contact_parts:
-        elements.append(Paragraph(" • ".join(contact_parts), company_sub_style))
+        elements.append(Paragraph(" • ".join(contact_parts), sub_style))
 
-    elements.append(Spacer(1, 8))
-    elements.append(Paragraph("PROFIT &amp; LOSS STATEMENT", title_style))
+    elements.append(Spacer(1, 6))
+    elements.append(Paragraph("STATEMENT OF PROFIT OR LOSS", title_style))
 
-    period_text = f"All amounts in {base_currency} ({symbol})"
-    if start_date or end_date:
-        period_text = (
-            f"Period: {start_date.strftime('%d %b %Y') if start_date else '...'} "
-            f"to {end_date.strftime('%d %b %Y') if end_date else '...'}  •  {period_text}"
+    period_text = (
+        f"For the period {start_date.strftime('%d %b %Y')} – "
+        f"{end_date.strftime('%d %b %Y')}"
+    )
+    if compare:
+        period_text += (
+            f"  •  Comparative: {prior_start.strftime('%d %b %Y')} – "
+            f"{prior_end.strftime('%d %b %Y')}"
         )
+    period_text += f"  •  All amounts in {base_currency} ({symbol})"
     elements.append(Paragraph(period_text, period_style))
 
-    # ========== REVENUE SECTION ==========
-    rev_head_style = ParagraphStyle(
-        'SecHeadRev', parent=styles['Heading2'], fontSize=12,
-        textColor=colors.white, backColor=colors.HexColor('#3498db'),
-        alignment=0, spaceBefore=8, spaceAfter=6, leftIndent=4,
-        fontName=FONT_BOLD,
-    )
-    elements.append(Paragraph("<b>REVENUE</b>", rev_head_style))
+    # ---------- Table build ----------
+    if compare:
+        col_widths = [95 * mm, 42 * mm, 42 * mm]
+        header = ['Description', 'Current period', 'Prior period']
+    else:
+        col_widths = [120 * mm, 55 * mm]
+        header = ['Description', 'Current period']
 
-    rev_data = [['Code', 'Account', 'Amount']]
-    for line in revenue_lines:
-        rev_data.append([line['code'], line['name'], f"{symbol}{line['amount']:,.2f}"])
-    if len(rev_data) == 1:
-        rev_data.append(['—', 'No revenue recorded', f"{symbol}0.00"])
+    data = [header]
+    row_meta = ['header']
 
-    total_label_para = Paragraph("<b>Total Revenue</b>", ParagraphStyle(
-        'TL', parent=styles['Normal'], fontName=FONT_BOLD, fontSize=9,
-    ))
-    total_value_para = Paragraph(f"<b>{symbol}{total_revenue:,.2f}</b>", ParagraphStyle(
-        'TV', parent=styles['Normal'], fontName=FONT_BOLD, fontSize=9, alignment=2,
-    ))
-    rev_data.append(['', total_label_para, total_value_para])
+    def add_line(code, name, amount, prior_amt, indent=1,
+                 section=None, subhead=None, subtotal=False, total=False,
+                 spacer=False, is_profit_label=False, net_amount=None,
+                 prior_net_amount=None):
+        if spacer:
+            data.append([''] * len(header))
+            row_meta.append('spacer')
+            return
+        if section is not None:
+            data.append([section] + [''] * (len(header) - 1))
+            row_meta.append('section')
+            return
+        if subhead is not None:
+            data.append([subhead] + [''] * (len(header) - 1))
+            row_meta.append('subhead')
+            return
 
-    rev_table = Table(rev_data, colWidths=[25 * mm, 105 * mm, 50 * mm], repeatRows=1)
-    rev_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ecf0f1')),
+        pad = '  ' * indent
+        desc = f"{pad}{code} — {name}" if code else f"{pad}{name}"
+
+        if is_profit_label:
+            cur_txt = f"{symbol}{abs(net_amount):,.2f}"
+            pri_txt = f"{symbol}{abs(prior_net_amount):,.2f}" if compare else None
+        else:
+            cur_txt = (f"({symbol}{abs(amount):,.2f})" if amount < 0
+                       else f"{symbol}{amount:,.2f}")
+
+            if compare and prior_amt is not None:
+                pri_txt = (f"({symbol}{abs(prior_amt):,.2f})" if prior_amt < 0
+                           else f"{symbol}{prior_amt:,.2f}")
+            else:
+                pri_txt = '—' if compare else None
+
+        if compare:
+            data.append([desc, cur_txt, pri_txt])
+        else:
+            data.append([desc, cur_txt])
+        row_meta.append('subtotal' if subtotal else ('total' if total else 'row'))
+
+    def prior_of(lst, code):
+        """Return the prior-period amount for a given account code, or None."""
+        if not lst:
+            return None
+        for x in lst:
+            if x['code'] == code:
+                return x['amount']
+        return None
+
+    # ---------- REVENUE ----------
+    add_line(None, None, None, None, section='REVENUE')
+    for line in current['revenue']:
+        prior_amt = prior_of(prior['revenue'], line['code']) if prior else None
+        add_line(line['code'], line['name'], line['amount'], prior_amt, indent=1)
+    add_line(None, 'Total revenue', current['total_revenue'],
+             prior['total_revenue'] if prior else None, subtotal=True)
+
+    # ---------- COST OF SALES ----------
+    add_line(None, None, None, None, section='COST OF SALES')
+    for line in current['cost_of_sales']:
+        prior_amt = prior_of(prior['cost_of_sales'], line['code']) if prior else None
+        add_line(line['code'], line['name'], -line['amount'],
+                 (-prior_amt) if prior_amt is not None else None, indent=1)
+    add_line(None, 'Total cost of sales', -current['total_cos'],
+             -prior['total_cos'] if prior else None, subtotal=True)
+
+    # ---------- GROSS PROFIT ----------
+    add_line(None, 'GROSS PROFIT', current['gross_profit'],
+             prior['gross_profit'] if prior else None, subtotal=True)
+
+    # ---------- OPERATING EXPENSES ----------
+    add_line(None, None, None, None, section='OPERATING EXPENSES')
+    for line in current['operating_expenses']:
+        prior_amt = prior_of(prior['operating_expenses'], line['code']) if prior else None
+        add_line(line['code'], line['name'], -line['amount'],
+                 (-prior_amt) if prior_amt is not None else None, indent=1)
+    add_line(None, 'Total operating expenses', -current['total_opex'],
+             -prior['total_opex'] if prior else None, subtotal=True)
+
+    # ---------- OPERATING PROFIT ----------
+    add_line(None, 'OPERATING PROFIT', current['operating_profit'],
+             prior['operating_profit'] if prior else None, subtotal=True)
+
+    # ---------- FINANCE COSTS ----------
+    if current['finance_costs'] or current['total_finance']:
+        add_line(None, None, None, None, section='FINANCE COSTS')
+        for line in current['finance_costs']:
+            prior_amt = prior_of(prior['finance_costs'], line['code']) if prior else None
+            add_line(line['code'], line['name'], -line['amount'],
+                     (-prior_amt) if prior_amt is not None else None, indent=1)
+        add_line(None, 'Total finance costs', -current['total_finance'],
+                 -prior['total_finance'] if prior else None, subtotal=True)
+
+    # ---------- PROFIT BEFORE TAX ----------
+    add_line(None, 'PROFIT BEFORE TAX', current['profit_before_tax'],
+             prior['profit_before_tax'] if prior else None, subtotal=True)
+
+    # ---------- TAX ----------
+    if current['tax'] or current['total_tax']:
+        add_line(None, None, None, None, section='INCOME TAX EXPENSE')
+        for line in current['tax']:
+            prior_amt = prior_of(prior['tax'], line['code']) if prior else None
+            add_line(line['code'], line['name'], -line['amount'],
+                     (-prior_amt) if prior_amt is not None else None, indent=1)
+        add_line(None, 'Total tax', -current['total_tax'],
+                 -prior['total_tax'] if prior else None, subtotal=True)
+
+    # ---------- NET PROFIT / LOSS ----------
+    net_label = ('NET PROFIT FOR THE PERIOD' if current['is_profit']
+                 else 'NET LOSS FOR THE PERIOD')
+    add_line(None, net_label, None, None,
+             total=True, is_profit_label=True,
+             net_amount=current['net_profit'],
+             prior_net_amount=prior['net_profit'] if prior else None)
+
+    # ---------- Style ----------
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495e')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('FONTNAME', (0, 1), (-1, -2), FONT),
-        ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#bdc3c7')),
-        ('BACKGROUND', (0, len(rev_data) - 1), (-1, len(rev_data) - 1), colors.HexColor('#d6eaf8')),
-        ('FONTNAME', (0, len(rev_data) - 1), (-1, len(rev_data) - 1), FONT_BOLD),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(rev_table)
-    elements.append(Spacer(1, 14))
-
-    # ========== EXPENSES SECTION ==========
-    exp_head_style = ParagraphStyle(
-        'SecHeadExp', parent=styles['Heading2'], fontSize=12,
-        textColor=colors.white, backColor=colors.HexColor('#e74c3c'),
-        alignment=0, spaceBefore=8, spaceAfter=6, leftIndent=4,
-        fontName=FONT_BOLD,
-    )
-    elements.append(Paragraph("<b>EXPENSES</b>", exp_head_style))
-
-    exp_data = [['Code', 'Account', 'Amount']]
-    for line in expense_lines:
-        exp_data.append([line['code'], line['name'], f"{symbol}{line['amount']:,.2f}"])
-    if len(exp_data) == 1:
-        exp_data.append(['—', 'No expenses recorded', f"{symbol}0.00"])
-
-    exp_total_label = Paragraph("<b>Total Expenses</b>", ParagraphStyle(
-        'TL2', parent=styles['Normal'], fontName=FONT_BOLD, fontSize=9,
-    ))
-    exp_total_value = Paragraph(f"<b>{symbol}{total_expenses:,.2f}</b>", ParagraphStyle(
-        'TV2', parent=styles['Normal'], fontName=FONT_BOLD, fontSize=9, alignment=2,
-    ))
-    exp_data.append(['', exp_total_label, exp_total_value])
-
-    exp_table = Table(exp_data, colWidths=[25 * mm, 105 * mm, 50 * mm], repeatRows=1)
-    exp_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ecf0f1')),
-        ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('FONTNAME', (0, 1), (-1, -2), FONT),
-        ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#bdc3c7')),
-        ('BACKGROUND', (0, len(exp_data) - 1), (-1, len(exp_data) - 1), colors.HexColor('#fadbd8')),
-        ('FONTNAME', (0, len(exp_data) - 1), (-1, len(exp_data) - 1), FONT_BOLD),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(exp_table)
-    elements.append(Spacer(1, 16))
-
-    # ========== NET PROFIT / LOSS ==========
-    net_color = colors.HexColor('#27ae60') if net_profit >= 0 else colors.HexColor('#c0392b')
-    net_label = "NET PROFIT" if net_profit >= 0 else "NET LOSS"
-
-    net_label_para = Paragraph(
-        f"<b>{net_label}</b>",
-        ParagraphStyle('NetL', parent=styles['Normal'], fontSize=13,
-                       fontName=FONT_BOLD, textColor=colors.white),
-    )
-    net_value_para = Paragraph(
-        f"<b>{symbol}{abs(net_profit):,.2f} {base_currency}</b>",
-        ParagraphStyle('NetR', parent=styles['Normal'], fontSize=13,
-                       fontName=FONT_BOLD, textColor=colors.white, alignment=2),
-    )
-    net_table = Table([[net_label_para, net_value_para]], colWidths=[100 * mm, 80 * mm])
-    net_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), net_color),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('ALIGN', (1, 0), (-1, 0), 'RIGHT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    elements.append(net_table)
-    elements.append(Spacer(1, 20))
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#d5dbdb')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('FONTNAME', (0, 1), (-1, -1), FONT),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+    ]
 
-    # ========== FOOTER ==========
+    for i, meta in enumerate(row_meta):
+        if meta == 'section':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#2c3e50')),
+                ('TEXTCOLOR', (0, i), (-1, i), colors.white),
+                ('FONTNAME', (0, i), (-1, i), FONT_BOLD),
+                ('SPAN', (0, i), (-1, i)),
+            ]
+        elif meta == 'subtotal':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f4f6f8')),
+                ('FONTNAME', (0, i), (-1, i), FONT_BOLD),
+            ]
+        elif meta == 'total':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#d6eaf8')),
+                ('FONTNAME', (0, i), (-1, i), FONT_BOLD),
+                ('LINEABOVE', (0, i), (-1, i), 1, colors.HexColor('#2c3e50')),
+                ('LINEBELOW', (0, i), (-1, i), 1.5, colors.HexColor('#2c3e50')),
+            ]
+
+    t.setStyle(TableStyle(style))
+    elements.append(t)
+    elements.append(Spacer(1, 14))
     elements.append(Paragraph(
-        f"This is a computer-generated Profit &amp; Loss statement. "
+        f"Computer-generated Statement of Profit or Loss. "
         f"All amounts in {base_currency}.",
         footer_style,
     ))
 
-    # ========== BUILD ==========
     doc.build(elements)
     buffer.seek(0)
 
-    fname_suffix = ""
-    if start_date:
-        fname_suffix += f"_{start_date.strftime('%Y%m%d')}"
-    if end_date:
-        fname_suffix += f"_{end_date.strftime('%Y%m%d')}"
+    suffix = f"_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}"
+    if compare:
+        suffix += "_comparative"
 
     return send_file(
         buffer,
         as_attachment=True,
-        download_name=f'profit_and_loss{fname_suffix}.pdf',
+        download_name=f'profit_and_loss{suffix}.pdf',
         mimetype='application/pdf',
     )
 
-# acctsys/app.py – Balance Sheet
+# acctsys/app.py – Balance Sheet (IFRS style, optional comparatives)
 
 @app.route('/balance_sheet')
 @login_required
 def balance_sheet():
-    """
-    Balance Sheet as of a given date.
-    Assets = Liabilities + Equity (+ Retained Earnings)
-    """
     from datetime import date
 
     as_of_str = request.args.get('as_of_date')
@@ -5142,119 +5340,284 @@ def balance_sheet():
     except ValueError:
         as_of_date = date.today()
 
-    # Query all journal entries up to as_of_date
-    entries = JournalEntry.query.filter(
-        JournalEntry.user_id == current_user.id,
-        JournalEntry.date <= as_of_date
-    ).all()
+    # ✅ Comparative toggle (default ON)
+    compare = request.args.get('compare', 'on').lower() not in ('off', '0', 'false', 'no')
 
-    account_totals = {}
-    for e in entries:
-        account_totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
-        account_totals[e.account_id]['debit'] += e.debit or 0.0
-        account_totals[e.account_id]['credit'] += e.credit or 0.0
+    # Comparative date: same date one year earlier
+    try:
+        prior_date = as_of_date.replace(year=as_of_date.year - 1)
+    except ValueError:
+        prior_date = as_of_date.replace(year=as_of_date.year - 1, day=28)
 
-    account_ids = list(account_totals.keys())
-    accounts = ChartOfAccount.query.filter(
-        ChartOfAccount.id.in_(account_ids)
-    ).all() if account_ids else []
-    accounts_by_id = {a.id: a for a in accounts}
+    # ---------- helper: build a snapshot as of a given date ----------
+    def build_snapshot(cutoff):
+        entries = JournalEntry.query.filter(
+            JournalEntry.user_id == current_user.id,
+            JournalEntry.date <= cutoff,
+        ).all()
 
-    asset_lines = []
-    liability_lines = []
-    equity_lines = []
+        totals = {}
+        for e in entries:
+            totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
+            totals[e.account_id]['debit'] += e.debit or 0.0
+            totals[e.account_id]['credit'] += e.credit or 0.0
 
-    total_assets = total_liabilities = total_equity = 0.0
-    total_revenue = total_expenses = 0.0
+        accounts = ChartOfAccount.query.filter(
+            ChartOfAccount.id.in_(list(totals.keys()))
+        ).all() if totals else []
+        acct_map = {a.id: a for a in accounts}
 
-    for account_id, totals in account_totals.items():
-        account = accounts_by_id.get(account_id)
-        if not account or not account.account_type:
-            continue
+        current_assets, non_current_assets = [], []
+        current_liabilities, non_current_liabilities = [], []
+        equity_lines = []
+        total_revenue = total_expenses = 0.0
 
-        at = account.account_type
-        debit = totals['debit']
-        credit = totals['credit']
+        for acc_id, t in totals.items():
+            acc = acct_map.get(acc_id)
+            if not acc or not acc.account_type:
+                continue
+            at = acc.account_type
+            balance = (t['debit'] - t['credit']) if at.normal_balance == 'Debit' \
+                      else (t['credit'] - t['debit'])
+            if balance == 0:
+                continue
 
-        # Compute signed balance based on normal balance
-        if at.normal_balance == 'Debit':
-            balance = debit - credit       # positive = asset-style
-        else:
-            balance = credit - debit       # positive = liability/equity/revenue-style
+            name_l = at.name.lower()
+            is_current = 'current' in name_l
 
-        if balance == 0:
-            continue
-
-        name_lower = at.name.lower()
-
-        if name_lower in ('asset', 'current asset', 'non-current asset',
-                          'fixed asset', 'current assets', 'non-current assets'):
-            asset_lines.append({
-                'code': account.account_code,
-                'name': account.account_name,
+            row = {
+                'code': acc.account_code,
+                'name': acc.account_name,
                 'type': at.name,
                 'amount': balance,
-            })
-            total_assets += balance
-        elif name_lower in ('liability', 'current liability', 'non-current liability',
-                            'current liabilities', 'non-current liabilities',
-                            'payable', 'accounts payable'):
-            liability_lines.append({
-                'code': account.account_code,
-                'name': account.account_name,
-                'type': at.name,
-                'amount': balance,
-            })
-            total_liabilities += balance
-        elif name_lower in ('equity', "owner's equity", 'capital', 'retained earnings'):
-            equity_lines.append({
-                'code': account.account_code,
-                'name': account.account_name,
-                'type': at.name,
-                'amount': balance,
-            })
-            total_equity += balance
-        elif name_lower in ('revenue', 'income', 'sales'):
-            total_revenue += balance
-        elif name_lower in ('expense', 'expenses', 'cost of sales', 'cogs'):
-            total_expenses += balance
+            }
 
-    # Retained earnings = cumulative net profit (revenue - expenses) up to as_of_date
-    retained_earnings = total_revenue - total_expenses
-    total_equity_with_re = total_equity + retained_earnings
+            if name_l.startswith('asset') or name_l in (
+                'current asset', 'current assets',
+                'non-current asset', 'non-current assets',
+                'fixed asset', 'fixed assets',
+            ):
+                (current_assets if is_current else non_current_assets).append(row)
+            elif name_l.startswith('liability') or name_l in (
+                'current liability', 'current liabilities',
+                'non-current liability', 'non-current liabilities',
+                'payable', 'accounts payable',
+            ):
+                (current_liabilities if is_current else non_current_liabilities).append(row)
+            elif name_l in ('equity', "owner's equity", 'capital',
+                            'share capital', 'retained earnings'):
+                equity_lines.append(row)
+            elif name_l in ('revenue', 'income', 'sales'):
+                total_revenue += balance
+            elif name_l in ('expense', 'expenses', 'cost of sales', 'cogs'):
+                total_expenses += balance
 
-    # Balance check
-    total_liabilities_and_equity = total_liabilities + total_equity_with_re
-    difference = total_assets - total_liabilities_and_equity
+        for lst in (current_assets, non_current_assets,
+                    current_liabilities, non_current_liabilities,
+                    equity_lines):
+            lst.sort(key=lambda x: x['code'])
+
+        tca = sum(x['amount'] for x in current_assets)
+        tnca = sum(x['amount'] for x in non_current_assets)
+        tcl = sum(x['amount'] for x in current_liabilities)
+        tncl = sum(x['amount'] for x in non_current_liabilities)
+        teq = sum(x['amount'] for x in equity_lines)
+        retained = total_revenue - total_expenses
+
+        return {
+            'current_assets': current_assets,
+            'non_current_assets': non_current_assets,
+            'current_liabilities': current_liabilities,
+            'non_current_liabilities': non_current_liabilities,
+            'equity_lines': equity_lines,
+            'total_current_assets': tca,
+            'total_non_current_assets': tnca,
+            'total_assets': tca + tnca,
+            'total_current_liabilities': tcl,
+            'total_non_current_liabilities': tncl,
+            'total_liabilities': tcl + tncl,
+            'total_equity_contrib': teq,
+            'retained_earnings': retained,
+            'total_equity': teq + retained,
+            'total_liab_eq': tcl + tncl + teq + retained,
+        }
+
+    current = build_snapshot(as_of_date)
+    # ✅ Only build the prior snapshot when the user asked for it
+    prior = build_snapshot(prior_date) if compare else None
+
+    difference = current['total_assets'] - current['total_liab_eq']
     is_balanced = abs(difference) < 0.01
-
-    asset_lines.sort(key=lambda x: x['code'])
-    liability_lines.sort(key=lambda x: x['code'])
-    equity_lines.sort(key=lambda x: x['code'])
+    working_capital = current['total_current_assets'] - current['total_current_liabilities']
 
     return render_template(
         'balance_sheet.html',
-        asset_lines=asset_lines,
-        liability_lines=liability_lines,
-        equity_lines=equity_lines,
-        total_assets=total_assets,
-        total_liabilities=total_liabilities,
-        total_equity=total_equity_with_re,
-        retained_earnings=retained_earnings,
-        total_liabilities_and_equity=total_liabilities_and_equity,
+        current=current,
+        prior=prior,
+        compare=compare,
+        as_of_date=as_of_date,
+        prior_date=prior_date,
+        working_capital=working_capital,
         difference=difference,
         is_balanced=is_balanced,
-        as_of_date=as_of_date,
     )
 
-
-
 # acctsys/app.py
+# acctsys/app.py – shared snapshot builders for report exporters
+
+def _bs_snapshot(user_id, cutoff):
+    """Return the IFRS-classified balance sheet snapshot for a cutoff date."""
+    entries = JournalEntry.query.filter(
+        JournalEntry.user_id == user_id,
+        JournalEntry.date <= cutoff,
+    ).all()
+
+    totals = {}
+    for e in entries:
+        totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
+        totals[e.account_id]['debit'] += e.debit or 0.0
+        totals[e.account_id]['credit'] += e.credit or 0.0
+
+    accounts = ChartOfAccount.query.filter(
+        ChartOfAccount.id.in_(list(totals.keys()))
+    ).all() if totals else []
+    acct_map = {a.id: a for a in accounts}
+
+    ca, nca, cl, ncl, eq = [], [], [], [], []
+    tr = te = 0.0
+
+    for acc_id, t in totals.items():
+        acc = acct_map.get(acc_id)
+        if not acc or not acc.account_type:
+            continue
+        at = acc.account_type
+        bal = (t['debit'] - t['credit']) if at.normal_balance == 'Debit' \
+              else (t['credit'] - t['debit'])
+        if bal == 0:
+            continue
+
+        nl = at.name.lower()
+        is_cur = 'current' in nl
+        row = {'code': acc.account_code, 'name': acc.account_name, 'amount': bal}
+
+        if nl.startswith('asset') or nl in (
+            'current asset', 'current assets',
+            'non-current asset', 'non-current assets',
+            'fixed asset', 'fixed assets',
+        ):
+            (ca if is_cur else nca).append(row)
+        elif nl.startswith('liability') or nl in (
+            'current liability', 'current liabilities',
+            'non-current liability', 'non-current liabilities',
+            'payable', 'accounts payable',
+        ):
+            (cl if is_cur else ncl).append(row)
+        elif nl in ('equity', "owner's equity", 'capital',
+                    'share capital', 'retained earnings'):
+            eq.append(row)
+        elif nl in ('revenue', 'income', 'sales'):
+            tr += bal
+        elif nl in ('expense', 'expenses', 'cost of sales', 'cogs'):
+            te += bal
+
+    for lst in (ca, nca, cl, ncl, eq):
+        lst.sort(key=lambda x: x['code'])
+
+    tca = sum(x['amount'] for x in ca)
+    tnca = sum(x['amount'] for x in nca)
+    tcl = sum(x['amount'] for x in cl)
+    tncl = sum(x['amount'] for x in ncl)
+    teq = sum(x['amount'] for x in eq)
+    retained = tr - te
+
+    return {
+        'current_assets': ca, 'non_current_assets': nca,
+        'current_liabilities': cl, 'non_current_liabilities': ncl,
+        'equity_lines': eq,
+        'total_current_assets': tca, 'total_non_current_assets': tnca,
+        'total_assets': tca + tnca,
+        'total_current_liabilities': tcl, 'total_non_current_liabilities': tncl,
+        'total_liabilities': tcl + tncl,
+        'total_equity_contrib': teq,
+        'retained_earnings': retained,
+        'total_equity': teq + retained,
+        'total_liab_eq': tcl + tncl + teq + retained,
+    }
+
+
+def _pl_snapshot(user_id, p_start, p_end):
+    """Return the IFRS-classified P&L snapshot for a period."""
+    entries = JournalEntry.query.filter(
+        JournalEntry.user_id == user_id,
+        JournalEntry.date >= p_start,
+        JournalEntry.date <= p_end,
+    ).all()
+
+    totals = {}
+    for e in entries:
+        totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
+        totals[e.account_id]['debit'] += e.debit or 0.0
+        totals[e.account_id]['credit'] += e.credit or 0.0
+
+    accounts = ChartOfAccount.query.filter(
+        ChartOfAccount.id.in_(list(totals.keys()))
+    ).all() if totals else []
+    acct_map = {a.id: a for a in accounts}
+
+    rev, cos, opex, fin, tax = [], [], [], [], []
+    tr = tcos = top = tfin = ttax = 0.0
+
+    for acc_id, t in totals.items():
+        acc = acct_map.get(acc_id)
+        if not acc or not acc.account_type:
+            continue
+        at = acc.account_type
+        bal = (t['credit'] - t['debit']) if at.normal_balance == 'Credit' \
+              else (t['debit'] - t['credit'])
+        if bal == 0:
+            continue
+
+        row = {'code': acc.account_code, 'name': acc.account_name, 'amount': bal}
+        nl = at.name.lower()
+        name_clean = acc.account_name.lower()
+
+        if nl in ('revenue', 'income', 'sales'):
+            rev.append(row); tr += bal
+        elif nl in ('cost of sales', 'cogs') or 'cost of sales' in name_clean or 'cogs' in name_clean:
+            cos.append(row); tcos += bal
+        elif nl in ('finance cost', 'finance costs', 'interest expense',
+                    'interest expenses') or 'interest' in name_clean:
+            fin.append(row); tfin += bal
+        elif nl in ('tax', 'taxes', 'income tax', 'income tax expense'):
+            tax.append(row); ttax += bal
+        elif nl in ('expense', 'expenses', 'operating expense', 'operating expenses'):
+            opex.append(row); top += bal
+
+    for lst in (rev, cos, opex, fin, tax):
+        lst.sort(key=lambda x: x['code'])
+
+    gross = tr - tcos
+    op = gross - top
+    pbt = op - tfin
+    net = pbt - ttax
+
+    return {
+        'revenue': rev, 'cost_of_sales': cos, 'operating_expenses': opex,
+        'finance_costs': fin, 'tax': tax,
+        'total_revenue': tr, 'total_cos': tcos, 'total_opex': top,
+        'total_finance': tfin, 'total_tax': ttax,
+        'gross_profit': gross,
+        'operating_profit': op,
+        'profit_before_tax': pbt,
+        'net_profit': net,
+        'is_profit': net >= 0,
+    }
+
+# acctsys/app.py – Balance Sheet PDF (IFRS + optional comparative)
 
 @app.route('/balance_sheet/pdf')
 @login_required
 def balance_sheet_pdf():
-    """Generate Balance Sheet as PDF."""
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib import colors
@@ -5263,302 +5626,291 @@ def balance_sheet_pdf():
     from io import BytesIO
     from datetime import date
 
-    # ========== ENSURE UNICODE FONTS ARE REGISTERED ==========
     register_unicode_fonts()
     FONT = get_pdf_font(bold=False)
     FONT_BOLD = get_pdf_font(bold=True)
 
-    # ========== PARSE AS-OF DATE ==========
+    # ---- params ----
     as_of_str = request.args.get('as_of_date')
     try:
         as_of_date = datetime.strptime(as_of_str, '%Y-%m-%d').date() if as_of_str else date.today()
     except ValueError:
         as_of_date = date.today()
 
-    # ========== QUERY ENTRIES UP TO AS-OF DATE ==========
-    entries = JournalEntry.query.filter(
-        JournalEntry.user_id == current_user.id,
-        JournalEntry.date <= as_of_date,
-    ).all()
+    compare = (request.args.getlist('compare') or ['on'])[-1].lower() \
+              not in ('off', '0', 'false', 'no')
 
-    account_totals = {}
-    for e in entries:
-        account_totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
-        account_totals[e.account_id]['debit'] += e.debit or 0.0
-        account_totals[e.account_id]['credit'] += e.credit or 0.0
+    try:
+        prior_date = as_of_date.replace(year=as_of_date.year - 1)
+    except ValueError:
+        prior_date = as_of_date.replace(year=as_of_date.year - 1, day=28)
 
-    accounts = ChartOfAccount.query.filter(
-        ChartOfAccount.id.in_(list(account_totals.keys()))
-    ).all() if account_totals else []
-    accounts_by_id = {a.id: a for a in accounts}
+    current = _bs_snapshot(current_user.id, as_of_date)
+    prior = _bs_snapshot(current_user.id, prior_date) if compare else None
 
-    asset_lines, liability_lines, equity_lines = [], [], []
-    total_assets = total_liabilities = total_equity = 0.0
-    total_revenue = total_expenses = 0.0
-
-    for account_id, totals in account_totals.items():
-        account = accounts_by_id.get(account_id)
-        if not account or not account.account_type:
-            continue
-        at = account.account_type
-        balance = (totals['debit'] - totals['credit']) if at.normal_balance == 'Debit' \
-                  else (totals['credit'] - totals['debit'])
-        if balance == 0:
-            continue
-
-        row = {'code': account.account_code, 'name': account.account_name, 'amount': balance}
-        nl = at.name.lower()
-
-        if nl in ('asset', 'current asset', 'non-current asset', 'fixed asset',
-                  'current assets', 'non-current assets'):
-            asset_lines.append(row)
-            total_assets += balance
-        elif nl in ('liability', 'current liability', 'non-current liability',
-                    'current liabilities', 'non-current liabilities',
-                    'payable', 'accounts payable'):
-            liability_lines.append(row)
-            total_liabilities += balance
-        elif nl in ('equity', "owner's equity", 'capital', 'retained earnings'):
-            equity_lines.append(row)
-            total_equity += balance
-        elif nl in ('revenue', 'income', 'sales'):
-            total_revenue += balance
-        elif nl in ('expense', 'expenses', 'cost of sales', 'cogs'):
-            total_expenses += balance
-
-    retained_earnings = total_revenue - total_expenses
-    total_equity_with_re = total_equity + retained_earnings
-    total_liab_eq = total_liabilities + total_equity_with_re
-
-    asset_lines.sort(key=lambda x: x['code'])
-    liability_lines.sort(key=lambda x: x['code'])
-    equity_lines.sort(key=lambda x: x['code'])
-
-    # ========== COMPANY + CURRENCY ==========
     company = get_company_profile()
     base_currency = get_base_currency()
     symbol = get_base_currency_symbol()
 
-    # ========== PDF SETUP ==========
+    # ---- PDF setup ----
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
         topMargin=15 * mm, bottomMargin=15 * mm,
         leftMargin=15 * mm, rightMargin=15 * mm,
-        title="Balance Sheet",
-        author=company['name'],
+        title="Statement of Financial Position", author=company['name'],
     )
     elements = []
     styles = getSampleStyleSheet()
 
-    # ========== STYLES ==========
     company_name_style = ParagraphStyle(
-        'CompanyName', parent=styles['Heading1'], fontSize=18,
-        textColor=colors.HexColor('#2c3e50'), alignment=1, spaceAfter=4,
+        'CN', parent=styles['Heading1'], fontSize=16,
+        textColor=colors.HexColor('#2c3e50'), alignment=1, spaceAfter=3,
         fontName=FONT_BOLD,
     )
-    company_sub_style = ParagraphStyle(
-        'CompanySub', parent=styles['Normal'], fontSize=9,
+    sub_style = ParagraphStyle(
+        'CS', parent=styles['Normal'], fontSize=9,
         textColor=colors.HexColor('#555555'), alignment=1,
-        spaceAfter=2, leading=12,
-        fontName=FONT,
+        spaceAfter=2, leading=11, fontName=FONT,
     )
     title_style = ParagraphStyle(
-        'Title', parent=styles['Heading1'], fontSize=20,
-        textColor=colors.HexColor('#2980b9'), alignment=1,
-        spaceBefore=6, spaceAfter=6,
-        fontName=FONT_BOLD,
+        'T', parent=styles['Heading1'], fontSize=18,
+        textColor=colors.HexColor('#2c3e50'), alignment=1,
+        spaceBefore=6, spaceAfter=4, fontName=FONT_BOLD,
     )
     period_style = ParagraphStyle(
-        'Period', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor('#7f8c8d'), alignment=1, spaceAfter=14,
-        fontName=FONT,
+        'P', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#7f8c8d'), alignment=1,
+        spaceAfter=10, fontName=FONT,
     )
     footer_style = ParagraphStyle(
-        'Footer', parent=styles['Normal'], fontSize=8,
-        textColor=colors.grey, alignment=1,
-        fontName=FONT,
+        'F', parent=styles['Normal'], fontSize=8,
+        textColor=colors.grey, alignment=1, fontName=FONT,
     )
 
-    # ========== HEADER ==========
     elements.append(Paragraph(f"<b>{company['name']}</b>", company_name_style))
-
     if company['address']:
-        elements.append(Paragraph(company['address'].replace('\n', ', '), company_sub_style))
-
+        elements.append(Paragraph(company['address'].replace('\n', ', '), sub_style))
     contact_parts = []
-    if company['phone']:
-        contact_parts.append(f"Tel: {company['phone']}")
-    if company['email']:
-        contact_parts.append(f"Email: {company['email']}")
+    if company['phone']: contact_parts.append(f"Tel: {company['phone']}")
+    if company['email']: contact_parts.append(f"Email: {company['email']}")
     if contact_parts:
-        elements.append(Paragraph(" • ".join(contact_parts), company_sub_style))
+        elements.append(Paragraph(" • ".join(contact_parts), sub_style))
 
-    elements.append(Spacer(1, 8))
-    elements.append(Paragraph("BALANCE SHEET", title_style))
-    elements.append(Paragraph(
-        f"As of {as_of_date.strftime('%d %b %Y')}  •  "
-        f"All amounts in {base_currency} ({symbol})",
-        period_style,
-    ))
+    elements.append(Spacer(1, 6))
+    elements.append(Paragraph("STATEMENT OF FINANCIAL POSITION", title_style))
 
-    # ========== HELPER: BUILD A SECTION ==========
-    def build_section(title, lines, total_label, total_value, head_color_hex):
-        head = ParagraphStyle(
-            f'SH_{title}', parent=styles['Heading2'], fontSize=12,
-            textColor=colors.white, backColor=colors.HexColor(head_color_hex),
-            alignment=0, spaceBefore=8, spaceAfter=6, leftIndent=4,
-            fontName=FONT_BOLD,
-        )
-        elements.append(Paragraph(f"<b>{title}</b>", head))
-
-        data = [['Code', 'Account', 'Amount']]
-        for line in lines:
-            data.append([line['code'], line['name'], f"{symbol}{line['amount']:,.2f}"])
-        if len(data) == 1:
-            data.append(['—', 'None', f"{symbol}0.00"])
-
-        total_label_para = Paragraph(
-            f"<b>{total_label}</b>",
-            ParagraphStyle('TL', parent=styles['Normal'], fontName=FONT_BOLD, fontSize=9),
-        )
-        total_value_para = Paragraph(
-            f"<b>{symbol}{total_value:,.2f}</b>",
-            ParagraphStyle('TV', parent=styles['Normal'], fontName=FONT_BOLD,
-                           fontSize=9, alignment=2),
-        )
-        data.append(['', total_label_para, total_value_para])
-
-        t = Table(data, colWidths=[25 * mm, 105 * mm, 50 * mm], repeatRows=1)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ecf0f1')),
-            ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('FONTNAME', (0, 1), (-1, -2), FONT),
-            ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#bdc3c7')),
-            ('BACKGROUND', (0, len(data) - 1), (-1, len(data) - 1), colors.HexColor('#eaf2f8')),
-            ('FONTNAME', (0, len(data) - 1), (-1, len(data) - 1), FONT_BOLD),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        elements.append(t)
-        elements.append(Spacer(1, 12))
-
-    # ========== ASSETS ==========
-    build_section("ASSETS", asset_lines, "Total Assets", total_assets, '#2980b9')
-
-    # ========== LIABILITIES ==========
-    build_section("LIABILITIES", liability_lines, "Total Liabilities",
-                  total_liabilities, '#c0392b')
-
-    # ========== EQUITY (with retained earnings) ==========
-    eq_head = ParagraphStyle(
-        'SH_EQ', parent=styles['Heading2'], fontSize=12,
-        textColor=colors.white, backColor=colors.HexColor('#8e44ad'),
-        alignment=0, spaceBefore=8, spaceAfter=6, leftIndent=4,
-        fontName=FONT_BOLD,
-    )
-    elements.append(Paragraph("<b>EQUITY</b>", eq_head))
-
-    eq_data = [['Code', 'Account', 'Amount']]
-    for line in equity_lines:
-        eq_data.append([line['code'], line['name'], f"{symbol}{line['amount']:,.2f}"])
-    if not equity_lines:
-        eq_data.append(['—', 'No equity accounts', f"{symbol}0.00"])
-
-    # Add retained earnings as a separate row
-    eq_data.append([
-        '—',
-        'Retained Earnings (cumulative net profit)',
-        f"{symbol}{retained_earnings:,.2f}",
-    ])
-
-    eq_total_label = Paragraph(
-        "<b>Total Equity</b>",
-        ParagraphStyle('EQ_TL', parent=styles['Normal'], fontName=FONT_BOLD, fontSize=9),
-    )
-    eq_total_value = Paragraph(
-        f"<b>{symbol}{total_equity_with_re:,.2f}</b>",
-        ParagraphStyle('EQ_TV', parent=styles['Normal'], fontName=FONT_BOLD,
-                       fontSize=9, alignment=2),
-    )
-    eq_data.append(['', eq_total_label, eq_total_value])
-
-    eq_table = Table(eq_data, colWidths=[25 * mm, 105 * mm, 50 * mm], repeatRows=1)
-    eq_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ecf0f1')),
-        ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('FONTNAME', (0, 1), (-1, -2), FONT),
-        ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#bdc3c7')),
-        ('BACKGROUND', (0, len(eq_data) - 1), (-1, len(eq_data) - 1), colors.HexColor('#f4ecf7')),
-        ('FONTNAME', (0, len(eq_data) - 1), (-1, len(eq_data) - 1), FONT_BOLD),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(eq_table)
-    elements.append(Spacer(1, 16))
-
-    # ========== TOTAL LIABILITIES + EQUITY ==========
-    total_l_label = Paragraph(
-        "<b>TOTAL LIABILITIES + EQUITY</b>",
-        ParagraphStyle('TL_LE', parent=styles['Normal'], fontSize=13,
-                       fontName=FONT_BOLD, textColor=colors.white),
-    )
-    total_l_value = Paragraph(
-        f"<b>{symbol}{total_liab_eq:,.2f} {base_currency}</b>",
-        ParagraphStyle('TV_LE', parent=styles['Normal'], fontSize=13,
-                       fontName=FONT_BOLD, textColor=colors.white, alignment=2),
-    )
-    total_table = Table([[total_l_label, total_l_value]], colWidths=[100 * mm, 80 * mm])
-    total_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495e')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    elements.append(total_table)
-
-    elements.append(Spacer(1, 10))
-
-    # ========== BALANCE CHECK ==========
-    diff = total_assets - total_liab_eq
-    if abs(diff) < 0.01:
-        msg = f"✓ Balance Sheet is balanced (Assets = Liabilities + Equity)"
-        msg_color = colors.HexColor('#27ae60')
+    if compare:
+        elements.append(Paragraph(
+            f"As of {as_of_date.strftime('%d %b %Y')}  •  "
+            f"Comparative: {prior_date.strftime('%d %b %Y')}  •  "
+            f"All amounts in {base_currency} ({symbol})",
+            period_style,
+        ))
     else:
-        msg = f"⚠ Out of balance by {symbol}{abs(diff):,.2f}"
-        msg_color = colors.HexColor('#c0392b')
+        elements.append(Paragraph(
+            f"As of {as_of_date.strftime('%d %b %Y')}  •  "
+            f"All amounts in {base_currency} ({symbol})",
+            period_style,
+        ))
 
-    elements.append(Paragraph(msg, ParagraphStyle(
-        'Bal', parent=styles['Normal'], fontSize=10,
-        textColor=msg_color, alignment=1, fontName=FONT_BOLD,
-    )))
+    # ---- build the table ----
+    if compare:
+        col_widths = [95 * mm, 42 * mm, 42 * mm]
+        header = ['Description',
+                  as_of_date.strftime('%d %b %Y'),
+                  prior_date.strftime('%d %b %Y')]
+    else:
+        col_widths = [120 * mm, 55 * mm]
+        header = ['Description', as_of_date.strftime('%d %b %Y')]
 
-    elements.append(Spacer(1, 16))
+    data = [header]
+    row_meta = []  # parallel to data rows: 'header', 'section', 'subhead', 'row', 'subtotal', 'total', 'spacer'
+    row_meta.append('header')
+
+    def add_line(code, name, amount, prior_amount, indent=1, is_section_header=False, is_subhead=False, is_subtotal=False, is_total=False, label=None, spacer=False):
+        if spacer:
+            row = [''] * len(header)
+            data.append(row); row_meta.append('spacer'); return
+
+        if is_section_header:
+            row = [label] + [''] * (len(header) - 1)
+            data.append(row); row_meta.append('section'); return
+
+        if is_subhead:
+            row = [label] + [''] * (len(header) - 1)
+            data.append(row); row_meta.append('subhead'); return
+
+        pad = '  ' * indent
+        desc = label if label is not None else f"{pad}{code} — {name}"
+        if compare:
+            row = [desc,
+                   f"{symbol}{amount:,.2f}" if amount is not None else '—',
+                   f"{symbol}{prior_amount:,.2f}" if prior_amount is not None else '—']
+        else:
+            row = [desc, f"{symbol}{amount:,.2f}" if amount is not None else '—']
+
+        data.append(row)
+        row_meta.append('subtotal' if is_subtotal else ('total' if is_total else 'row'))
+
+    def prior_amount_of(prior_list, code):
+        if not prior_list:
+            return None
+        for x in prior_list:
+            if x['code'] == code:
+                return x['amount']
+        return None
+
+    # ================== ASSETS ==================
+    add_line(None, None, None, None, is_section_header=True, label='ASSETS')
+
+    add_line(None, None, None, None, is_subhead=True, label='Non-current assets')
+    for line in current['non_current_assets']:
+        add_line(line['code'], line['name'], line['amount'],
+                 prior_amount_of(prior['non_current_assets'], line['code']) if prior else None,
+                 indent=2)
+    add_line(None, None, current['total_non_current_assets'],
+             prior['total_non_current_assets'] if prior else None,
+             indent=1, is_subtotal=True, label='  Total non-current assets')
+
+    add_line(None, None, None, None, is_subhead=True, label='Current assets')
+    for line in current['current_assets']:
+        add_line(line['code'], line['name'], line['amount'],
+                 prior_amount_of(prior['current_assets'], line['code']) if prior else None,
+                 indent=2)
+    add_line(None, None, current['total_current_assets'],
+             prior['total_current_assets'] if prior else None,
+             indent=1, is_subtotal=True, label='  Total current assets')
+
+    add_line(None, None, current['total_assets'],
+             prior['total_assets'] if prior else None,
+             is_total=True, label='TOTAL ASSETS')
+
+    add_line(None, None, None, None, spacer=True)
+
+    # ================== EQUITY ==================
+    add_line(None, None, None, None, is_section_header=True, label='EQUITY')
+    for line in current['equity_lines']:
+        add_line(line['code'], line['name'], line['amount'],
+                 prior_amount_of(prior['equity_lines'], line['code']) if prior else None,
+                 indent=1)
+    add_line(None, None, current['retained_earnings'],
+             prior['retained_earnings'] if prior else None,
+             indent=1, label='  Retained earnings')
+    add_line(None, None, current['total_equity'],
+             prior['total_equity'] if prior else None,
+             is_subtotal=True, label='Total equity')
+
+    # ================== LIABILITIES ==================
+    add_line(None, None, None, None, is_section_header=True, label='LIABILITIES')
+
+    add_line(None, None, None, None, is_subhead=True, label='Non-current liabilities')
+    for line in current['non_current_liabilities']:
+        add_line(line['code'], line['name'], line['amount'],
+                 prior_amount_of(prior['non_current_liabilities'], line['code']) if prior else None,
+                 indent=2)
+    add_line(None, None, current['total_non_current_liabilities'],
+             prior['total_non_current_liabilities'] if prior else None,
+             indent=1, is_subtotal=True, label='  Total non-current liabilities')
+
+    add_line(None, None, None, None, is_subhead=True, label='Current liabilities')
+    for line in current['current_liabilities']:
+        add_line(line['code'], line['name'], line['amount'],
+                 prior_amount_of(prior['current_liabilities'], line['code']) if prior else None,
+                 indent=2)
+    add_line(None, None, current['total_current_liabilities'],
+             prior['total_current_liabilities'] if prior else None,
+             indent=1, is_subtotal=True, label='  Total current liabilities')
+
+    add_line(None, None, current['total_liabilities'],
+             prior['total_liabilities'] if prior else None,
+             is_subtotal=True, label='Total liabilities')
+
+    add_line(None, None, current['total_liab_eq'],
+             prior['total_liab_eq'] if prior else None,
+             is_total=True, label='TOTAL EQUITY AND LIABILITIES')
+
+    # ---- style ----
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    style = [
+        # header
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495e')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), FONT_BOLD),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('ALIGN', (1, 0), (-1, 0), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#d5dbdb')),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        # default font for the body
+        ('FONTNAME', (0, 1), (-1, -1), FONT),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+    ]
+
+    for i, meta in enumerate(row_meta):
+        if meta == 'section':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#2c3e50')),
+                ('TEXTCOLOR', (0, i), (-1, i), colors.white),
+                ('FONTNAME', (0, i), (-1, i), FONT_BOLD),
+                ('SPAN', (0, i), (-1, i)),
+            ]
+        elif meta == 'subhead':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#ecf0f1')),
+                ('FONTNAME', (0, i), (-1, i), FONT_BOLD),
+                ('SPAN', (0, i), (-1, i)),
+            ]
+        elif meta == 'subtotal':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f4f6f8')),
+                ('FONTNAME', (0, i), (-1, i), FONT_BOLD),
+            ]
+        elif meta == 'total':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#d6eaf8')),
+                ('FONTNAME', (0, i), (-1, i), FONT_BOLD),
+                ('LINEABOVE', (0, i), (-1, i), 1, colors.HexColor('#2c3e50')),
+                ('LINEBELOW', (0, i), (-1, i), 1.5, colors.HexColor('#2c3e50')),
+            ]
+        elif meta == 'spacer':
+            style += [
+                ('BACKGROUND', (0, i), (-1, i), colors.HexColor('#fafafa')),
+                ('LINEBELOW', (0, i), (-1, i), 0, colors.white),
+                ('LINEABOVE', (0, i), (-1, i), 0, colors.white),
+            ]
+
+    t.setStyle(TableStyle(style))
+    elements.append(t)
+
+    elements.append(Spacer(1, 14))
     elements.append(Paragraph(
-        f"This is a computer-generated Balance Sheet. All amounts in {base_currency}.",
+        f"This is a computer-generated Statement of Financial Position. "
+        f"All amounts in {base_currency}.",
         footer_style,
     ))
 
-    # ========== BUILD ==========
     doc.build(elements)
     buffer.seek(0)
+
+    suffix = f"_{as_of_date.strftime('%Y%m%d')}"
+    if compare:
+        suffix += "_comparative"
 
     return send_file(
         buffer,
         as_attachment=True,
-        download_name=f'balance_sheet_{as_of_date.strftime("%Y%m%d")}.pdf',
+        download_name=f'balance_sheet{suffix}.pdf',
         mimetype='application/pdf',
     )
 
-# acctsys/app.py – PDF export of Trial Balance
-
 # acctsys/app.py – Balance Sheet Excel export
+
+# acctsys/app.py – Balance Sheet Excel (IFRS + optional comparative)
 
 @app.route('/balance_sheet/excel')
 @login_required
@@ -5571,60 +5923,17 @@ def balance_sheet_excel():
     except ValueError:
         as_of_date = date.today()
 
-    entries = JournalEntry.query.filter(
-        JournalEntry.user_id == current_user.id,
-        JournalEntry.date <= as_of_date,
-    ).all()
+    compare = (request.args.getlist('compare') or ['on'])[-1].lower() \
+              not in ('off', '0', 'false', 'no')
 
-    account_totals = {}
-    for e in entries:
-        account_totals.setdefault(e.account_id, {'debit': 0.0, 'credit': 0.0})
-        account_totals[e.account_id]['debit'] += e.debit or 0.0
-        account_totals[e.account_id]['credit'] += e.credit or 0.0
+    try:
+        prior_date = as_of_date.replace(year=as_of_date.year - 1)
+    except ValueError:
+        prior_date = as_of_date.replace(year=as_of_date.year - 1, day=28)
 
-    accounts = ChartOfAccount.query.filter(
-        ChartOfAccount.id.in_(list(account_totals.keys()))
-    ).all() if account_totals else []
-    accounts_by_id = {a.id: a for a in accounts}
+    current = _bs_snapshot(current_user.id, as_of_date)
+    prior = _bs_snapshot(current_user.id, prior_date) if compare else None
 
-    asset_lines, liability_lines, equity_lines = [], [], []
-    total_assets = total_liabilities = total_equity = 0.0
-    total_revenue = total_expenses = 0.0
-
-    for account_id, totals in account_totals.items():
-        account = accounts_by_id.get(account_id)
-        if not account or not account.account_type:
-            continue
-        at = account.account_type
-        balance = (totals['debit'] - totals['credit']) if at.normal_balance == 'Debit' \
-                  else (totals['credit'] - totals['debit'])
-        if balance == 0:
-            continue
-        row = {'code': account.account_code, 'name': account.account_name, 'amount': balance}
-        nl = at.name.lower()
-        if nl in ('asset', 'current asset', 'non-current asset', 'fixed asset',
-                  'current assets', 'non-current assets'):
-            asset_lines.append(row); total_assets += balance
-        elif nl in ('liability', 'current liability', 'non-current liability',
-                    'current liabilities', 'non-current liabilities',
-                    'payable', 'accounts payable'):
-            liability_lines.append(row); total_liabilities += balance
-        elif nl in ('equity', "owner's equity", 'capital', 'retained earnings'):
-            equity_lines.append(row); total_equity += balance
-        elif nl in ('revenue', 'income', 'sales'):
-            total_revenue += balance
-        elif nl in ('expense', 'expenses', 'cost of sales', 'cogs'):
-            total_expenses += balance
-
-    retained_earnings = total_revenue - total_expenses
-    total_equity_with_re = total_equity + retained_earnings
-    total_liab_eq = total_liabilities + total_equity_with_re
-
-    asset_lines.sort(key=lambda x: x['code'])
-    liability_lines.sort(key=lambda x: x['code'])
-    equity_lines.sort(key=lambda x: x['code'])
-
-    # ========== BUILD WORKBOOK ==========
     company = get_company_profile()
     base_currency = get_base_currency()
     symbol = get_base_currency_symbol()
@@ -5633,174 +5942,229 @@ def balance_sheet_excel():
     ws = wb.active
     ws.title = "Balance Sheet"
 
-    row = _write_company_header(ws, company, base_currency, symbol)
-    row = _write_sheet_title(
-        ws, row, "BALANCE SHEET",
-        f"As of {as_of_date.strftime('%d %b %Y')}  •  All amounts in {base_currency} ({symbol})"
-    )
+    # ---- Title block ----
+    ncols = 3 if compare else 2
+    last_col_letter = get_column_letter(ncols)
 
-    def write_section(title, lines, total_label, total_value, header_fill, total_fill):
-        nonlocal row
-        # Section header
-        ws.cell(row=row, column=1, value=title).font = EXCEL_SECTION_FONT
-        for c in range(1, 4):
-            ws.cell(row=row, column=c).fill = header_fill
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+    ws['A1'] = company['name']
+    ws['A1'].font = EXCEL_TITLE_FONT
+    ws.merge_cells(f'A1:{last_col_letter}1')
+
+    row = 2
+    if company.get('address'):
+        ws.cell(row=row, column=1,
+                value=company['address'].replace('\n', ', ')).font = EXCEL_SUBTITLE_FONT
+        ws.merge_cells(f'A{row}:{last_col_letter}{row}')
         row += 1
 
-        # Column headers
-        for c, h in enumerate(['Code', 'Account', f'Amount ({base_currency})'], start=1):
-            cell = ws.cell(row=row, column=c, value=h)
-            cell.font = EXCEL_HEADER_FONT
-            cell.fill = EXCEL_HEADER_FILL
-            cell.alignment = EXCEL_ALIGN_CENTER
-        header_row = row
+    contact = []
+    if company.get('phone'):   contact.append(f"Tel: {company['phone']}")
+    if company.get('email'):   contact.append(f"Email: {company['email']}")
+    if contact:
+        ws.cell(row=row, column=1,
+                value=" • ".join(contact)).font = EXCEL_SUBTITLE_FONT
+        ws.merge_cells(f'A{row}:{last_col_letter}{row}')
         row += 1
 
-        first_data_row = row
-        for line in lines:
-            ws.cell(row=row, column=1, value=line['code']).font = EXCEL_NORMAL_FONT
-            ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
-            ws.cell(row=row, column=2, value=line['name']).font = EXCEL_NORMAL_FONT
-            c3 = ws.cell(row=row, column=3, value=line['amount'])
-            c3.number_format = f'"{symbol}"#,##0.00'
-            c3.font = EXCEL_NORMAL_FONT
-            c3.alignment = EXCEL_ALIGN_RIGHT
-            row += 1
-
-        if not lines:
-            ws.cell(row=row, column=1, value="—").font = EXCEL_NORMAL_FONT
-            ws.cell(row=row, column=2, value="None").font = EXCEL_NORMAL_FONT
-            c3 = ws.cell(row=row, column=3, value=0)
-            c3.number_format = f'"{symbol}"#,##0.00'
-            c3.font = EXCEL_NORMAL_FONT
-            c3.alignment = EXCEL_ALIGN_RIGHT
-            row += 1
-
-        last_data_row = row - 1
-
-        # Total row
-        ws.cell(row=row, column=1).fill = total_fill
-        ws.cell(row=row, column=2, value=total_label).font = EXCEL_TOTAL_FONT
-        ws.cell(row=row, column=2).alignment = EXCEL_ALIGN_RIGHT
-        ws.cell(row=row, column=2).fill = total_fill
-        c3 = ws.cell(row=row, column=3, value=f"=SUM(C{first_data_row}:C{last_data_row})")
-        c3.number_format = f'"{symbol}"#,##0.00'
-        c3.font = EXCEL_TOTAL_FONT
-        c3.alignment = EXCEL_ALIGN_RIGHT
-        c3.fill = total_fill
-        total_row = row
-        row += 2
-
-        _apply_border(ws, header_row, total_row, 1, 3)
-        return total_row
-
-    asset_total_row = write_section("ASSETS", asset_lines, "Total Assets",
-                                    total_assets, EXCEL_SECTION_FILL, EXCEL_TOTAL_FILL)
-    liab_total_row = write_section("LIABILITIES", liability_lines, "Total Liabilities",
-                                   total_liabilities, EXCEL_SECTION_FILL_2, EXCEL_TOTAL_FILL_RED)
-
-    # Equity section (custom because of retained earnings row)
-    ws.cell(row=row, column=1, value="EQUITY").font = EXCEL_SECTION_FONT
-    for c in range(1, 4):
-        ws.cell(row=row, column=c).fill = EXCEL_SECTION_FILL_3
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+    ws.cell(row=row, column=1,
+            value="STATEMENT OF FINANCIAL POSITION").font = Font(
+        name='Calibri', size=14, bold=True, color='2C3E50')
+    ws.merge_cells(f'A{row}:{last_col_letter}{row}')
+    ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
     row += 1
 
-    for c, h in enumerate(['Code', 'Account', f'Amount ({base_currency})'], start=1):
+    period_text = f"As of {as_of_date.strftime('%d %b %Y')}"
+    if compare:
+        period_text += f"  •  Comparative: {prior_date.strftime('%d %b %Y')}"
+    period_text += f"  •  All amounts in {base_currency} ({symbol})"
+
+    ws.cell(row=row, column=1, value=period_text).font = EXCEL_SUBTITLE_FONT
+    ws.merge_cells(f'A{row}:{last_col_letter}{row}')
+    ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
+    row += 2
+
+    # ---- Header row ----
+    if compare:
+        headers = ['Description',
+                   as_of_date.strftime('%d %b %Y'),
+                   prior_date.strftime('%d %b %Y')]
+    else:
+        headers = ['Description', as_of_date.strftime('%d %b %Y')]
+
+    header_row = row
+    for c, h in enumerate(headers, start=1):
         cell = ws.cell(row=row, column=c, value=h)
         cell.font = EXCEL_HEADER_FONT
         cell.fill = EXCEL_HEADER_FILL
         cell.alignment = EXCEL_ALIGN_CENTER
-    eq_header_row = row
     row += 1
 
-    eq_first_data = row
-    for line in equity_lines:
-        ws.cell(row=row, column=1, value=line['code']).font = EXCEL_NORMAL_FONT
-        ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
-        ws.cell(row=row, column=2, value=line['name']).font = EXCEL_NORMAL_FONT
-        c3 = ws.cell(row=row, column=3, value=line['amount'])
-        c3.number_format = f'"{symbol}"#,##0.00'
-        c3.font = EXCEL_NORMAL_FONT
-        c3.alignment = EXCEL_ALIGN_RIGHT
+    def write_section(label):
+        nonlocal row
+        ws.cell(row=row, column=1, value=label).font = EXCEL_SECTION_FONT
+        for c in range(1, ncols + 1):
+            ws.cell(row=row, column=c).fill = EXCEL_HEADER_FILL
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
         row += 1
 
-    # Retained earnings row
-    ws.cell(row=row, column=1, value="—").font = EXCEL_NORMAL_FONT
-    ws.cell(row=row, column=1).alignment = EXCEL_ALIGN_CENTER
-    ws.cell(row=row, column=2,
-            value="Retained Earnings (cumulative net profit)").font = EXCEL_NORMAL_FONT
-    c3 = ws.cell(row=row, column=3, value=retained_earnings)
-    c3.number_format = f'"{symbol}"#,##0.00'
-    c3.font = EXCEL_NORMAL_FONT
-    c3.alignment = EXCEL_ALIGN_RIGHT
+    def write_subhead(label):
+        nonlocal row
+        ws.cell(row=row, column=1, value=label).font = Font(
+            name='Calibri', size=10, italic=True, bold=True, color='34495E')
+        for c in range(1, ncols + 1):
+            ws.cell(row=row, column=c).fill = PatternFill('solid', fgColor='ECF0F1')
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+        row += 1
+
+    def write_line(code, name, amount, prior_amt, indent=2):
+        nonlocal row
+        prefix = '    ' * indent
+        ws.cell(row=row, column=1, value=f"{prefix}{code} — {name}").font = EXCEL_NORMAL_FONT
+
+        c2 = ws.cell(row=row, column=2, value=amount if amount is not None else None)
+        c2.number_format = f'"{symbol}"#,##0.00'
+        c2.font = EXCEL_NORMAL_FONT
+        c2.alignment = EXCEL_ALIGN_RIGHT
+        if amount is None:
+            c2.value = '—'
+            c2.alignment = EXCEL_ALIGN_CENTER
+
+        if compare:
+            c3 = ws.cell(row=row, column=3,
+                         value=prior_amt if prior_amt is not None else '—')
+            if prior_amt is not None:
+                c3.number_format = f'"{symbol}"#,##0.00'
+                c3.alignment = EXCEL_ALIGN_RIGHT
+            else:
+                c3.alignment = EXCEL_ALIGN_CENTER
+            c3.font = EXCEL_NORMAL_FONT
+        row += 1
+
+    def write_total(label, amount, prior_amt, kind='subtotal', indent=0):
+        nonlocal row
+        prefix = '    ' * indent
+        ws.cell(row=row, column=1, value=f"{prefix}{label}").font = EXCEL_TOTAL_FONT
+
+        fill = EXCEL_TOTAL_FILL if kind == 'subtotal' else PatternFill('solid', fgColor='D6EAF8')
+        for c in range(1, ncols + 1):
+            ws.cell(row=row, column=c).fill = fill
+
+        c2 = ws.cell(row=row, column=2, value=amount)
+        c2.number_format = f'"{symbol}"#,##0.00'
+        c2.font = EXCEL_TOTAL_FONT
+        c2.alignment = EXCEL_ALIGN_RIGHT
+
+        if compare:
+            c3 = ws.cell(row=row, column=3, value=prior_amt)
+            c3.number_format = f'"{symbol}"#,##0.00'
+            c3.font = EXCEL_TOTAL_FONT
+            c3.alignment = EXCEL_ALIGN_RIGHT
+
+        if kind == 'total':
+            for c in range(1, ncols + 1):
+                cell = ws.cell(row=row, column=c)
+                cell.border = Border(
+                    top=Side(style='medium', color='2C3E50'),
+                    bottom=Side(style='double', color='2C3E50'),
+                )
+        row += 1
+
+    # ---- DATA ----
+    def prior_of(lst, code):
+        if not lst:
+            return None
+        for x in lst:
+            if x['code'] == code:
+                return x['amount']
+        return None
+
+    write_section('ASSETS')
+
+    write_subhead('Non-current assets')
+    for line in current['non_current_assets']:
+        write_line(line['code'], line['name'], line['amount'],
+                   prior_of(prior['non_current_assets'], line['code']) if prior else None)
+    write_total('Total non-current assets',
+                current['total_non_current_assets'],
+                prior['total_non_current_assets'] if prior else None, indent=1)
+
+    write_subhead('Current assets')
+    for line in current['current_assets']:
+        write_line(line['code'], line['name'], line['amount'],
+                   prior_of(prior['current_assets'], line['code']) if prior else None)
+    write_total('Total current assets',
+                current['total_current_assets'],
+                prior['total_current_assets'] if prior else None, indent=1)
+
+    write_total('TOTAL ASSETS',
+                current['total_assets'],
+                prior['total_assets'] if prior else None, kind='total')
+
     row += 1
-    eq_last_data = row - 1
 
-    # Total Equity
-    ws.cell(row=row, column=1).fill = EXCEL_TOTAL_FILL
-    ws.cell(row=row, column=2, value="Total Equity").font = EXCEL_TOTAL_FONT
-    ws.cell(row=row, column=2).alignment = EXCEL_ALIGN_RIGHT
-    ws.cell(row=row, column=2).fill = EXCEL_TOTAL_FILL
-    c3 = ws.cell(row=row, column=3, value=f"=SUM(C{eq_first_data}:C{eq_last_data})")
-    c3.number_format = f'"{symbol}"#,##0.00'
-    c3.font = EXCEL_TOTAL_FONT
-    c3.alignment = EXCEL_ALIGN_RIGHT
-    c3.fill = EXCEL_TOTAL_FILL
-    eq_total_row = row
-    row += 2
+    write_section('EQUITY')
+    for line in current['equity_lines']:
+        write_line(line['code'], line['name'], line['amount'],
+                   prior_of(prior['equity_lines'], line['code']) if prior else None,
+                   indent=1)
+    write_line('—', 'Retained earnings', current['retained_earnings'],
+               prior['retained_earnings'] if prior else None, indent=1)
+    write_total('Total equity',
+                current['total_equity'],
+                prior['total_equity'] if prior else None)
 
-    _apply_border(ws, eq_header_row, eq_total_row, 1, 3)
+    write_section('LIABILITIES')
 
-    # Total Liabilities + Equity
-    c1 = ws.cell(row=row, column=1, value="TOTAL LIABILITIES + EQUITY")
-    c1.font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
-    c1.alignment = EXCEL_ALIGN_LEFT
-    c1.fill = PatternFill('solid', fgColor='34495E')
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+    write_subhead('Non-current liabilities')
+    for line in current['non_current_liabilities']:
+        write_line(line['code'], line['name'], line['amount'],
+                   prior_of(prior['non_current_liabilities'], line['code']) if prior else None)
+    write_total('Total non-current liabilities',
+                current['total_non_current_liabilities'],
+                prior['total_non_current_liabilities'] if prior else None, indent=1)
 
-    c3 = ws.cell(row=row, column=3, value=f"=C{liab_total_row}+C{eq_total_row}")
-    c3.number_format = f'"{symbol}"#,##0.00'
-    c3.font = Font(name='Calibri', size=12, bold=True, color='FFFFFF')
-    c3.alignment = EXCEL_ALIGN_RIGHT
-    c3.fill = PatternFill('solid', fgColor='34495E')
-    liab_eq_row = row
-    row += 2
+    write_subhead('Current liabilities')
+    for line in current['current_liabilities']:
+        write_line(line['code'], line['name'], line['amount'],
+                   prior_of(prior['current_liabilities'], line['code']) if prior else None)
+    write_total('Total current liabilities',
+                current['total_current_liabilities'],
+                prior['total_current_liabilities'] if prior else None, indent=1)
 
-    # Balance check
-    diff = total_assets - total_liab_eq
-    if abs(diff) < 0.01:
-        msg = "✓ Balance Sheet is balanced (Assets = Liabilities + Equity)"
-        fill = EXCEL_TOTAL_FILL_GRN
-    else:
-        msg = f"⚠ Out of balance by {symbol}{abs(diff):,.2f}"
-        fill = EXCEL_TOTAL_FILL_RED
+    write_total('Total liabilities',
+                current['total_liabilities'],
+                prior['total_liabilities'] if prior else None)
 
-    c = ws.cell(row=row, column=1, value=msg)
-    c.font = EXCEL_TOTAL_FONT
-    c.alignment = EXCEL_ALIGN_CENTER
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
-    for col in range(1, 4):
-        ws.cell(row=row, column=col).fill = fill
-    row += 2
+    write_total('TOTAL EQUITY AND LIABILITIES',
+                current['total_liab_eq'],
+                prior['total_liab_eq'] if prior else None, kind='total')
 
     # Footer
+    row += 2
     ws.cell(row=row, column=1,
-            value=f"This is a computer-generated Balance Sheet. All amounts in {base_currency}."
-            ).font = Font(name='Calibri', size=8, italic=True, color='888888')
-    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+            value=f"Computer-generated Statement of Financial Position. "
+                  f"All amounts in {base_currency}.").font = Font(
+        name='Calibri', size=8, italic=True, color='888888')
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
 
-    _autosize_columns(ws)
+    # Column widths
+    ws.column_dimensions['A'].width = 55
+    ws.column_dimensions['B'].width = 22
+    if compare:
+        ws.column_dimensions['C'].width = 22
 
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
 
+    suffix = f"_{as_of_date.strftime('%Y%m%d')}"
+    if compare:
+        suffix += "_comparative"
+
     return send_file(
         buf,
         as_attachment=True,
-        download_name=f'balance_sheet_{as_of_date.strftime("%Y%m%d")}.xlsx',
+        download_name=f'balance_sheet{suffix}.xlsx',
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
 
@@ -6054,6 +6418,27 @@ def trial_balance_pdf():
         download_name=f'trial_balance{suffix}.pdf',
         mimetype='application/pdf',
     )
+
+@app.route('/debug/company-scope')
+@login_required
+def debug_company_scope():
+    from flask import session as fs
+    from acctsys import models as mm
+    from extensions import db as _db
+
+    cid = fs.get('company_id')
+    orm_count = mm.ChartOfAccount.query.count()
+    sql_count = _db.session.execute(
+        _db.text("SELECT COUNT(*) FROM chart_of_account WHERE company_id = :c"),
+        {'c': cid},
+    ).scalar()
+
+    return {
+        'session_company_id': cid,
+        'orm_chart_of_accounts': orm_count,
+        'sql_chart_of_accounts': sql_count,
+        'match': orm_count == sql_count,
+    }
 
 # ============================================================
 # ✅ MAIN

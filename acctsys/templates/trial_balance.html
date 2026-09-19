@@ -22,6 +22,9 @@
                class="btn btn-success">
                 <i class="fas fa-file-excel"></i> Excel
             </a>
+            <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
         </div>
     </div>
 
@@ -190,6 +193,13 @@
             Movement during the selected period.
         {% endif %}
         For the accounting system to be in balance, total debits must equal total credits.
+    </div>
+
+    <!-- ========== BOTTOM BACK BUTTON ========== -->
+    <div class="d-flex justify-content-start mt-3">
+        <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Reports
+        </a>
     </div>
 </div>
 {% endblock %}
