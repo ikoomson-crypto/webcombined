@@ -2029,42 +2029,71 @@ def create_invoice_from_payroll(company_id, employee_id, year, month, descriptio
     gross_salary = payroll['gross_salary']
     invoice_number = generate_invoice_number(company_id)
 
-    cursor.execute("""
-        INSERT INTO consultant_invoices (
-            company_id, employee_id, invoice_number, invoice_date, due_date,
-            period_start, period_end, description, hourly_rate, hours_worked,
-            total_amount, tax_amount, discount_amount, final_amount, status,
-            notes, created_date, updated_date
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        company_id,
-        employee_id,
-        invoice_number,
-        datetime.datetime.now().strftime('%Y-%m-%d'),
-        (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%Y-%m-%d'),
-        period_start,
-        period_end,
-        description or f"Consulting services for {get_month_name(month)} {year}",
-        0, 0,  # hourly_rate, hours_worked
-        gross_salary,
-        0, 0,  # tax_amount, discount_amount
-        gross_salary,
-        'Sent',
-        notes,
-        datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    ))
+    now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    due_date = (datetime.datetime.now() + datetime.timedelta(days=30)).strftime('%Y-%m-%d')
+    invoice_date = datetime.datetime.now().strftime('%Y-%m-%d')
 
+    # ✅ FIX: Use proper INSERT with RETURNING for PostgreSQL and lastrowid for SQLite
     if IS_PRODUCTION:
-        cursor.execute("""INSERT INTO consultant_invoices (...) VALUES (...) RETURNING id""", (...))
+        cursor.execute("""
+            INSERT INTO consultant_invoices (
+                company_id, employee_id, invoice_number, invoice_date, due_date,
+                period_start, period_end, description, hourly_rate, hours_worked,
+                total_amount, tax_amount, discount_amount, final_amount, status,
+                notes, created_date, updated_date
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                      %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            company_id,
+            employee_id,
+            invoice_number,
+            invoice_date,
+            due_date,
+            period_start,
+            period_end,
+            description or f"Consulting services for {get_month_name(month)} {year}",
+            0, 0,
+            gross_salary,
+            0, 0,
+            gross_salary,
+            'Sent',
+            notes,
+            now,
+            now
+        ))
         invoice_id = cursor.fetchone()['id']
     else:
-        cursor.execute("""INSERT INTO consultant_invoices (...) VALUES (...)""", (...))
+        cursor.execute("""
+            INSERT INTO consultant_invoices (
+                company_id, employee_id, invoice_number, invoice_date, due_date,
+                period_start, period_end, description, hourly_rate, hours_worked,
+                total_amount, tax_amount, discount_amount, final_amount, status,
+                notes, created_date, updated_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            company_id,
+            employee_id,
+            invoice_number,
+            invoice_date,
+            due_date,
+            period_start,
+            period_end,
+            description or f"Consulting services for {get_month_name(month)} {year}",
+            0, 0,
+            gross_salary,
+            0, 0,
+            gross_salary,
+            'Sent',
+            notes,
+            now,
+            now
+        ))
         invoice_id = cursor.lastrowid
+
     db.commit()
 
     return get_invoice(invoice_id)
-
 
 def create_invoices_for_consultants(company_id, year, month):
     """Create invoices for all consultants for a specific period"""
