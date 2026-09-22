@@ -25,6 +25,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from decimal import Decimal
 
 # ============================================
 # APPLICATION CONFIGURATION
@@ -1904,7 +1905,10 @@ def get_invoice(invoice_id):
 
         total_paid = sum(p['amount'] for p in payments)
         invoice['amount_paid'] = total_paid
-        invoice['balance_due'] = invoice['final_amount'] - total_paid
+        invoice['balance_due'] = (
+                Decimal(str(invoice['final_amount'] or 0))
+                - Decimal(str(total_paid or 0))
+        )
 
         if invoice['balance_due'] <= 0 and invoice['status'] != 'Paid':
             cursor.execute('UPDATE consultant_invoices SET status = ? WHERE id = ?', ('Paid', invoice_id))
