@@ -36,6 +36,20 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-pr
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# ============================================
+# JINJA TEMPLATE FILTERS
+# ============================================
+
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Parse a JSON string in templates. Returns [] on failure."""
+    if not value:
+        return []
+    try:
+        return json.loads(value)
+    except (ValueError, TypeError):
+        return []
+
 # Create uploads folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -283,6 +297,8 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 company_id INTEGER NOT NULL REFERENCES companies(id),
                 year INTEGER NOT NULL,
+                start_month INTEGER NOT NULL DEFAULT 1,
+                end_month INTEGER NOT NULL DEFAULT 12,
                 country TEXT NOT NULL,
                 standard_deduction REAL NOT NULL,
                 social_security_rate REAL NOT NULL,
@@ -296,6 +312,8 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 company_id INTEGER NOT NULL,
                 year INTEGER NOT NULL,
+                start_month INTEGER NOT NULL DEFAULT 1,
+                end_month INTEGER NOT NULL DEFAULT 12,
                 country TEXT NOT NULL,
                 standard_deduction REAL NOT NULL,
                 social_security_rate REAL NOT NULL,
@@ -789,27 +807,28 @@ def migrate_to_date_ranges():
 
 
 def migrate_database():
-    """Check and migrate database schema if needed"""
+    """Check and migrate database schema if needed."""
     db = get_db()
-    cursor = db.cursor()
+    cursor = get_cursor(db)
 
     try:
-        # Check for new columns in employees table
-        cursor.execute("PRAGMA table_info(employees)")
-        columns = [column[1] for column in cursor.fetchall()]
+        if IS_PRODUCTION:
+            # PostgreSQL schema checks
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'employees'
+            """)
+            columns = [row['column_name'] for row in cursor.fetchall()]
+        else:
+            cursor.execute("PRAGMA table_info(employees)")
+            columns = [column[1] for column in cursor.fetchall()]
 
-        # Bank details columns
         bank_fields = [
-            ('bank_name', 'TEXT'),
-            ('bank_currency', 'TEXT'),
-            ('bank_account_number', 'TEXT'),
-            ('bank_iban', 'TEXT'),
-            ('bank_account_name', 'TEXT'),
-            ('bank_swift_code', 'TEXT'),
-            ('bank_address', 'TEXT'),
-            ('id_type', 'TEXT'),
-            ('id_number', 'TEXT'),
-            ('street_location', 'TEXT')
+            ('bank_name', 'TEXT'), ('bank_currency', 'TEXT'),
+            ('bank_account_number', 'TEXT'), ('bank_iban', 'TEXT'),
+            ('bank_account_name', 'TEXT'), ('bank_swift_code', 'TEXT'),
+            ('bank_address', 'TEXT'), ('id_type', 'TEXT'),
+            ('id_number', 'TEXT'), ('street_location', 'TEXT')
         ]
 
         for field, field_type in bank_fields:
@@ -819,11 +838,16 @@ def migrate_database():
                 db.commit()
                 print(f"✅ {field} column added successfully!")
 
-        # Check payroll_records columns
-        cursor.execute("PRAGMA table_info(payroll_records)")
-        columns = [column[1] for column in cursor.fetchall()]
+        if IS_PRODUCTION:
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'payroll_records'
+            """)
+            columns = [row['column_name'] for row in cursor.fetchall()]
+        else:
+            cursor.execute("PRAGMA table_info(payroll_records)")
+            columns = [column[1] for column in cursor.fetchall()]
 
-        # Add month column if missing
         if 'month' not in columns:
             print("🔄 Adding 'month' column to payroll_records...")
             cursor.execute("ALTER TABLE payroll_records ADD COLUMN month INTEGER DEFAULT 1")
@@ -832,20 +856,16 @@ def migrate_database():
             cursor.execute("SELECT id, period FROM payroll_records WHERE month IS NULL OR month = 1")
             records = cursor.fetchall()
             for rec in records:
-                rec_id = rec[0]
-                period = rec[1]
-                if period and '-' in period:
-                    try:
-                        month = int(period.split('-')[1])
-                    except:
-                        month = 1
-                else:
+                rec_id = rec['id'] if hasattr(rec, 'keys') else rec[0]
+                period = rec['period'] if hasattr(rec, 'keys') else rec[1]
+                try:
+                    month = int(period.split('-')[1]) if period and '-' in period else 1
+                except Exception:
                     month = 1
                 cursor.execute("UPDATE payroll_records SET month = ? WHERE id = ?", (month, rec_id))
             db.commit()
             print(f"✅ Updated {len(records)} records with month values")
 
-        # Add other payroll columns if missing
         payroll_columns = [
             ('deductions_total', "ALTER TABLE payroll_records ADD COLUMN deductions_total REAL DEFAULT 0"),
             ('deduction_details', "ALTER TABLE payroll_records ADD COLUMN deduction_details TEXT DEFAULT '[]'"),
@@ -867,10 +887,10 @@ def migrate_database():
                 db.commit()
                 print(f"✅ {col_name} column added successfully!")
 
-        # Run date range migration
         if not IS_PRODUCTION:
             migrate_to_date_ranges()
 
+        migrate_tax_configs_to_month_ranges()
         print("✅ Database schema is up to date")
 
     except Exception as e:
@@ -1025,6 +1045,38 @@ def get_default_tax_rates(year=2024):
     return tax_rates.get(year, tax_rates[2024])
 
 
+def get_default_tax_rates_with_month(year=2024, month=1):
+    """Get default tax rates for a specific year AND month.
+
+    Supports mid-year tax band changes (e.g., Ghana 2024 bands changed after August).
+    """
+    # Start with the standard (base) rates for the year
+    base = get_default_tax_rates(year)
+
+    # ============================================
+    # MID-YEAR TAX BAND OVERRIDES
+    # ============================================
+    # Ghana 2024: bands changed effective September 2024
+    # Jan–Aug 2024 used old bands; Sep–Dec 2024 use new bands.
+    if year == 2024 and month >= 9:
+        # NEW bands effective September 2024 (example values — replace with official)
+        base = {
+            'brackets': [
+                {'min': 0, 'max': 490, 'rate': 0},  # Example: tax-free threshold
+                {'min': 491, 'max': 600, 'rate': 5},
+                {'min': 601, 'max': 730, 'rate': 10},
+                {'min': 731, 'max': 3896, 'rate': 17.5},
+                {'min': 3897, 'max': 20000, 'rate': 25},
+                {'min': 20001, 'max': 50000, 'rate': 30},
+                {'min': 50001, 'max': float('inf'), 'rate': 35},
+            ],
+            'standard_deduction': base['standard_deduction'],
+            'social_security_rate': base['social_security_rate'],
+            'social_security_threshold': base['social_security_threshold'],
+        }
+
+    return base
+
 def calculate_progressive_tax(annual_income, tax_config):
     """Calculate tax using progressive tax system"""
     if not tax_config:
@@ -1093,21 +1145,75 @@ def get_all_employees():
 def get_tax_configs_by_company(company_id):
     db = get_db()
     cursor = get_cursor(db)
-    cursor.execute("SELECT * FROM tax_configs WHERE company_id = ? ORDER BY year", (company_id,))
+    cursor.execute("SELECT * FROM tax_configs WHERE company_id = ? ORDER BY year, start_month, id", (company_id,))
     return rows_to_list(cursor.fetchall())
 
+def get_tax_config(company_id, year, month=None):
+    """Get the tax config covering a company/year/month.
 
-def get_tax_config(company_id, year):
+    Picks the most recently created config whose [start_month, end_month]
+    range includes `month`. Falls back to the single config for the year
+    if only one exists (legacy behavior).
+    """
     db = get_db()
     cursor = get_cursor(db)
-    cursor.execute("SELECT * FROM tax_configs WHERE company_id = ? AND year = ?", (company_id, year))
-    return dict_from_row(cursor.fetchone())
+
+    if month is not None:
+        cursor.execute("""
+            SELECT * FROM tax_configs
+            WHERE company_id = ? AND year = ?
+              AND start_month <= ? AND end_month >= ?
+            ORDER BY start_month DESC, created_date DESC, id DESC
+            LIMIT 1
+        """, (company_id, year, month, month))
+        row = cursor.fetchone()
+        if row:
+            return dict_from_row(row)
+
+        # Fallback: if only one config exists for the year, use it
+        cursor.execute("""
+            SELECT COUNT(*) as cnt FROM tax_configs
+            WHERE company_id = ? AND year = ?
+        """, (company_id, year))
+        cnt_row = cursor.fetchone()
+        if cnt_row and cnt_row['cnt'] == 1:
+            cursor.execute("""
+                SELECT * FROM tax_configs
+                WHERE company_id = ? AND year = ?
+                LIMIT 1
+            """, (company_id, year))
+            row = cursor.fetchone()
+            if row:
+                return dict_from_row(row)
+        return None
+    else:
+        cursor.execute("""
+            SELECT * FROM tax_configs
+            WHERE company_id = ? AND year = ?
+            ORDER BY is_active DESC, start_month ASC, created_date DESC, id DESC
+            LIMIT 1
+        """, (company_id, year))
+        return dict_from_row(cursor.fetchone())
 
 
-def get_active_tax_config(company_id):
+def get_active_tax_config(company_id, month=None):
     db = get_db()
     cursor = get_cursor(db)
-    cursor.execute("SELECT * FROM tax_configs WHERE company_id = ? AND is_active = 1", (company_id,))
+
+    if month is not None:
+        cursor.execute("""
+            SELECT * FROM tax_configs
+            WHERE company_id = ? AND is_active = 1
+              AND start_month <= ? AND end_month >= ?
+            ORDER BY id DESC LIMIT 1
+        """, (company_id, month, month))
+    else:
+        cursor.execute("""
+            SELECT * FROM tax_configs
+            WHERE company_id = ? AND is_active = 1
+            ORDER BY id DESC LIMIT 1
+        """, (company_id,))
+
     return dict_from_row(cursor.fetchone())
 
 
@@ -1726,10 +1832,11 @@ def calculate_payroll(employee_id, period, year, month, tax_config=None):
         return None
 
     if not tax_config:
-        tax_config = get_active_tax_config(employee['company_id'])
+        tax_config = get_active_tax_config(employee['company_id'], month=month)
         if not tax_config:
-            tax_config = get_tax_config(employee['company_id'], year)
+            tax_config = get_tax_config(employee['company_id'], year, month=month)
 
+    # Tax configuration is now selected by the database month range.
     if not tax_config:
         return None
 
@@ -3490,6 +3597,7 @@ def delete_company(company_id):
 # ROUTES - Employee Management
 # ============================================
 
+
 @app.route('/employees/<int:company_id>')
 def list_employees(company_id):
     company = get_company(company_id)
@@ -3499,7 +3607,6 @@ def list_employees(company_id):
 
     employee_list = get_employees_by_company(company_id)
     return render_template('employees.html', company=company, employees=employee_list)
-
 
 @app.route('/employees/add/<int:company_id>', methods=['GET', 'POST'])
 def add_employee(company_id):
@@ -3516,15 +3623,7 @@ def add_employee(company_id):
         is_tax_exempt = 1 if request.form.get('is_tax_exempt') == 'on' else 0
         exempt_from_social_security = 1 if request.form.get('exempt_from_social_security') == 'on' else 0
 
-        cursor.execute("""
-            INSERT INTO employees (
-                company_id, first_name, last_name, email, position, department, 
-                base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security,
-                bank_name, bank_currency, bank_account_number, bank_iban, 
-                bank_account_name, bank_swift_code, bank_address,
-                id_type, id_number, street_location
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        employee_data = (
             company_id,
             request.form['first_name'],
             request.form['last_name'],
@@ -3546,14 +3645,32 @@ def add_employee(company_id):
             request.form.get('id_type', ''),
             request.form.get('id_number', ''),
             request.form.get('street_location', '')
-        ))
+        )
 
         if IS_PRODUCTION:
-            cursor.execute("""INSERT INTO employees (...) VALUES (...) RETURNING id""", (...))
+            cursor.execute("""
+                INSERT INTO employees (
+                    company_id, first_name, last_name, email, position, department, 
+                    base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security,
+                    bank_name, bank_currency, bank_account_number, bank_iban, 
+                    bank_account_name, bank_swift_code, bank_address,
+                    id_type, id_number, street_location
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, employee_data)
             employee_id = cursor.fetchone()['id']
         else:
-            cursor.execute("""INSERT INTO employees (...) VALUES (...)""", (...))
+            cursor.execute("""
+                INSERT INTO employees (
+                    company_id, first_name, last_name, email, position, department, 
+                    base_salary, hire_date, status, is_tax_exempt, exempt_from_social_security,
+                    bank_name, bank_currency, bank_account_number, bank_iban, 
+                    bank_account_name, bank_swift_code, bank_address,
+                    id_type, id_number, street_location
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, employee_data)
             employee_id = cursor.lastrowid
+
         db.commit()
 
         # Add default allowances
@@ -3570,7 +3687,6 @@ def add_employee(company_id):
         return redirect(url_for('list_employees', company_id=company_id))
 
     return render_template('employee_form.html', company=company, employee=None, action='Add')
-
 
 @app.route('/employees/edit/<int:employee_id>', methods=['GET', 'POST'])
 def edit_employee(employee_id):
@@ -4426,7 +4542,6 @@ def delete_social_security_threshold(company_id, year, month):
 # ============================================
 # ROUTES - Tax Configuration
 # ============================================
-
 @app.route('/tax_config/<int:company_id>', methods=['GET', 'POST'])
 def manage_tax_config(company_id):
     company = get_company(company_id)
@@ -4435,22 +4550,51 @@ def manage_tax_config(company_id):
         return redirect(url_for('list_companies'))
 
     company_tax_configs = get_tax_configs_by_company(company_id)
-    available_years = [c['year'] for c in company_tax_configs]
+    available_years = sorted({c['year'] for c in company_tax_configs})
 
+    # ============================================================
+    # POST — create or update a tax config
+    # ============================================================
     if request.method == 'POST':
         year = int(request.form['year'])
-        existing_config = get_tax_config(company_id, year)
+        start_month = int(request.form.get('start_month', 1))
+        end_month = int(request.form.get('end_month', 12))
+        config_id = request.form.get('config_id', type=int)
 
+        if not 1 <= start_month <= 12 or not 1 <= end_month <= 12:
+            flash('Invalid month range (1–12).', 'error')
+            return redirect(url_for('manage_tax_config', company_id=company_id, year=year))
+
+        if start_month > end_month:
+            flash('Start month must be ≤ End month.', 'error')
+            return redirect(url_for('manage_tax_config', company_id=company_id, year=year))
+
+        # ---- Overlap check (excluding the config being edited) ----
+        for cfg in company_tax_configs:
+            if cfg['year'] != year:
+                continue
+            if config_id and cfg['id'] == config_id:
+                continue
+            if start_month <= cfg['end_month'] and cfg['start_month'] <= end_month:
+                flash(
+                    f'Range {get_month_name(start_month)}–{get_month_name(end_month)} overlaps with '
+                    f'existing config #{cfg["id"]} '
+                    f'({get_month_name(cfg["start_month"])}–{get_month_name(cfg["end_month"])}).',
+                    'error'
+                )
+                return redirect(url_for('manage_tax_config', company_id=company_id, year=year))
+
+        # ---- Build brackets from form ----
         bracket_count = int(request.form.get('bracket_count', 0))
         brackets = []
         for i in range(bracket_count):
-            min_val = float(request.form.get(f'bracket_min_{i}', 0))
-            max_val = request.form.get(f'bracket_max_{i}', '')
-            if max_val == '' or max_val == 'inf' or max_val == '∞':
+            min_val = float(request.form.get(f'bracket_min_{i}', 0) or 0)
+            max_raw = request.form.get(f'bracket_max_{i}', '')
+            if max_raw in ('', 'inf', '∞', 'Infinity', 'infinity'):
                 max_val = float('inf')
             else:
-                max_val = float(max_val)
-            rate = float(request.form.get(f'bracket_rate_{i}', 0))
+                max_val = float(max_raw)
+            rate = float(request.form.get(f'bracket_rate_{i}', 0) or 0)
             brackets.append({'min': min_val, 'max': max_val, 'rate': rate})
 
         is_active = 1 if request.form.get('is_active') == 'on' else 0
@@ -4459,89 +4603,153 @@ def manage_tax_config(company_id):
         db = get_db()
         cursor = get_cursor(db)
 
-        if existing_config:
+        if config_id:
+            # ---------- UPDATE ----------
             cursor.execute("""
-                UPDATE tax_configs 
+                UPDATE tax_configs
                 SET country = ?, standard_deduction = ?, social_security_rate = ?,
-                    social_security_threshold = ?, brackets = ?, is_active = ?
-                WHERE company_id = ? AND year = ?
+                    social_security_threshold = ?, brackets = ?, is_active = ?,
+                    year = ?, start_month = ?, end_month = ?
+                WHERE id = ? AND company_id = ?
             """, (
                 request.form['country'],
                 float(request.form['standard_deduction']),
                 float(request.form['social_security_rate']),
                 float(request.form['social_security_threshold']),
-                brackets_json,
-                is_active,
-                company_id,
-                year
+                brackets_json, is_active, year, start_month, end_month,
+                config_id, company_id
             ))
-            config_id = existing_config['id']
+            flash(
+                f'Tax config for {year} '
+                f'({get_month_name(start_month)}–{get_month_name(end_month)}) updated!',
+                'success'
+            )
         else:
+            # ---------- INSERT ----------
             cursor.execute("""
-                INSERT INTO tax_configs (company_id, year, country, standard_deduction,
-                                         social_security_rate, social_security_threshold, brackets, is_active, created_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tax_configs (
+                    company_id, year, start_month, end_month, country,
+                    standard_deduction, social_security_rate,
+                    social_security_threshold, brackets, is_active, created_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                company_id,
-                year,
-                request.form['country'],
+                company_id, year, start_month, end_month, request.form['country'],
                 float(request.form['standard_deduction']),
                 float(request.form['social_security_rate']),
                 float(request.form['social_security_threshold']),
-                brackets_json,
-                is_active,
+                brackets_json, is_active,
                 datetime.datetime.now().strftime('%Y-%m-%d')
             ))
-            config_id = cursor.lastrowid
 
-        if is_active:
-            cursor.execute("UPDATE tax_configs SET is_active = 0 WHERE company_id = ? AND id != ?", (company_id, config_id))
+            if IS_PRODUCTION:
+                cursor.execute("""
+                    SELECT id FROM tax_configs
+                    WHERE company_id = ? AND year = ? AND start_month = ? AND end_month = ?
+                    ORDER BY id DESC LIMIT 1
+                """, (company_id, year, start_month, end_month))
+                row = cursor.fetchone()
+                config_id = row['id'] if row else None
+            else:
+                config_id = cursor.lastrowid
+
+            flash(
+                f'Tax config for {year} '
+                f'({get_month_name(start_month)}–{get_month_name(end_month)}) created!',
+                'success'
+            )
+
+        # If marked active, deactivate only *overlapping* configs (not the whole year)
+        if is_active and config_id:
+            cursor.execute("""
+                UPDATE tax_configs SET is_active = 0
+                WHERE company_id = ? AND year = ? AND id != ?
+                  AND start_month <= ? AND end_month >= ?
+            """, (company_id, year, config_id, end_month, start_month))
 
         db.commit()
-        flash(f'Tax configuration for {year} saved successfully!', 'success')
-        return redirect(url_for('manage_tax_config', company_id=company_id))
+        return redirect(url_for('manage_tax_config', company_id=company_id, year=year))
 
+    # ============================================================
+    # GET — render form (optionally for editing, or blank for new)
+    # ============================================================
     selected_year = request.args.get('year', type=int)
+    selected_id = request.args.get('config_id', type=int)
+    is_new = request.args.get('new') == '1'          # 👈 new=1 → blank form
+
+    # Default to most recent year if none specified
     if not selected_year and available_years:
         selected_year = max(available_years)
+    if not selected_year:
+        selected_year = datetime.datetime.now().year
 
-    tax_config = get_tax_config(company_id, selected_year) if selected_year else None
+    tax_config_dict = None
 
-    if tax_config:
-        brackets = json.loads(tax_config['brackets'])
+    # ---- Load a specific config for editing (highest priority) ----
+    if selected_id:
+        db = get_db()
+        cursor = get_cursor(db)
+        cursor.execute(
+            "SELECT * FROM tax_configs WHERE id = ? AND company_id = ?",
+            (selected_id, company_id)
+        )
+        row = cursor.fetchone()
+        if row:
+            tax_config_dict = dict_from_row(row)
+            selected_year = tax_config_dict['year']
+
+    # ---- Auto-load first config for year ONLY when NOT creating new ----
+    if not is_new and tax_config_dict is None:
+        configs_for_year = [c for c in company_tax_configs if c['year'] == selected_year]
+        if configs_for_year:
+            tax_config_dict = sorted(
+                configs_for_year,
+                key=lambda c: (c.get('start_month', 1), c['id'])
+            )[0]
+
+    # ---- Parse brackets for the template ----
+    if tax_config_dict:
+        try:
+            brackets = json.loads(tax_config_dict['brackets']) if tax_config_dict.get('brackets') else []
+        except (ValueError, TypeError):
+            brackets = []
         for bracket in brackets:
-            if bracket.get('max') == float('inf'):
-                bracket['max_display'] = '∞'
-            else:
-                bracket['max_display'] = bracket.get('max')
-        tax_config_dict = dict(tax_config)
+            bracket['max_display'] = (
+                '∞' if bracket.get('max') in (float('inf'), 'Infinity', 'inf') else bracket.get('max')
+            )
+        tax_config_dict = dict(tax_config_dict)
         tax_config_dict['brackets'] = brackets
-    else:
-        tax_config_dict = None
 
+    # ---- Default brackets for blank form ----
     default_brackets = get_default_tax_rates(selected_year or 2024)['brackets']
     for bracket in default_brackets:
-        if bracket.get('max') == float('inf'):
-            bracket['max_display'] = '∞'
-        else:
-            bracket['max_display'] = bracket.get('max')
+        bracket['max_display'] = (
+            '∞' if bracket.get('max') == float('inf') else bracket.get('max')
+        )
 
-    return render_template('tax_config.html',
-                           company=company,
-                           tax_config=tax_config_dict,
-                           available_years=available_years,
-                           selected_year=selected_year,
-                           default_brackets=default_brackets,
-                           all_configs=company_tax_configs)
+    return render_template(
+        'tax_config.html',
+        company=company,
+        tax_config=tax_config_dict,
+        available_years=available_years,
+        selected_year=selected_year,
+        default_brackets=default_brackets,
+        all_configs=company_tax_configs,
+    )
 
-
-@app.route('/tax_config/delete/<int:company_id>/<int:year>')
-def delete_tax_config(company_id, year):
+@app.route('/tax_config/delete/<int:config_id>')
+def delete_tax_config(config_id):
     db = get_db()
     cursor = get_cursor(db)
-    cursor.execute("DELETE FROM tax_configs WHERE company_id = ? AND year = ?", (company_id, year))
+    cursor.execute("SELECT company_id FROM tax_configs WHERE id = ?", (config_id,))
+    row = cursor.fetchone()
+    if not row:
+        flash('Tax config not found!', 'error')
+        return redirect(url_for('list_companies'))
+
+    company_id = row['company_id']
+    cursor.execute("DELETE FROM tax_configs WHERE id = ?", (config_id,))
     db.commit()
-    flash(f'Tax configuration for {year} deleted!', 'success')
+    flash('Tax configuration deleted!', 'success')
     return redirect(url_for('manage_tax_config', company_id=company_id))
 
 
@@ -4571,7 +4779,7 @@ def payroll_dashboard(company_id):
     if not selected_month:
         selected_month = current_month
 
-    tax_config = get_tax_config(company_id, selected_year) if selected_year else None
+    tax_config = get_tax_config(company_id, selected_year, month=selected_month) if selected_year else None
 
     payroll_data = []
     total_net = 0
@@ -4602,7 +4810,7 @@ def payroll_dashboard(company_id):
 
     year_comparison = []
     for year in available_years:
-        year_config = get_tax_config(company_id, year)
+        year_config = get_tax_config(company_id, year, month=selected_month)
         if year_config:
             year_total_net = 0
             year_total_gross = 0
@@ -4663,10 +4871,36 @@ def process_payroll(company_id):
         flash(f'Payroll for {get_month_name(month)} {year} has already been processed!', 'warning')
         return redirect(url_for('payroll_dashboard', company_id=company_id, year=year, month=month))
 
-    tax_config = get_tax_config(company_id, year)
+    tax_config = get_tax_config(company_id, year, month=month)
     if not tax_config:
-        flash(f'Tax configuration not found for year {year}!', 'error')
-        return redirect(url_for('payroll_dashboard', company_id=company_id))
+        # Find which months ARE covered so we can help the user
+        db = get_db()
+        cursor = get_cursor(db)
+        cursor.execute("""
+            SELECT start_month, end_month FROM tax_configs
+            WHERE company_id = ? AND year = ?
+            ORDER BY start_month
+        """, (company_id, year))
+        ranges = rows_to_list(cursor.fetchall())
+        if ranges:
+            range_str = ", ".join(
+                f"{get_month_name(r['start_month'])}–{get_month_name(r['end_month'])}"
+                for r in ranges
+            )
+            flash(
+                f'No tax configuration covers {get_month_name(month)} {year}. '
+                f'Existing ranges for {year}: {range_str}. '
+                f'Please add a config that includes {get_month_name(month)}.',
+                'error'
+            )
+        else:
+            flash(
+                f'No tax configuration found for {year}. '
+                f'Please create one covering {get_month_name(month)}.',
+                'error'
+            )
+        return redirect(url_for('payroll_dashboard', company_id=company_id,
+                                year=year, month=month))
 
     employee_list = get_employees_by_company(company_id)
     if not employee_list:
@@ -6282,9 +6516,10 @@ def get_tax_brackets_api(company_id, year):
         if not company:
             return jsonify({'error': 'Company not found'}), 404
 
-        tax_config = get_tax_config(company_id, year)
+        month = request.args.get('month', type=int) or datetime.datetime.now().month
+        tax_config = get_tax_config(company_id, year, month=month)
         if not tax_config:
-            return jsonify({'error': f'Tax configuration not found for year {year}'}), 404
+            return jsonify({'error': f'Tax configuration not found for {get_month_name(month)} {year}'}), 404
 
         try:
             brackets_data = json.loads(tax_config['brackets'])
